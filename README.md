@@ -13,7 +13,64 @@ AgentPost 是一个给 AI Agent 使用的超轻量邮件网关 MVP。它让 Agen
 - 可选 SMTP 入站监听，将外部邮件解析成纯文本后投递到本地 Agent
 - 默认 `allow_external_relay: false`，MVP 不直接向外网发信
 
-## 快速启动
+## 一键启动（推荐）
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+脚本会自动：
+
+- 生成 `config.yaml`（默认邮箱后缀 `@agent.local`）
+- 优先用 Docker Compose 启动；没有 Docker 时回退到 `go run`
+- 等待 `/healthz` 就绪并打印 API 地址
+
+常用命令：
+
+```bash
+./start.sh                  # 自动选择 Docker 或本机 Go
+./start.sh --docker         # 强制 Docker 部署
+./start.sh --native         # 本机 Go 前台运行
+./start.sh --domain agent.local --http-port 8080
+./start.sh --smtp           # 额外开启 SMTP 入站 :2525
+./start.sh stop             # 停止 Docker 部署
+./start.sh status           # 健康检查
+```
+
+可选环境变量（见 `.env.example`）：
+
+```bash
+cp .env.example .env
+# 编辑 AGENTPOST_DOMAIN、AGENTPOST_HTTP_PORT 等
+./start.sh
+```
+
+远程 Agent 只需能访问：
+
+```text
+http://<你的服务器IP>:8080
+```
+
+邮箱地址形如 `bot-a@agent.local`（与 HTTP 访问地址无关）。
+
+## Docker 部署
+
+```bash
+cp .env.example .env
+./start.sh --docker
+```
+
+或手动：
+
+```bash
+cp config.example.yaml config.yaml
+# 编辑 config.yaml
+docker compose up -d --build
+curl -fsS http://127.0.0.1:8080/healthz
+```
+
+## 手动启动（Go）
 
 ```bash
 cp config.example.yaml config.yaml
@@ -23,13 +80,7 @@ go run . -config config.yaml
 默认服务：
 
 - HTTP: `:8080`
-- SMTP: `:2525`
-
-如果不想启动 SMTP 入站，可以在 `config.yaml` 中设置：
-
-```yaml
-smtp_addr: ""
-```
+- SMTP: `:2525`（可在 `config.yaml` 里设 `smtp_addr: ""` 关闭）
 
 ## 配置
 
