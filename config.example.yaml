@@ -1,0 +1,5 @@
+domain: yourdomain.com
+http_addr: ":8080"
+smtp_addr: ":2525"
+allow_external_relay: false
+max_message_bytes: 1048576
