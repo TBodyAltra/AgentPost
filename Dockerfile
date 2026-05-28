@@ -1,5 +1,11 @@
 FROM golang:1.25-alpine AS builder
 
+ENV GOPROXY=https://goproxy.cn,direct \
+    HTTP_PROXY= \
+    HTTPS_PROXY= \
+    http_proxy= \
+    https_proxy=
+
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
