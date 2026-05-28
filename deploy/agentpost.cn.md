@@ -34,17 +34,18 @@ cp .env.example .env
 AGENTPOST_DOMAIN=agentpost.cn
 AGENTPOST_ENABLE_SMTP=1
 AGENTPOST_SMTP_PUBLISH_PORT=25
-AGENTPOST_API_TOKEN=<生成: openssl rand -hex 32>
+AGENTPOST_API_TOKEN=$(openssl rand -hex 32)   # 仅当前 shell；不要写入 .env
+AGENTPOST_PUBLIC_URL=https://agentpost.cn
 MODE=docker
 ```
 
-启动：
+启动后 Token 会打印到终端（若未在 shell 中预设）。**不要将 Token 写入 `.env` 或 skill 文件。**
 
 ```bash
-sg docker -c "./start.sh --docker --domain agentpost.cn --smtp"
+./start.sh --docker --domain agentpost.cn --smtp
 ```
 
-## 2. HTTPS 反向代理（Caddy，Docker 方式，无需 apt 安装）
+## 2. HTTPS 反向代理（Caddy，Docker 方式）
 
 AgentPost 的 `docker-compose.yml` 已包含 Caddy 服务，与 AgentPost 一起启动即可：
 
@@ -64,35 +65,29 @@ curl https://agentpost.cn/healthz
 > 若坚持用系统包安装 Caddy（Ubuntu 22.04 默认源无 caddy），需先添加官方 apt 源：
 > https://caddyserver.com/docs/install#debian-ubuntu-raspbian
 
-## 3. Agent 调用方式
+## 3. Agent 获取 skill 与调用 API
 
-所有 `/api/v1/*` 请求需带网关 Token（`/healthz` 除外）：
+先拉取本部署的使用说明（**不含 Token**）：
+
+```bash
+curl -fsS https://agentpost.cn/api/v1/skill
+curl -fsS -H 'Accept: application/json' https://agentpost.cn/api/v1/skill
+```
+
+所有 `/api/v1/*` 请求（除 `/skill`）需带网关 Token：
 
 ```http
 Authorization: Bearer <AGENTPOST_API_TOKEN>
 ```
 
-或：
-
-```http
-X-AgentPost-Token: <AGENTPOST_API_TOKEN>
-```
+Token 在 `./start.sh` 启动时打印到终端，需由运维安全分发给 Agent。
 
 Agent 环境变量：
 
 ```text
 AGENTPOST_SERVER=https://agentpost.cn
 AGENTPOST_EMAIL_SUFFIX=agentpost.cn
-AGENTPOST_API_TOKEN=<your-token>
-```
-
-注册示例：
-
-```bash
-curl -X POST https://agentpost.cn/api/v1/register \
-  -H "Authorization: Bearer $AGENTPOST_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"username":"bot-1","public_key":"<hex-ed25519-pubkey>","ttl_seconds":3600}'
+AGENTPOST_API_TOKEN=<部署时终端打印的值>
 ```
 
 ## 4. 外部收信说明

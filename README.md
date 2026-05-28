@@ -89,6 +89,12 @@ AGENTPOST_SERVER=http://127.0.0.1:8080
 AGENTPOST_EMAIL_SUFFIX=agent.local
 ```
 
+Agent 或编排器应先拉取 skill 文档：
+
+```bash
+curl -fsS http://127.0.0.1:8080/api/v1/skill
+```
+
 ---
 
 ## 场景 B：局域网部署（无公网 IP、无域名）
@@ -102,9 +108,14 @@ cp .env.example .env
 # .env 保持默认即可，或显式设置：
 # AGENTPOST_DOMAIN=agent.local
 # AGENTPOST_ENABLE_SMTP=0
-# AGENTPOST_API_TOKEN=          # 内网可留空
 
 ./start.sh --docker --domain agent.local
+```
+
+`./start.sh` 会自动生成网关 Token 并**打印到终端**（不写入任何文件）。内网可信环境可在启动前设空以禁用 Token：
+
+```bash
+AGENTPOST_API_TOKEN= ./start.sh --docker --domain agent.local
 ```
 
 查看网关机器的内网 IP（示例 `192.168.1.100`）：
@@ -127,11 +138,12 @@ AGENTPOST_EMAIL_SUFFIX=agent.local
 | 防火墙 | 网关机器需放行 **8080**（局域网入站） |
 | 邮箱后缀 | `agent.local` 只是逻辑后缀，不需要 DNS 解析 |
 | SMTP | 局域网场景通常**不需要**开启；Agent 之间通过 HTTP API 互发即可 |
-| Token | 内网可信环境可不开；若网段内有不可信设备，建议设置 `AGENTPOST_API_TOKEN` |
+| Token | 默认自动生成并打印到终端；内网可信环境可用 `AGENTPOST_API_TOKEN=` 禁用 |
 
-### 4. 验证（从另一台局域网机器）
+### 4. 获取 skill 并验证
 
 ```bash
+curl http://192.168.1.100:8080/api/v1/skill
 curl http://192.168.1.100:8080/healthz
 ```
 
@@ -161,10 +173,16 @@ cp .env.example .env
 
 ```bash
 AGENTPOST_DOMAIN=example.com
-AGENTPOST_ENABLE_SMTP=1              # 需要外部收信时开启
+AGENTPOST_PUBLIC_URL=https://example.com
+AGENTPOST_ENABLE_SMTP=1
 AGENTPOST_SMTP_PUBLISH_PORT=25
-AGENTPOST_API_TOKEN=$(openssl rand -hex 32)   # 公网强烈建议设置
 MODE=docker
+```
+
+启动时 `./start.sh` 会生成 Token 并打印到终端（不写入文件）。若要复用固定 Token：
+
+```bash
+AGENTPOST_API_TOKEN=$(openssl rand -hex 32) ./start.sh --docker --domain example.com --smtp
 ```
 
 ### 3. 启动（含 Caddy HTTPS 反代）
@@ -198,13 +216,14 @@ Caddy 会：
 ```text
 AGENTPOST_SERVER=https://example.com
 AGENTPOST_EMAIL_SUFFIX=example.com
-AGENTPOST_API_TOKEN=<与 .env 中一致>
+AGENTPOST_API_TOKEN=<部署时终端打印的值>
 ```
 
 验证：
 
 ```bash
 curl https://example.com/healthz
+curl https://example.com/api/v1/skill
 # {"status":"ok"}
 ```
 
@@ -255,25 +274,34 @@ http_addr: ":8080"
 smtp_addr: ""                # 留空关闭 SMTP；":2525" 开启容器内入站
 allow_external_relay: false  # MVP 禁止外发 relay
 max_message_bytes: 1048576
-api_token: ""                # 留空 = 不启用网关 Token
 ```
 
-### 环境变量（`.env`，覆盖配置文件）
+网关 Token **不写入配置文件**，仅通过环境变量 `AGENTPOST_API_TOKEN` 在运行时注入。
+
+### 环境变量（`.env` + 启动时 shell）
 
 | 变量 | 说明 | 场景 |
 |------|------|------|
 | `AGENTPOST_DOMAIN` | 邮箱后缀，如 `agent.local` | 全部 |
 | `AGENTPOST_HTTP_PORT` | 宿主机映射端口，默认 `8080` | 全部 |
-| `AGENTPOST_API_TOKEN` | 网关 Token，留空则关闭 | 公网建议开启 |
+| `AGENTPOST_PUBLIC_URL` | Agent 应使用的公网 URL（可选） | 公网 / 反代 |
+| `AGENTPOST_API_TOKEN` | 网关 Token；**不要写入 `.env`**，由 `./start.sh` 生成并打印，或在启动命令前 export | 公网建议开启 |
 | `AGENTPOST_ENABLE_SMTP` | `1` 开启 SMTP 入站 | 仅外部收信 |
 | `AGENTPOST_SMTP_PUBLISH_PORT` | 宿主机 SMTP 端口，公网用 `25` | 仅外部收信 |
 | `AGENTPOST_SMTP_ADDR` | 容器内监听，通常 `:2525` | 由 start.sh 设置 |
 | `MODE` | `auto` / `docker` / `native` | 全部 |
 
-生成 Token：
+Token 用法：
 
 ```bash
-openssl rand -hex 32
+# 自动生成并打印（不存盘）
+./start.sh --docker
+
+# 复用固定 Token（仅当前 shell 会话）
+AGENTPOST_API_TOKEN=$(openssl rand -hex 32) ./start.sh --docker
+
+# 内网禁用 Token
+AGENTPOST_API_TOKEN= ./start.sh --docker
 ```
 
 ---
@@ -282,7 +310,7 @@ openssl rand -hex 32
 
 | 层级 | 作用 | 何时需要 |
 |------|------|----------|
-| **网关 Token** | 保护 `/api/v1/*` 不被随意调用 | 配置了 `api_token` / `AGENTPOST_API_TOKEN` 时 |
+| **网关 Token** | 保护 `/api/v1/*` 不被随意调用 | 设置了 `AGENTPOST_API_TOKEN` 环境变量时 |
 | **Ed25519 签名** | 标识具体 Agent，用于发信 / 收信 | `send`、`messages` 始终需要 |
 
 网关 Token 请求头（二选一）：
@@ -292,7 +320,35 @@ Authorization: Bearer <token>
 X-AgentPost-Token: <token>
 ```
 
-`/healthz` 不需要任何鉴权。SMTP 入站不走 HTTP Token（邮件协议限制）。
+`/healthz` 与 `/api/v1/skill` 不需要任何鉴权。SMTP 入站不走 HTTP Token（邮件协议限制）。
+
+---
+
+## Agent Skill API
+
+部署后，Agent 或编排器通过 HTTP 获取**本实例**的使用说明（Markdown 或 JSON）：
+
+```bash
+# Markdown（默认）
+curl -fsS http://127.0.0.1:8080/api/v1/skill
+
+# JSON（含结构化 meta）
+curl -fsS -H 'Accept: application/json' http://127.0.0.1:8080/api/v1/skill
+```
+
+Skill 文档会尽量填好当前部署信息：
+
+| 字段 | 说明 |
+|------|------|
+| `server_url` | 建议 Agent 连接的 HTTP(S) 地址 |
+| `domain` | 邮箱 `@` 后缀 |
+| `gateway_token_required` | 是否需要网关 Token |
+| `smtp_inbound_enabled` | 是否开启 SMTP 入站 |
+| 使用流程 / 建议 | 注册、签名、轮询、TTL、重启注意事项 |
+
+**Skill 不包含 Token 值。** Token 仅在 `./start.sh` 首次启动时打印到终端，需由运维人员安全分发给 Agent。
+
+公网 + Caddy 场景下，skill 会根据请求 `Host` / `X-Forwarded-Proto` 或 `AGENTPOST_PUBLIC_URL` 生成 `https://your-domain` 形式的地址。
 
 ---
 
@@ -301,6 +357,7 @@ X-AgentPost-Token: <token>
 | 方法 | 路径 | 网关 Token | Ed25519 | 说明 |
 |------|------|------------|---------|------|
 | `GET` | `/healthz` | 否 | 否 | 健康检查 |
+| `GET` | `/api/v1/skill` | 否 | 否 | 本部署的使用说明（Markdown / JSON） |
 | `POST` | `/api/v1/register` | 若已配置 | 否 | 注册临时邮箱 |
 | `POST` | `/api/v1/send` | 若已配置 | 是 | 同域内部投递 |
 | `GET` | `/api/v1/messages` | 若已配置 | 是 | 拉取收件箱（**会清空已返回消息**） |
@@ -437,28 +494,148 @@ requests.post(
 
 ---
 
+## 常见问题（FAQ）
+
+### `AGENTPOST_EMAIL_SUFFIX` 必须是真实域名吗？
+
+**不需要。** 它只是邮箱地址的逻辑后缀（如 `bot@agent.local`），**不必**已备案、已解析或拥有 DNS。
+
+Agent 实际连接的 **`AGENTPOST_SERVER`**（HTTP 地址）与邮箱后缀可以完全不同：
+
+```text
+AGENTPOST_SERVER=http://192.168.1.100:8080   ← 怎么连网关
+AGENTPOST_EMAIL_SUFFIX=agent.local             ← 邮箱长什么样
+```
+
+局域网场景用 `agent.local`、`agent.lan` 等「假后缀」完全正常。
+
+---
+
+### 假后缀会被 MX 解析到别人的邮箱吗？
+
+**Agent 互发不会。** HTTP API 投递只在**你的网关内存**里路由，不查 DNS、不走 MX。
+
+```text
+Agent 互发  →  HTTP API  →  只看 username + @domain  →  不经过 MX
+外部收信  →  SMTP + MX   →  只有开启 SMTP 且配置了 MX 时才走这条
+```
+
+| 后缀 | Agent 互发 | 外部 Gmail 能投进来吗 |
+|------|-----------|----------------------|
+| `agent.local` | ✅ | ❌ 一般不行 |
+| 你拥有的真实域名 + MX | ✅ | ✅ 可以 |
+
+假后缀的效果是**外部邮件送不进来**，不是「被 MX 指到别人那里」。
+
+---
+
+### Agent 怎么互相区分，避免收发错？
+
+靠 **username + Ed25519 密钥 + 连同一台网关**：
+
+| 机制 | 作用 |
+|------|------|
+| 唯一 `username` | 邮箱前缀，同网关内不重复 |
+| Ed25519 签名 | 发信/收信时证明「我是 bot-a」 |
+| `@domain` 校验 | `to` 必须与网关配置的 domain 一致 |
+| 同一 `AGENTPOST_SERVER` | 不同网关即使后缀相同也互不相通 |
+
+AgentPost **不提供通讯录**；谁发给谁，由你的编排逻辑约定（配置、任务 payload 等）。
+
+---
+
+### 账户过期被清理了怎么办？
+
+过期后用户记录和收件箱会被**彻底删除**，需要 **重新 `register`**：
+
+```bash
+POST /api/v1/register   # 同一 username 可在过期后再次注册
+```
+
+建议：
+
+- 长期运行的 Agent：设 `ttl_seconds=86400`（最大 24h），并定时 re-register
+- 重要邮件：及时 `GET /api/v1/messages`（poll 会清空已返回邮件）
+- 收到 `401`：通常表示过期，自动 re-register 后重试
+
+---
+
+### 「内存存储，重启也丢数据」是什么意思？
+
+用户、公钥、收件箱都存在**进程内存**里，没有 SQLite/文件持久化。因此：
+
+| 事件 | 结果 |
+|------|------|
+| 容器/进程重启 | **全部**账户和邮件清空 |
+| 账户 TTL 过期 | 仅该账户及其邮件被删 |
+
+这与「过期」不同：重启是**无差别清空**，所有 Agent 都要重新 register。
+
+---
+
+### 网关 Token 存在哪里？能分多个吗？
+
+- **不写入** `.env`、`config.yaml` 或 `/api/v1/skill`
+- `./start.sh` 启动时：若 shell 未预设 Token，则**生成并打印到终端一次**
+- 复用：`AGENTPOST_API_TOKEN=xxx ./start.sh --docker`
+- 内网禁用：`AGENTPOST_API_TOKEN= ./start.sh --docker`
+- **多 Token 分发**：MVP 暂不支持（路线图中有计划）；目前一个网关一个 Token，多 Agent 可共用，或用 Ed25519 区分身份
+
+---
+
+### Agent 怎么知道如何使用本部署？
+
+部署后请求 Skill API（**不含 Token**）：
+
+```bash
+curl -fsS "${AGENTPOST_SERVER}/api/v1/skill"
+```
+
+返回 Markdown 或 JSON，包含本实例的 URL、domain、是否需 Token、SMTP 状态和使用建议。Agent 应先读 skill，再 register。
+
+---
+
+### 什么是 Caddy 反代？局域网需要吗？
+
+Caddy 是 HTTPS「前台」：对外 `https://your-domain`，对内转给 AgentPost `:8080`，并自动申请证书。
+
+```text
+Agent → https://example.com:443 → Caddy → http://agentpost:8080
+```
+
+| 场景 | 是否需要 Caddy |
+|------|----------------|
+| 本机 / 局域网 | ❌ 直接用 `http://IP:8080` |
+| 公网 + 域名 | ✅ 推荐 |
+
+仅启动 AgentPost、不启 Caddy：`docker compose up -d agentpost`
+
+---
+
+### 公网需要配哪些 DNS 记录？
+
+以 `example.com`、公网 IP `203.0.113.10` 为例：
+
+| 类型 | 主机 | 值 | 用途 |
+|------|------|-----|------|
+| A | `@` | `203.0.113.10` | API + 邮箱根域 |
+| A | `www` | `203.0.113.10` | 可选 |
+| MX | `@` | `example.com`（优先级 10） | 仅外部收信时需要 |
+
+防火墙：公网放行 **80/443**（Caddy）、**25**（SMTP，可选）；**8080** 建议仅本机访问。
+
+详见 [`deploy/agentpost.cn.md`](deploy/agentpost.cn.md)。
+
+---
+
 ## 安全与限制
 
 - 默认 **禁止** `allow_external_relay`，Agent 之间仅同域内部通讯。
 - 网关层将 HTML 邮件转为纯文本，降低 Prompt 注入风险。
 - 数据存于 **进程内存**，重启后丢失。
-- **公网部署**务必设置 `AGENTPOST_API_TOKEN`，并尽量通过 Caddy 提供 HTTPS。
-- **局域网部署**可不开 Token，但应确保 8080 不对不可信网络暴露。
+- **公网部署**务必启用网关 Token（`./start.sh` 默认生成），并尽量通过 Caddy 提供 HTTPS。
+- **Token 不写入磁盘**；请保存启动时终端输出，或通过 `AGENTPOST_API_TOKEN=... ./start.sh` 自行管理。
 - SMTP 入站：收件人须先通过 HTTP API 注册；MVP 不支持向外网发信。
-
----
-
-## Cursor Agent Skill
-
-仓库内置 Cursor Skill，教 AI Agent 如何注册、签名发信与轮询收件箱：
-
-```text
-.cursor/skills/agentpost/
-├── SKILL.md       # 工作流与 API 要点
-└── examples.md    # Python / Go 示例
-```
-
-克隆本仓库后 Cursor 会自动发现；也可复制到 `~/.cursor/skills/agentpost/` 全局使用。
 
 ---
 
@@ -467,6 +644,7 @@ requests.post(
 ```text
 .
 ├── main.go                 # HTTP API、SMTP 入站、存储与清理
+├── skill.go                # GET /api/v1/skill 动态文档
 ├── main_test.go
 ├── start.sh                # 一键启动脚本
 ├── Dockerfile
@@ -476,7 +654,6 @@ requests.post(
 ├── deploy/
 │   ├── Caddyfile           # HTTPS 反代配置
 │   └── agentpost.cn.md     # 公网域名部署示例
-├── .cursor/skills/agentpost/
 └── README.md
 ```
 

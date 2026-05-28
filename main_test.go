@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -69,6 +70,52 @@ func TestRegisterSendAndPoll(t *testing.T) {
 	}
 	if got.Messages[0].Subject != "hello" || got.Messages[0].BodyText != "internal delivery works" {
 		t.Fatalf("unexpected message: %+v", got.Messages[0])
+	}
+}
+
+func TestSkillEndpoint(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+		APIToken:        "secret-gateway-token",
+	})
+	handler := app.routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
+	req.Host = "gateway.example.com"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("skill status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+	body := resp.Body.String()
+	if strings.Contains(body, "secret-gateway-token") {
+		t.Fatalf("skill must not contain the gateway token")
+	}
+	if !strings.Contains(body, "https://gateway.example.com") {
+		t.Fatalf("skill should include resolved server URL, got: %s", body)
+	}
+	if !strings.Contains(body, "agent.test") {
+		t.Fatalf("skill should include domain")
+	}
+
+	jsonReq := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
+	jsonReq.Header.Set("Accept", "application/json")
+	jsonReq.Host = "gateway.example.com"
+	jsonResp := httptest.NewRecorder()
+	handler.ServeHTTP(jsonResp, jsonReq)
+	if jsonResp.Code != http.StatusOK {
+		t.Fatalf("skill json status = %d", jsonResp.Code)
+	}
+	var got skillResponse
+	if err := json.NewDecoder(jsonResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode skill json: %v", err)
+	}
+	if got.Meta.Domain != "agent.test" || !got.Meta.GatewayToken {
+		t.Fatalf("unexpected skill meta: %+v", got.Meta)
 	}
 }
 

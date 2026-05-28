@@ -1,7 +1,5 @@
-domain: yourdomain.com
+domain: agent.local
 http_addr: ":8080"
-smtp_addr: ":2525"
+smtp_addr: ""
 allow_external_relay: false
 max_message_bytes: 1048576
-# Optional gateway token for public HTTP API access (Authorization: Bearer <token>)
-api_token: ""
