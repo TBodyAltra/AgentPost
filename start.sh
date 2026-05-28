@@ -69,6 +69,7 @@ write_config() {
   if [[ "$ENABLE_SMTP" == "1" || "$ENABLE_SMTP" == "true" || "$ENABLE_SMTP" == "yes" ]]; then
     smtp_addr=":2525"
   fi
+  local api_token="${AGENTPOST_API_TOKEN:-}"
 
   cat >"$CONFIG_FILE" <<EOF
 domain: ${DOMAIN}
@@ -76,8 +77,9 @@ http_addr: ":8080"
 smtp_addr: "${smtp_addr}"
 allow_external_relay: false
 max_message_bytes: 1048576
+api_token: "${api_token}"
 EOF
-  log "Wrote ${CONFIG_FILE} (domain=${DOMAIN}, smtp=${smtp_addr:-disabled})"
+  log "Wrote ${CONFIG_FILE} (domain=${DOMAIN}, smtp=${smtp_addr:-disabled}, api_token=${api_token:+enabled})"
 }
 
 detect_mode() {
@@ -129,7 +131,7 @@ Tip: Agents only need outbound HTTP to this host; use your server IP if remote:
   http://<your-server-ip>:${HTTP_PORT}
 EOF
   if [[ "$ENABLE_SMTP" == "1" || "$ENABLE_SMTP" == "true" || "$ENABLE_SMTP" == "yes" ]]; then
-    echo "  SMTP inbound: :${SMTP_PORT}"
+    echo "  SMTP inbound: :${AGENTPOST_SMTP_PUBLISH_PORT:-25} (host) -> :2525 (container)"
   fi
 }
 
@@ -145,6 +147,8 @@ cmd_up_docker() {
   export AGENTPOST_DOMAIN="$DOMAIN"
   export AGENTPOST_HTTP_PORT="$HTTP_PORT"
   export AGENTPOST_SMTP_PORT="$SMTP_PORT"
+  export AGENTPOST_SMTP_PUBLISH_PORT="${AGENTPOST_SMTP_PUBLISH_PORT:-25}"
+  export AGENTPOST_API_TOKEN="${AGENTPOST_API_TOKEN:-}"
   if [[ "$ENABLE_SMTP" == "1" || "$ENABLE_SMTP" == "true" || "$ENABLE_SMTP" == "yes" ]]; then
     export AGENTPOST_SMTP_ADDR=":2525"
   else

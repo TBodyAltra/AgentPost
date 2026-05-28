@@ -72,6 +72,51 @@ func TestRegisterSendAndPoll(t *testing.T) {
 	}
 }
 
+func TestGatewayTokenRequiredWhenConfigured(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+		APIToken:        "secret-gateway-token",
+	})
+	handler := app.routes()
+
+	publicKey, _, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	registerBody := mustJSON(t, registerRequest{
+		Username:   "bot_1",
+		PublicKey:  hex.EncodeToString(publicKey),
+		TTLSeconds: 3600,
+	})
+
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(registerBody))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerResp := httptest.NewRecorder()
+	handler.ServeHTTP(registerResp, registerReq)
+	if registerResp.Code != http.StatusUnauthorized {
+		t.Fatalf("register without token status = %d, want %d", registerResp.Code, http.StatusUnauthorized)
+	}
+
+	registerReq = httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(registerBody))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerReq.Header.Set("Authorization", "Bearer secret-gateway-token")
+	registerResp = httptest.NewRecorder()
+	handler.ServeHTTP(registerResp, registerReq)
+	if registerResp.Code != http.StatusCreated {
+		t.Fatalf("register with token status = %d, body = %s", registerResp.Code, registerResp.Body.String())
+	}
+
+	healthReq := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	healthResp := httptest.NewRecorder()
+	handler.ServeHTTP(healthResp, healthReq)
+	if healthResp.Code != http.StatusOK {
+		t.Fatalf("healthz status = %d, want %d", healthResp.Code, http.StatusOK)
+	}
+}
+
 func TestSendRejectsBadSignature(t *testing.T) {
 	app := NewApp(Config{
 		Domain:          "agent.test",

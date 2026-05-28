@@ -1,0 +1,8 @@
+agentpost.cn {
+	encode gzip
+	reverse_proxy agentpost:8080
+}
+
+www.agentpost.cn {
+	redir https://agentpost.cn{uri} permanent
+}
