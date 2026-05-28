@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -48,6 +49,7 @@ type Config struct {
 	SMTPAddr           string `yaml:"smtp_addr"`
 	AllowExternalRelay bool   `yaml:"allow_external_relay"`
 	MaxMessageBytes    int64  `yaml:"max_message_bytes"`
+	APIToken           string `yaml:"api_token"`
 }
 
 type App struct {
@@ -211,6 +213,9 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("AGENTPOST_ALLOW_EXTERNAL_RELAY"); v != "" {
 		cfg.AllowExternalRelay = strings.EqualFold(v, "true") || v == "1"
 	}
+	if v := os.Getenv("AGENTPOST_API_TOKEN"); v != "" {
+		cfg.APIToken = v
+	}
 }
 
 func NewApp(cfg Config) *App {
@@ -235,7 +240,44 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	return mux
+	return a.withGatewayAuth(mux)
+}
+
+func (a *App) withGatewayAuth(next http.Handler) http.Handler {
+	token := strings.TrimSpace(a.cfg.APIToken)
+	if token == "" {
+		return next
+	}
+	expected := []byte(token)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		got := extractGatewayToken(r)
+		if got == "" || subtle.ConstantTimeCompare([]byte(got), expected) != 1 {
+			writeJSON(w, http.StatusUnauthorized, errorResponse{Error: "missing or invalid API token"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func extractGatewayToken(r *http.Request) string {
+	if auth := strings.TrimSpace(r.Header.Get("Authorization")); auth != "" {
+		const prefix = "Bearer "
+		if strings.HasPrefix(auth, prefix) {
+			return strings.TrimSpace(auth[len(prefix):])
+		}
+	}
+	if v := strings.TrimSpace(r.Header.Get("X-AgentPost-Token")); v != "" {
+		return v
+	}
+	return ""
 }
 
 func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
