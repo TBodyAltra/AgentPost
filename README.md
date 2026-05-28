@@ -1,8 +1,6 @@
-# AgentPost（GetPost）
+# GetPost
 
 专为 **AI Agent** 设计的开源、超轻量邮件网关 MVP。Agent 通过 **HTTP API** 注册临时邮箱、用 **Ed25519** 签名鉴权、在网关内投递消息，并通过轮询拉取收件箱——无需传统邮件服务器的复杂反垃圾与持久化方案。
-
-> **GetPost** 为本仓库名；产品概念称为 **AgentPost（智能体邮局）**。
 
 ## 特性
 
@@ -28,7 +26,7 @@ flowchart TB
     B[Agent B]
   end
 
-  subgraph gateway [你们部署的 AgentPost 网关]
+  subgraph gateway [你们部署的 GetPost 网关]
     HTTP[HTTP API :8080]
     SMTP[SMTP 入站 可选 :2525]
     Store[(内存 用户表 + 收件箱)]
@@ -41,7 +39,7 @@ flowchart TB
   Ext[外部邮箱] -.->|可选| SMTP
 ```
 
-协作模式：**所有 Agent 连同一个 AgentPost 实例**（公网 IP 或域名均可）。Agent 只需能 **出站访问 HTTP**，不要求公网入站或 WebHook。
+协作模式：**所有 Agent 连同一个 GetPost 实例**（公网 IP 或域名均可）。Agent 只需能 **出站访问 HTTP**，不要求公网入站或 WebHook。
 
 ## 快速开始
 
@@ -103,8 +101,8 @@ cp .env.example .env
 远程 Agent 配置：
 
 ```text
-AGENTPOST_SERVER=http://203.0.113.10:8080
-AGENTPOST_EMAIL_SUFFIX=agent.local
+GETPOST_SERVER=http://203.0.113.10:8080
+GETPOST_EMAIL_SUFFIX=agent.local
 ```
 
 多台机器、不同内网中的 Agent，只要都能访问上述 HTTP 地址，即可通过同一网关协作。
@@ -148,11 +146,11 @@ max_message_bytes: 1048576
 
 | 变量 | 说明 |
 |------|------|
-| `AGENTPOST_CONFIG` | 配置文件路径，默认 `config.yaml` |
-| `AGENTPOST_DOMAIN` | 邮箱后缀 |
-| `AGENTPOST_HTTP_ADDR` | 监听地址，如 `:8080` |
-| `AGENTPOST_SMTP_ADDR` | SMTP 监听，空字符串表示关闭 |
-| `AGENTPOST_ALLOW_EXTERNAL_RELAY` | `true` / `1` 开启外发（MVP 仍会拒绝未实现逻辑） |
+| `GETPOST_CONFIG` | 配置文件路径，默认 `config.yaml` |
+| `GETPOST_DOMAIN` | 邮箱后缀 |
+| `GETPOST_HTTP_ADDR` | 监听地址，如 `:8080` |
+| `GETPOST_SMTP_ADDR` | SMTP 监听，空字符串表示关闭 |
+| `GETPOST_ALLOW_EXTERNAL_RELAY` | `true` / `1` 开启外发（MVP 仍会拒绝未实现逻辑） |
 
 ## API 概览
 
@@ -338,7 +336,7 @@ go run . -config config.yaml
 
 - [ ] Python SDK（`AgentMailbox.wait_for_mail()`）
 - [ ] SQLite 持久化
-- [ ] HTTP Federation（`/.well-known/agentpost`）
+- [ ] HTTP Federation（`/.well-known/getpost`）
 - [ ] 可选外发 Relay（Resend / SES）
 - [ ] WebHook 推送模式
 

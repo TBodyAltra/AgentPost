@@ -1,16 +1,16 @@
 services:
-  agentpost:
+  getpost:
     build: .
-    container_name: agentpost
+    container_name: getpost
     restart: unless-stopped
     ports:
-      - "${AGENTPOST_HTTP_PORT:-8080}:8080"
-      - "${AGENTPOST_SMTP_PORT:-2525}:2525"
+      - "${GETPOST_HTTP_PORT:-8080}:8080"
+      - "${GETPOST_SMTP_PORT:-2525}:2525"
     environment:
-      AGENTPOST_DOMAIN: ${AGENTPOST_DOMAIN:-agent.local}
-      AGENTPOST_HTTP_ADDR: ":8080"
-      AGENTPOST_SMTP_ADDR: ${AGENTPOST_SMTP_ADDR:-}
-      AGENTPOST_ALLOW_EXTERNAL_RELAY: "false"
+      GETPOST_DOMAIN: ${GETPOST_DOMAIN:-agent.local}
+      GETPOST_HTTP_ADDR: ":8080"
+      GETPOST_SMTP_ADDR: ${GETPOST_SMTP_ADDR:-}
+      GETPOST_ALLOW_EXTERNAL_RELAY: "false"
     volumes:
       - ./config.yaml:/app/config.yaml:ro
     healthcheck:

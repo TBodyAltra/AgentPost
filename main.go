@@ -107,7 +107,7 @@ type errorResponse struct {
 }
 
 func main() {
-	configPath := flag.String("config", envOrDefault("AGENTPOST_CONFIG", "config.yaml"), "path to config.yaml")
+	configPath := flag.String("config", envOrDefault("GETPOST_CONFIG", "config.yaml"), "path to config.yaml")
 	flag.Parse()
 
 	cfg, err := loadConfig(*configPath)
@@ -128,7 +128,7 @@ func main() {
 
 	errCh := make(chan error, 2)
 	go func() {
-		log.Printf("AgentPost HTTP listening on %s for domain %s", cfg.HTTPAddr, cfg.Domain)
+		log.Printf("GetPost HTTP listening on %s for domain %s", cfg.HTTPAddr, cfg.Domain)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -137,7 +137,7 @@ func main() {
 	if cfg.SMTPAddr != "" {
 		smtpServer := newSMTPServer(app)
 		go func() {
-			log.Printf("AgentPost SMTP listening on %s", cfg.SMTPAddr)
+			log.Printf("GetPost SMTP listening on %s", cfg.SMTPAddr)
 			if err := smtpServer.ListenAndServe(); err != nil {
 				errCh <- err
 			}
@@ -199,16 +199,16 @@ func loadConfig(path string) (Config, error) {
 }
 
 func applyEnvOverrides(cfg *Config) {
-	if v := os.Getenv("AGENTPOST_DOMAIN"); v != "" {
+	if v := os.Getenv("GETPOST_DOMAIN"); v != "" {
 		cfg.Domain = v
 	}
-	if v := os.Getenv("AGENTPOST_HTTP_ADDR"); v != "" {
+	if v := os.Getenv("GETPOST_HTTP_ADDR"); v != "" {
 		cfg.HTTPAddr = v
 	}
-	if v := os.Getenv("AGENTPOST_SMTP_ADDR"); v != "" {
+	if v := os.Getenv("GETPOST_SMTP_ADDR"); v != "" {
 		cfg.SMTPAddr = v
 	}
-	if v := os.Getenv("AGENTPOST_ALLOW_EXTERNAL_RELAY"); v != "" {
+	if v := os.Getenv("GETPOST_ALLOW_EXTERNAL_RELAY"); v != "" {
 		cfg.AllowExternalRelay = strings.EqualFold(v, "true") || v == "1"
 	}
 }

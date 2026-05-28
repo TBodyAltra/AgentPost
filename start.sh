@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AgentPost one-click launcher (native Go or Docker).
+# GetPost one-click launcher (native Go or Docker).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,17 +8,17 @@ cd "$ROOT"
 ENV_FILE="${ENV_FILE:-.env}"
 CONFIG_FILE="${CONFIG_FILE:-config.yaml}"
 MODE="${MODE:-auto}" # auto | docker | native
-HTTP_PORT="${AGENTPOST_HTTP_PORT:-8080}"
-DOMAIN="${AGENTPOST_DOMAIN:-agent.local}"
-ENABLE_SMTP="${AGENTPOST_ENABLE_SMTP:-0}"
-SMTP_PORT="${AGENTPOST_SMTP_PORT:-2525}"
+HTTP_PORT="${GETPOST_HTTP_PORT:-8080}"
+DOMAIN="${GETPOST_DOMAIN:-agent.local}"
+ENABLE_SMTP="${GETPOST_ENABLE_SMTP:-0}"
+SMTP_PORT="${GETPOST_SMTP_PORT:-2525}"
 
 usage() {
   cat <<'EOF'
 Usage: ./start.sh [command] [options]
 
 Commands:
-  up        Start AgentPost (default)
+  up        Start GetPost (default)
   stop      Stop Docker deployment
   status    Show health and endpoint info
   logs      Follow Docker logs (docker mode only)
@@ -38,12 +38,12 @@ Examples:
   ./start.sh
   ./start.sh --native
   ./start.sh --docker --domain post.my-team.internal --http-port 8080
-  AGENTPOST_DOMAIN=agent.local ./start.sh up
+  GETPOST_DOMAIN=agent.local ./start.sh up
 EOF
 }
 
 log() {
-  printf '[agentpost] %s\n' "$*"
+  printf '[getpost] %s\n' "$*"
 }
 
 have_cmd() {
@@ -56,10 +56,10 @@ load_env_file() {
     set -a
     source "$ENV_FILE"
     set +a
-    DOMAIN="${AGENTPOST_DOMAIN:-$DOMAIN}"
-    HTTP_PORT="${AGENTPOST_HTTP_PORT:-$HTTP_PORT}"
-    ENABLE_SMTP="${AGENTPOST_ENABLE_SMTP:-$ENABLE_SMTP}"
-    SMTP_PORT="${AGENTPOST_SMTP_PORT:-$SMTP_PORT}"
+    DOMAIN="${GETPOST_DOMAIN:-$DOMAIN}"
+    HTTP_PORT="${GETPOST_HTTP_PORT:-$HTTP_PORT}"
+    ENABLE_SMTP="${GETPOST_ENABLE_SMTP:-$ENABLE_SMTP}"
+    SMTP_PORT="${GETPOST_SMTP_PORT:-$SMTP_PORT}"
     MODE="${MODE:-auto}"
   fi
 }
@@ -115,7 +115,7 @@ wait_for_health() {
 print_endpoints() {
   cat <<EOF
 
-AgentPost is running.
+GetPost is running.
 
   Health:  http://127.0.0.1:${HTTP_PORT}/healthz
   Register: POST http://127.0.0.1:${HTTP_PORT}/api/v1/register
@@ -142,13 +142,13 @@ cmd_up_docker() {
   fi
 
   write_config
-  export AGENTPOST_DOMAIN="$DOMAIN"
-  export AGENTPOST_HTTP_PORT="$HTTP_PORT"
-  export AGENTPOST_SMTP_PORT="$SMTP_PORT"
+  export GETPOST_DOMAIN="$DOMAIN"
+  export GETPOST_HTTP_PORT="$HTTP_PORT"
+  export GETPOST_SMTP_PORT="$SMTP_PORT"
   if [[ "$ENABLE_SMTP" == "1" || "$ENABLE_SMTP" == "true" || "$ENABLE_SMTP" == "yes" ]]; then
-    export AGENTPOST_SMTP_ADDR=":2525"
+    export GETPOST_SMTP_ADDR=":2525"
   else
-    export AGENTPOST_SMTP_ADDR=""
+    export GETPOST_SMTP_ADDR=""
   fi
 
   log "Starting with Docker Compose..."
@@ -169,14 +169,14 @@ cmd_up_native() {
     exit 1
   fi
 
-  export AGENTPOST_DOMAIN="$DOMAIN"
-  export AGENTPOST_HTTP_ADDR=":${HTTP_PORT}"
+  export GETPOST_DOMAIN="$DOMAIN"
+  export GETPOST_HTTP_ADDR=":${HTTP_PORT}"
   if [[ "$ENABLE_SMTP" == "1" || "$ENABLE_SMTP" == "true" || "$ENABLE_SMTP" == "yes" ]]; then
-    export AGENTPOST_SMTP_ADDR=":2525"
+    export GETPOST_SMTP_ADDR=":2525"
   else
-    export AGENTPOST_SMTP_ADDR=""
+    export GETPOST_SMTP_ADDR=""
   fi
-  export AGENTPOST_ALLOW_EXTERNAL_RELAY=false
+  export GETPOST_ALLOW_EXTERNAL_RELAY=false
 
   log "Starting with go run on :${HTTP_PORT} ..."
   log "Press Ctrl+C to stop."
@@ -208,7 +208,7 @@ cmd_status() {
     echo
     print_endpoints
   else
-    log "AgentPost does not appear to be running on ${url}"
+    log "GetPost does not appear to be running on ${url}"
     exit 1
   fi
 }
