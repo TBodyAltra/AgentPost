@@ -1,4 +1,4 @@
-module github.com/TBodyAltra/GetPost
+module github.com/TBodyAltra/AgentPost
 
 go 1.25.0
 
