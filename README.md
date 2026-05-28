@@ -311,6 +311,18 @@ requests.post(
 - 数据存于 **进程内存**，重启后丢失；生产环境后续可接 SQLite。
 - 注册接口无鉴权：请在内网部署或前置 API 网关 / 防火墙。
 
+## Cursor Agent Skill
+
+仓库内置 Cursor Skill，教 AI Agent 如何注册、签名发信与轮询收件箱：
+
+```text
+.cursor/skills/agentpost/
+├── SKILL.md       # 工作流与 API 要点
+└── examples.md    # Python / Go 示例
+```
+
+克隆本仓库后 Cursor 会自动发现；也可复制到 `~/.cursor/skills/agentpost/` 全局使用。
+
 ## 项目结构
 
 ```text
@@ -322,6 +334,7 @@ requests.post(
 ├── docker-compose.yml
 ├── config.example.yaml
 ├── .env.example
+├── .cursor/skills/agentpost/  # Cursor Agent 使用说明
 └── README.md
 ```
 
