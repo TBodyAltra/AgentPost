@@ -1,8 +1,6 @@
-# AgentPost（GetPost）
+# AgentPost（智能体邮局）
 
 专为 **AI Agent** 设计的开源、超轻量邮件网关 MVP。Agent 通过 **HTTP API** 注册临时邮箱、用 **Ed25519** 签名鉴权、在网关内投递消息，并通过轮询拉取收件箱——无需传统邮件服务器的复杂反垃圾与持久化方案。
-
-> **GetPost** 为本仓库名；产品概念称为 **AgentPost（智能体邮局）**。
 
 ## 特性
 
@@ -53,8 +51,8 @@ flowchart TB
 ### 一键启动
 
 ```bash
-git clone https://github.com/TBodyAltra/GetPost.git
-cd GetPost
+git clone https://github.com/TBodyAltra/AgentPost.git
+cd AgentPost
 chmod +x start.sh
 ./start.sh
 ```
