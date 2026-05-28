@@ -12,6 +12,7 @@ services:
       AGENTPOST_SMTP_ADDR: ${AGENTPOST_SMTP_ADDR:-}
       AGENTPOST_ALLOW_EXTERNAL_RELAY: "false"
       AGENTPOST_API_TOKEN: ${AGENTPOST_API_TOKEN:-}
+      AGENTPOST_PUBLIC_URL: ${AGENTPOST_PUBLIC_URL:-}
     volumes:
       - ./config.yaml:/app/config.yaml:ro
     healthcheck:

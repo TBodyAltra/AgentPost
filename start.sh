@@ -12,6 +12,7 @@ HTTP_PORT="${AGENTPOST_HTTP_PORT:-8080}"
 DOMAIN="${AGENTPOST_DOMAIN:-agent.local}"
 ENABLE_SMTP="${AGENTPOST_ENABLE_SMTP:-0}"
 SMTP_PORT="${AGENTPOST_SMTP_PORT:-2525}"
+TOKEN_GENERATED=0
 
 usage() {
   cat <<'EOF'
@@ -32,13 +33,16 @@ Options:
   --smtp            Enable SMTP inbound on :2525
 
 Environment:
-  Reads .env if present. See .env.example.
+  Reads .env if present (AGENTPOST_API_TOKEN is never loaded from .env).
+  Set AGENTPOST_API_TOKEN in the shell before ./start.sh to reuse a token.
+  See .env.example.
 
 Examples:
   ./start.sh
   ./start.sh --native
   ./start.sh --docker --domain post.my-team.internal --http-port 8080
   AGENTPOST_DOMAIN=agent.local ./start.sh up
+  AGENTPOST_API_TOKEN=$(openssl rand -hex 32) ./start.sh --docker
 EOF
 }
 
@@ -51,6 +55,10 @@ have_cmd() {
 }
 
 load_env_file() {
+  local saved_token=""
+  if [[ -n "${AGENTPOST_API_TOKEN:-}" ]]; then
+    saved_token="$AGENTPOST_API_TOKEN"
+  fi
   if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
     set -a
@@ -62,6 +70,38 @@ load_env_file() {
     SMTP_PORT="${AGENTPOST_SMTP_PORT:-$SMTP_PORT}"
     MODE="${MODE:-auto}"
   fi
+  if [[ -n "$saved_token" ]]; then
+    AGENTPOST_API_TOKEN="$saved_token"
+  else
+    unset AGENTPOST_API_TOKEN
+  fi
+}
+
+ensure_api_token() {
+  if [[ -n "${AGENTPOST_API_TOKEN:-}" ]]; then
+    export AGENTPOST_API_TOKEN
+    return
+  fi
+  if [[ -z "${AGENTPOST_API_TOKEN+x}" ]]; then
+    AGENTPOST_API_TOKEN="$(openssl rand -hex 32)"
+    TOKEN_GENERATED=1
+    export AGENTPOST_API_TOKEN
+    return
+  fi
+  unset AGENTPOST_API_TOKEN
+}
+
+print_api_token() {
+  if [[ "$TOKEN_GENERATED" == "1" ]]; then
+    echo ""
+    log "AGENTPOST_API_TOKEN (shown once — not saved to any file):"
+    printf '%s\n' "$AGENTPOST_API_TOKEN"
+    echo ""
+    log "Save this token now. Reuse it with: AGENTPOST_API_TOKEN=<token> ./start.sh"
+    echo ""
+  elif [[ -n "${AGENTPOST_API_TOKEN:-}" ]]; then
+    log "Using AGENTPOST_API_TOKEN from the current shell environment."
+  fi
 }
 
 write_config() {
@@ -69,7 +109,6 @@ write_config() {
   if [[ "$ENABLE_SMTP" == "1" || "$ENABLE_SMTP" == "true" || "$ENABLE_SMTP" == "yes" ]]; then
     smtp_addr=":2525"
   fi
-  local api_token="${AGENTPOST_API_TOKEN:-}"
 
   cat >"$CONFIG_FILE" <<EOF
 domain: ${DOMAIN}
@@ -77,9 +116,8 @@ http_addr: ":8080"
 smtp_addr: "${smtp_addr}"
 allow_external_relay: false
 max_message_bytes: 1048576
-api_token: "${api_token}"
 EOF
-  log "Wrote ${CONFIG_FILE} (domain=${DOMAIN}, smtp=${smtp_addr:-disabled}, api_token=${api_token:+enabled})"
+  log "Wrote ${CONFIG_FILE} (domain=${DOMAIN}, smtp=${smtp_addr:-disabled})"
 }
 
 detect_mode() {
@@ -120,6 +158,7 @@ print_endpoints() {
 AgentPost is running.
 
   Health:  http://127.0.0.1:${HTTP_PORT}/healthz
+  Skill:   http://127.0.0.1:${HTTP_PORT}/api/v1/skill
   Register: POST http://127.0.0.1:${HTTP_PORT}/api/v1/register
   Send:     POST http://127.0.0.1:${HTTP_PORT}/api/v1/send
   Inbox:    GET  http://127.0.0.1:${HTTP_PORT}/api/v1/messages
@@ -127,8 +166,8 @@ AgentPost is running.
 Mailbox domain suffix: @${DOMAIN}
 Example address: agent-a@${DOMAIN}
 
-Tip: Agents only need outbound HTTP to this host; use your server IP if remote:
-  http://<your-server-ip>:${HTTP_PORT}
+Agents should fetch the skill document first:
+  curl -fsS http://127.0.0.1:${HTTP_PORT}/api/v1/skill
 EOF
   if [[ "$ENABLE_SMTP" == "1" || "$ENABLE_SMTP" == "true" || "$ENABLE_SMTP" == "yes" ]]; then
     echo "  SMTP inbound: :${AGENTPOST_SMTP_PUBLISH_PORT:-25} (host) -> :2525 (container)"
@@ -143,12 +182,13 @@ cmd_up_docker() {
     write_config
   fi
 
+  ensure_api_token
   write_config
   export AGENTPOST_DOMAIN="$DOMAIN"
   export AGENTPOST_HTTP_PORT="$HTTP_PORT"
   export AGENTPOST_SMTP_PORT="$SMTP_PORT"
   export AGENTPOST_SMTP_PUBLISH_PORT="${AGENTPOST_SMTP_PUBLISH_PORT:-25}"
-  export AGENTPOST_API_TOKEN="${AGENTPOST_API_TOKEN:-}"
+  export AGENTPOST_PUBLIC_URL="${AGENTPOST_PUBLIC_URL:-}"
   if [[ "$ENABLE_SMTP" == "1" || "$ENABLE_SMTP" == "true" || "$ENABLE_SMTP" == "yes" ]]; then
     export AGENTPOST_SMTP_ADDR=":2525"
   else
@@ -159,6 +199,7 @@ cmd_up_docker() {
   docker compose up -d --build
 
   if wait_for_health; then
+    print_api_token
     print_endpoints
   else
     log "Service started but health check timed out. Run: ./start.sh logs"
@@ -167,6 +208,7 @@ cmd_up_docker() {
 }
 
 cmd_up_native() {
+  ensure_api_token
   write_config
   if ! have_cmd go; then
     log "Go is not installed. Use ./start.sh --docker or install Go 1.25+."
@@ -175,6 +217,7 @@ cmd_up_native() {
 
   export AGENTPOST_DOMAIN="$DOMAIN"
   export AGENTPOST_HTTP_ADDR=":${HTTP_PORT}"
+  export AGENTPOST_PUBLIC_URL="${AGENTPOST_PUBLIC_URL:-}"
   if [[ "$ENABLE_SMTP" == "1" || "$ENABLE_SMTP" == "true" || "$ENABLE_SMTP" == "yes" ]]; then
     export AGENTPOST_SMTP_ADDR=":2525"
   else
@@ -182,6 +225,7 @@ cmd_up_native() {
   fi
   export AGENTPOST_ALLOW_EXTERNAL_RELAY=false
 
+  print_api_token
   log "Starting with go run on :${HTTP_PORT} ..."
   log "Press Ctrl+C to stop."
   go run . -config "$CONFIG_FILE"

@@ -49,7 +49,7 @@ type Config struct {
 	SMTPAddr           string `yaml:"smtp_addr"`
 	AllowExternalRelay bool   `yaml:"allow_external_relay"`
 	MaxMessageBytes    int64  `yaml:"max_message_bytes"`
-	APIToken           string `yaml:"api_token"`
+	APIToken           string `yaml:"-"`
 }
 
 type App struct {
@@ -237,6 +237,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("/api/v1/register", a.handleRegister)
 	mux.HandleFunc("/api/v1/send", a.handleSend)
 	mux.HandleFunc("/api/v1/messages", a.handleMessages)
+	mux.HandleFunc("/api/v1/skill", a.handleSkill)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -250,7 +251,7 @@ func (a *App) withGatewayAuth(next http.Handler) http.Handler {
 	}
 	expected := []byte(token)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/api/v1/skill" {
 			next.ServeHTTP(w, r)
 			return
 		}
