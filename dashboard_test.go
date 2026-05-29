@@ -111,23 +111,26 @@ func TestDashboardSnapshotDomainsAndLinks(t *testing.T) {
 		t.Fatalf("expected 2 domains, got %d", len(got.Domains))
 	}
 
-	linkStatus := func(from, to string) string {
+	pairStatus := func(a, b string) string {
+		if a > b {
+			a, b = b, a
+		}
 		for _, l := range got.Links {
-			if l.From == from && l.To == to {
+			if l.From == a && l.To == b {
 				return l.Status
 			}
 		}
 		return ""
 	}
 
-	if status := linkStatus("sender@team-a.test", "target@team-a.test"); status != "blocked" {
-		t.Fatalf("same-domain blocklist status = %q, want blocked", status)
+	if status := pairStatus("sender@team-a.test", "target@team-a.test"); status != "blocked" {
+		t.Fatalf("blocklist pair status = %q, want blocked (one-way block breaks bidirectional link)", status)
 	}
-	if status := linkStatus("sender@team-a.test", "partner@team-b.test"); status != "allowlisted" {
-		t.Fatalf("cross-domain allowlist status = %q, want allowlisted", status)
+	if status := pairStatus("sender@team-a.test", "partner@team-b.test"); status != "cross_domain_blocked" {
+		t.Fatalf("asymmetric allowlist pair status = %q, want cross_domain_blocked", status)
 	}
-	if status := linkStatus("partner@team-b.test", "sender@team-a.test"); status != "cross_domain_blocked" {
-		t.Fatalf("default cross-domain status = %q, want cross_domain_blocked", status)
+	if len(got.Links) != 3 {
+		t.Fatalf("expected 3 undirected links for 3 mailboxes, got %d", len(got.Links))
 	}
 
 	var target *dashboardMailbox
@@ -139,5 +142,34 @@ func TestDashboardSnapshotDomainsAndLinks(t *testing.T) {
 	}
 	if target == nil || len(target.InboxPolicy.Blocklist) != 1 {
 		t.Fatalf("target mailbox detail missing blocklist: %+v", target)
+	}
+}
+
+func TestDashboardPairStatusBidirectional(t *testing.T) {
+	users := map[string]*User{
+		"alice@a.test": {
+			Username: "alice", Domain: "a.test",
+			InboxPolicy: InboxPolicy{},
+		},
+		"bob@a.test": {
+			Username: "bob", Domain: "a.test",
+			InboxPolicy: InboxPolicy{Blocklist: []string{"alice@a.test"}},
+		},
+		"carol@b.test": {
+			Username: "carol", Domain: "b.test",
+			InboxPolicy: InboxPolicy{Allowlist: []string{"alice@a.test"}},
+		},
+	}
+
+	if status := dashboardPairStatus("alice@a.test", "bob@a.test", users); status != "blocked" {
+		t.Fatalf("one-way blocklist pair = %q, want blocked", status)
+	}
+	if status := dashboardPairStatus("alice@a.test", "carol@b.test", users); status != "cross_domain_blocked" {
+		t.Fatalf("one-way allowlist pair = %q, want cross_domain_blocked", status)
+	}
+
+	users["dave@a.test"] = &User{Username: "dave", Domain: "a.test"}
+	if status := dashboardPairStatus("alice@a.test", "dave@a.test", users); status != "allowed" {
+		t.Fatalf("same-domain open pair = %q, want allowed", status)
 	}
 }
