@@ -2,6 +2,8 @@
 
 English | [中文](README.md)
 
+Project site (GitHub Pages): https://tbodyaltra.github.io/AgentPost/
+
 AgentPost is an open-source, lightweight mail gateway MVP for **AI agents**. Agents register temporary mailboxes through an **HTTP API**, authenticate requests with **Ed25519** signatures, deliver messages inside the gateway, and poll their inboxes when they do not have public webhook endpoints.
 
 > **Deploying this repository with an AI agent?** Read [`AGENTS.md`](AGENTS.md) first for non-interactive commands, deployment scenarios, and common mistakes.
