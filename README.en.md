@@ -6,206 +6,102 @@ English | [中文](README.md)
 
 Project site (GitHub Pages): https://tbodyaltra.github.io/AgentPost/
 
-AgentPost is an open-source mail gateway built for **AI agents**: register, send, and receive through JSON APIs so multi-agent workflows, task callbacks, and temporary identities feel as simple as calling REST.
+AgentPost is an open-source mail gateway for **AI agents**: register, send, and receive through JSON APIs so multi-agent workflows, callbacks, and temporary identities feel as simple as REST.
 
-> **Deploying this repository with an AI agent?** Read [`AGENTS.md`](AGENTS.md) first for non-interactive commands, deployment scenarios, and common mistakes.
+> **Deploying with an AI agent?** Read [`AGENTS.md`](AGENTS.md) first (non-interactive commands, scenarios, common mistakes).
 >
-> **Public deployment note**: operators are responsible for abuse prevention, anti-spam controls, compliance, DNS/TLS, and firewall configuration. Public scenarios should enable the gateway token and expose only the required ports.
+> **Public deployments**: operators are responsible for abuse prevention, compliance, DNS/TLS, and firewalls; enable the gateway token on the public internet.
 
 ## Why AgentPost
 
 | Advantage | Details |
 |-----------|---------|
-| **Lightweight** | Single Go binary, low memory; no IMAP or heavy folder/anti-spam stack—start with Docker or `./start.sh` |
-| **Agent-native** | HTTP + JSON + Ed25519 signatures; machines manage keys, no human-style passwords |
-| **Temporary mailboxes** | TTL on registration; identities expire automatically for one-off tasks and sandboxes |
-| **Receive without a public IP** | Poll `GET /api/v1/messages`; agents do not need inbound webhooks |
-| **Two roles, one API** | Run the **gateway** (server) or act as a **client** against an existing instance—both can be automated by agents |
-| **Safe defaults** | Public deployments default to gateway tokens, registration/send rate limits, and no external SMTP relay |
-| **Deployment-aware discovery** | `GET /api/v1/skill` returns this instance’s real URLs and rules so clients do not guess wrong hosts |
+| **Lightweight** | Single Go binary, low memory; no IMAP stack—start with `./start.sh` or Docker |
+| **Agent-native** | HTTP + JSON + Ed25519; machines manage keys, no human passwords |
+| **Temporary mailboxes** | TTL on registration; identities expire for one-off tasks |
+| **No public IP required** | Poll `GET /api/v1/messages`; no inbound webhooks |
+| **Two roles, one API** | Run the **gateway** or connect as a **client**—both automatable |
+| **Deployment-aware** | `GET /api/v1/skill` returns this instance’s real URLs and rules |
+| **Human-in-the-loop (planned)** | Roadmap adds Gmail, Outlook, and similar mailboxes so humans join agent chains ([Roadmap](#roadmap)) |
 
-## Architecture at a glance
+## Architecture
 
-### Gateway deployment vs client agents
-
-This repository serves two roles: **running the gateway** (the post office server) and **using the gateway** (agents that register mailboxes). Both can be driven by agents via HTTP APIs and `start.sh`.
+### Gateway vs client agents
 
 ```mermaid
 flowchart TB
-  subgraph deploy["Server side: deploy AgentPost (agent-automatable)"]
-    OP["./start.sh --scenario …\nor docker compose up"]
-    GW["AgentPost gateway\nregister · send · messages · skill"]
+  subgraph deploy["Server: deploy AgentPost"]
+    OP["./start.sh --scenario …"]
+    GW["AgentPost gateway"]
     OP --> GW
   end
 
-  subgraph clients["Client side: workload agents (use an existing gateway)"]
-    A1["Agent A\nregister → bot-a@example.domain"]
-    A2["Agent B\nsend / poll inbox"]
-    A3["Agent C\nGET /api/v1/skill discovery"]
+  subgraph clients["Clients: workload agents"]
+    A1["Agent A\nbot-a@example.domain"]
+    A2["Agent B\nsend / poll"]
   end
 
-  A1 & A2 & A3 -->|"Ed25519-signed HTTP JSON"| GW
-  GW -->|"deliver within same @domain"| A1
-  GW --> A2
+  A1 & A2 -->|"Ed25519 + HTTP JSON"| GW
+  GW --> A1 & A2
 ```
 
-Typical flow: a deploy agent reads `GET /api/v1/skill` → workload agents `POST /register` → collaborate with `POST /send` and `GET /messages`.
+Typical flow: `GET /api/v1/skill` → `POST /register` → `POST /send` / `GET /messages`.
 
-### Separating reachability (`server_url`) from mailbox domain (`domain`)
+### `server_url` vs `domain`
 
-**How agents reach HTTP** and **what addresses look like** are independent. They are often set differently on purpose (for example IP-only access while mailboxes still use `@example.domain`).
+**How to reach HTTP** (`AGENTPOST_PUBLIC_URL` / skill `server_url`) and **mailbox suffix** (`AGENTPOST_DOMAIN`) are independent—for example `http://203.0.113.10:8080` while addresses look like `bot@example.domain`. The skill’s `server_url` comes from **`AGENTPOST_PUBLIC_URL` at deploy time**, not from the request Host header.
 
 ```mermaid
 flowchart LR
-  subgraph how["① How to reach the gateway — AGENTPOST_PUBLIC_URL"]
-    URL["server_url\nhttp://203.0.113.10:8080"]
-  end
-
-  subgraph what["② What mailboxes look like — AGENTPOST_DOMAIN"]
-    MAIL["alice@example.domain\nbob@example.domain"]
-  end
-
-  AG["Downstream agent"] -->|"HTTP goes here"| URL
-  URL --> GW2["AgentPost"]
-  GW2 -->|"composed at register"| MAIL
-
-  NOTE["Common: domain blocked / no HTTPS yet\nuse IP:8080 while keeping a logical @ suffix"]
-  URL -.-> NOTE
+  AG["Agent"] -->|"HTTP"| URL["server_url"]
+  URL --> GW["AgentPost"]
+  GW --> MAIL["alice@example.domain"]
 ```
 
-The `server_url` in `/api/v1/skill` comes from **`AGENTPOST_PUBLIC_URL` at deploy time**, not from whatever Host header a client happened to use. See **Core concepts** below.
+### Gateway isolation and domain boundaries
 
-### Gateway isolation and domain delivery boundaries
+The trust boundary is a **gateway instance** (one deployment), not the `@domain` suffix.
 
-The trust boundary in AgentPost is a **gateway instance** (one `./start.sh` run or one Docker Compose deployment), **not** the `@domain` suffix in an email address. Connecting to the wrong `server_url` means talking to a completely separate post office.
-
-| Boundary | Default behavior |
-|----------|------------------|
-| **Different gateways** | **Fully isolated**—no routing between instances. Two `alice@team-a.internal` mailboxes on different gateways are unrelated accounts; they cannot send to or poll each other |
-| **Same gateway · same domain** | **Allowed by default**; recipients may use `inbox_policy.blocklist` to reject specific senders |
-| **Same gateway · different domains** | **Denied by default**; delivery is allowed only when the recipient’s `inbox_policy.allowlist` includes the sender |
-
-> `AGENTPOST_DOMAIN` is only this gateway’s **default** mailbox suffix at registration. Agents may register other valid `domain` values, but **no two independent gateways ever exchange mail**, even if the suffix strings match.
-
-**Different gateways: identical `@` suffixes still do not connect**
+| Boundary | Default |
+|----------|---------|
+| **Different gateways** | Fully isolated |
+| **Same gateway · same domain** | Allowed; `blocklist` can reject senders |
+| **Same gateway · different domains** | Denied unless recipient `allowlist` includes sender |
 
 ```mermaid
 flowchart TB
-  subgraph GWA["Gateway A · http://203.0.113.10:8080"]
-    A1["alice@team-a.internal"]
-    A2["bob@team-a.internal"]
-    A1 <-->|same gateway · same domain · allowed| A2
+  subgraph GWA["Gateway A"]
+    A1["alice@team-a"] <-->|allowed| A2["bob@team-a"]
   end
-
-  subgraph GWB["Gateway B · http://198.51.100.20:8080"]
-    B1["alice@team-a.internal"]
-    B2["bob@team-a.internal"]
-    B1 <-->|same gateway · same domain · allowed| B2
+  subgraph GWB["Gateway B"]
+    B1["alice@team-a"] <-->|allowed| B2["bob@team-a"]
   end
-
-  GWA -.->|"❌ different gateways: no routing, no shared inboxes"| GWB
+  GWA -.->|"❌ no route"| GWB
 ```
 
-**One gateway: domains are isolated by default; allowlist / blocklist refine visibility**
+Within one gateway, refine cross-domain delivery with `inbox_policy`; see [Inbox policy & protocol](#inbox-policy--protocol) and `PUT /api/v1/account/inbox-policy`.
 
-```mermaid
-flowchart LR
-  subgraph GW["Single AgentPost gateway instance"]
-    subgraph DA["domain: team-a.internal"]
-      S1["sender@team-a.internal"]
-      T1["target@team-a.internal"]
-      SP["spammer@team-a.internal"]
-      S1 -->|"✅ allowed by default"| T1
-      SP -.->|"blocked by blocklist"| T1
-    end
+## Roadmap
 
-    subgraph DB["domain: team-b.internal"]
-      P1["partner@team-b.internal"]
-      T2["target@team-b.internal"]
-    end
+The MVP focuses on **agent ↔ agent** (HTTP API + optional SMTP inbound). Planned next:
 
-    S1 -->|"❌ cross-domain denied by default"| T2
-    S1 -->|"✅ allowed when recipient allowlists sender"| P1
-  end
-```
+| Phase | Capability | Notes |
+|-------|------------|-------|
+| **Outbound** | Deliver to Gmail, Outlook, and other providers | Configurable SMTP relay (SES, Resend, etc.) so agents can notify or hand off to humans |
+| **Inbound** | Receive from commercial mailboxes and route to agents | Build on SMTP inbound with stronger parsing, auth, and policy |
+| **Shared lane** | Humans and agents on the same addressing model | e.g. `human@corp` mails `dev-runner@corp`; the dev agent polls, runs the task, and replies |
 
-See [Domains and inbox policy](#domains-and-inbox-policy) for registration examples, or update policy later with `PUT /api/v1/account/inbox-policy`.
-
-## Features
-
-| Capability | Description |
-|------------|-------------|
-| Self-service registration | `POST /api/v1/register` uploads an Ed25519 public key |
-| Signed sending | `POST /api/v1/send` signs the raw body plus timestamp |
-| Inbox polling | `GET /api/v1/messages`, suitable for agents without public IPs |
-| Internal delivery | Delivery within one gateway; same domain allowed by default, cross-domain needs allowlist; different gateways are fully isolated |
-| Skill API | `GET /api/v1/skill?lang=en` returns URLs and usage rules for this deployment |
-| Dashboard | `/dashboard/` visualizes domains, mailbox connectivity, and account details |
-| One-click deployment | `./start.sh` supports interactive and parameterized deployment |
-| Abuse-prevention defaults | Public scenarios default to gateway tokens, registration rate limiting, send rate limiting, and no external relay |
-
-## Core concepts
-
-Read this together with the three diagrams above:
-
-1. **Gateway vs client** — who runs the post office vs who registers mailboxes  
-2. **`server_url` vs `domain`** — how to reach HTTP vs what `@` addresses look like (**this gateway only**)  
-3. **Gateway isolation vs domain policy** — different gateways never interoperate; within one gateway, domains and `inbox_policy` control visibility  
-
-### Two independent settings
-
-| Setting | Purpose | Example |
-|---------|---------|---------|
-| **`AGENTPOST_PUBLIC_URL`** (`server_url` in the skill) | How agents reach HTTP | `http://203.0.113.10:8080` |
-| **`AGENTPOST_DOMAIN`** (mailbox suffix) | What mailbox addresses look like | `example.domain` |
-
-They can be different. For example, if a domain cannot be used for HTTPS yet, agents may connect to `http://203.0.113.10:8080` while mailboxes still look like `bot@example.domain`.
-
-### Skill output follows deployment configuration
-
-`/api/v1/skill` prefers the deployed `AGENTPOST_PUBLIC_URL`. It does not switch to a blocked domain or an accidental request host just because the request used a different URL. Choose the right `./start.sh --scenario ...` during deployment.
-
-## Deployment scenarios
-
-| Scenario | `--scenario` | Agent URL | DNS required | Caddy | Gateway token |
-|----------|--------------|-----------|--------------|-------|---------------|
-| **Local** | `local` | `http://127.0.0.1:8080` | No | No | Off by default |
-| **LAN** | `lan` | `http://LAN_IP:8080` | No | No | Off by default |
-| **Public IP** | `public-ip` | `http://PUBLIC_IP:8080` | No | No | **On by default** |
-| **Public domain** | `public-domain` | `https://domain` | Yes | **Yes** | **On by default** |
+Outbound SMTP **relay is not implemented yet**; enabling `allow_external_relay` still returns not implemented. Issues and PRs welcome.
 
 ## Quick start
-
-### Interactive
 
 ```bash
 git clone https://github.com/TBodyAltra/AgentPost.git
 cd AgentPost
 chmod +x start.sh
-./start.sh          # choose scenario -> write .env -> start
-```
-
-Generate config without starting:
-
-```bash
-./start.sh configure
-```
-
-### Non-interactive
-
-```bash
-# Local
+./start.sh
+# or
 ./start.sh --non-interactive --scenario local
-
-# LAN
-./start.sh --non-interactive --scenario lan --lan-ip 192.168.1.100
-
-# Public IP
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 --domain example.domain
-
-# Public HTTPS domain
-./start.sh --non-interactive --scenario public-domain --domain example.domain --smtp
 ```
 
 Verify:
@@ -216,153 +112,54 @@ curl -fsS "${AGENTPOST_PUBLIC_URL}/healthz"
 curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill?lang=en"
 ```
 
-### Agent environment variables
-
-Client agents should use values from `.env` or the skill:
+Client environment variables (from skill or `.env`):
 
 ```text
 AGENTPOST_SERVER=<AGENTPOST_PUBLIC_URL>
 AGENTPOST_EMAIL_SUFFIX=<AGENTPOST_DOMAIN>
-AGENTPOST_API_TOKEN=<distributed by the operator for public deployments; not included in the skill>
+AGENTPOST_API_TOKEN=<operator-provided on public deployments; not in skill>
 ```
 
-## Scenario notes
+## Deployment scenarios
 
-### Local (`local`)
-
-For development when the agent and gateway run on the same machine.
+| Scenario | `--scenario` | URL | DNS | Caddy | Gateway token |
+|----------|--------------|-----|-----|-------|---------------|
+| Local | `local` | `http://127.0.0.1:8080` | No | No | Off by default |
+| LAN | `lan` | `http://LAN_IP:8080` | No | No | Off by default |
+| Public IP | `public-ip` | `http://PUBLIC_IP:8080` | No | No | On by default |
+| Public domain | `public-domain` | `https://domain` | Yes | Yes | On by default |
 
 ```bash
-./start.sh --scenario local
+./start.sh --non-interactive --scenario public-ip \
+  --public-ip 203.0.113.10 --domain example.domain
+
+./start.sh --non-interactive --scenario public-domain \
+  --domain example.domain --smtp
 ```
 
-### LAN (`lan`)
+`public-domain` needs a DNS **A** record and firewall **80/443** (**25** if SMTP inbound is enabled). See [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
 
-For the same Wi-Fi, switch, or VPN. Agents can use outbound HTTP and do not need public IPs.
+Common commands: `./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 
-```bash
-./start.sh --scenario lan --lan-ip "$(hostname -I | awk '{print $1}')"
-```
+Templates: [`.env.example`](.env.example), [`config.example.yaml`](config.example.yaml). Do **not** commit `AGENTPOST_API_TOKEN` to `.env`.
 
-Open firewall port **8080**. Mailbox suffixes such as `agent.local` do **not** need DNS unless you enable external SMTP delivery.
-
-### Public IP (`public-ip`)
-
-Use a public server IP plus **8080** when no working HTTPS domain is available.
-
-```bash
-./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.domain
-```
-
-| Item | Notes |
-|------|-------|
-| Firewall | Open **8080** |
-| Domain | Used only as the mailbox suffix; DNS is not required |
-| Caddy | Not started |
-| Skill | Fixed to `http://PUBLIC_IP:8080` |
-
-### Public domain (`public-domain`)
-
-For agents distributed across networks, with HTTPS and optional external inbound SMTP.
-
-```bash
-./start.sh --scenario public-domain --domain example.domain --smtp
-```
-
-1. DNS **A** record `@` -> public IP
-2. Firewall **80 / 443** for Caddy certificates and HTTPS; **25** if SMTP inbound is enabled
-3. Caddy proxies `https://example.domain` to AgentPost on `:8080`
-
-Detailed DNS checklist: [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
-
-Architecture:
-
-```text
-Agent -> https://example.domain:443 -> Caddy -> http://agentpost:8080 -> AgentPost
-```
-
-If agents access the server by IP only, use `public-ip` instead.
-
-## Common commands
-
-```bash
-./start.sh help
-./start.sh configure --scenario public-ip --public-ip 203.0.113.10
-./start.sh --scenario lan --lan-ip 192.168.1.100
-./start.sh status
-./start.sh stop
-./start.sh logs
-```
-
-| Option | Description |
-|--------|-------------|
-| `--scenario` | `local` \| `lan` \| `public-ip` \| `public-domain` |
-| `--domain` | Mailbox suffix |
-| `--public-url` | Overrides generated `AGENTPOST_PUBLIC_URL` |
-| `--lan-ip` / `--public-ip` | LAN / public IP |
-| `--http-port` | Host HTTP port, default 8080 |
-| `--smtp` / `--no-smtp` | SMTP inbound |
-| `--token` / `--no-token` | Gateway token |
-| `--docker` / `--native` | Runtime mode |
-| `--non-interactive` | Fail instead of prompting when inputs are missing |
-
-## Configuration
-
-`./start.sh` writes `.env` and `config.yaml`. Templates: [`.env.example`](.env.example), [`config.example.yaml`](config.example.yaml).
-
-| Variable | Description |
-|----------|-------------|
-| `AGENTPOST_SCENARIO` | Deployment scenario |
-| `AGENTPOST_PUBLIC_URL` | Canonical URL agents should use; the skill follows it exactly |
-| `AGENTPOST_DOMAIN` | Mailbox suffix |
-| `AGENTPOST_HTTP_PORT` | Host HTTP port |
-| `AGENTPOST_ENABLE_CADDY` | Enables Caddy for `public-domain` |
-| `AGENTPOST_REQUIRE_TOKEN` | Requires gateway token |
-| `AGENTPOST_ENABLE_SMTP` | Enables SMTP inbound |
-| `AGENTPOST_API_TOKEN` | **Do not write it to `.env`**; pass it through the shell or use the startup-printed token |
-
-## Authentication layers
-
-| Layer | Paths | Notes |
-|-------|-------|-------|
-| Gateway token | `/api/v1/*` except `/healthz` and `/api/v1/skill` | Recommended for public deployments |
-| Ed25519 signature | `/api/v1/send`, `/api/v1/messages`, `/api/v1/agents`, account endpoints | Always required for agent identity |
-
-`POST /api/v1/register` is also rate-limited to **10 requests per client IP per minute**. Sending is limited to **2 messages per mailbox per minute**.
-
-Signature bytes are:
-
-```text
-<unix_timestamp>\n<raw_request_body>
-```
-
-For signed GET and DELETE requests, the body is empty.
-
-## Agent Skill API
-
-```bash
-curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill?lang=en"
-curl -fsS -H 'Accept-Language: en' "${AGENTPOST_PUBLIC_URL}/api/v1/skill"
-curl -fsS -H 'Accept: application/json' "${AGENTPOST_PUBLIC_URL}/api/v1/skill?lang=en"
-```
-
-The JSON `meta` field includes `server_url`, `domain`, `deployment_scenario`, `gateway_token_required`, `language`, and related deployment metadata. It never includes the token value.
-
-## API overview
+## API & authentication
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/healthz` | Health check |
-| `GET` | `/api/v1/skill` | Deployment-specific usage guide |
-| `POST` | `/api/v1/register` | Register mailbox and optional profile |
-| `GET` | `/api/v1/agents` | List active agents and profiles (signed) |
-| `GET` | `/api/v1/account/inbox-policy` | Read your inbox policy (signed) |
-| `PUT` | `/api/v1/account/inbox-policy` | Update your inbox policy (signed) |
-| `DELETE` | `/api/v1/account` | Unregister early (signed) |
-| `POST` | `/api/v1/send` | Send internal mail |
-| `GET` | `/api/v1/messages` | Destructive inbox poll |
+| `GET` | `/api/v1/skill` | Deployment guide (`?lang=en`) |
+| `POST` | `/api/v1/register` | Register mailbox |
+| `GET` | `/api/v1/agents` | Active agents (signed) |
+| `GET`/`PUT` | `/api/v1/account/inbox-policy` | Inbox policy (signed) |
+| `DELETE` | `/api/v1/account` | Unregister (signed) |
+| `POST` | `/api/v1/send` | Send within gateway (cross-domain via allowlist) |
+| `GET` | `/api/v1/messages` | Poll inbox (destructive) |
+| `GET` | `/api/v1/dashboard` | Ops stats (optional Bearer token) |
 
-Registration example:
+**Two layers**: **gateway token** on public deployments (`Authorization: Bearer` or `X-AgentPost-Token` for `/api/v1/*` except `/healthz` and `/api/v1/skill`); **Ed25519** for send, poll, and account routes (`X-Agent-Email` recommended, `X-Agent-Timestamp` + `X-Agent-Signature`, payload `<unix_ts>\n<raw_body>`, empty body on GET).
+
+Registration excerpt:
 
 ```json
 {
@@ -370,127 +167,48 @@ Registration example:
   "domain": "team-a.internal",
   "public_key": "<hex-ed25519-public-key>",
   "ttl_seconds": 86400,
-  "profile": {
-    "display_name": "Research Agent",
-    "host": "worker-01.internal",
-    "responsibilities": "literature review",
-    "skills": ["web-search", "summarize"],
-    "mcp_services": ["filesystem", "browser"],
-    "capabilities": ["can summarize PDFs"],
-    "notes": "optional notes"
-  },
   "inbox_policy": {
-    "blocklist": ["spammer@team-a.internal"],
     "allowlist": ["partner@team-b.internal"]
   }
 }
 ```
 
-## Domains and inbox policy
+## Inbox policy & protocol
 
-Rules apply **inside the current gateway instance** (see [Gateway isolation and domain delivery boundaries](#gateway-isolation-and-domain-delivery-boundaries)):
+- Full `user@domain` must be unique **on this gateway**; `config.yaml` `domain` is only the default suffix.
+- Agent mail `body` must be a JSON string with exactly **`request` or `reply`** (polled as `body_text`).
+- On `request`, execute the task and reply with results—do not send generic acknowledgements.
+- Poll with scripts; wake the model only when mail arrives.
+- Reference worker: [`examples/inbox-worker/`](examples/inbox-worker/) (`template` / `manual` / `command`).
 
-- Registration may specify any valid `domain`; the full `user@domain` must be unique **on this gateway**
-- **Same domain**: delivery is allowed by default; `blocklist` can reject specific senders
-- **Different domains** (same gateway): delivery is denied by default; allowed only when the recipient `allowlist` includes the sender
-- **Different gateways**: no delivery regardless of domain strings—clients must use the correct `AGENTPOST_PUBLIC_URL` / skill `server_url`
-
-Example gateway default domain (`config.yaml`):
-
-```yaml
-domain: agent.local
-```
-
-Use the full email for signatures when multiple domains are involved: `X-Agent-Email: my-bot@team-a.internal`.
-
-## Request / reply protocol
-
-Agent-to-agent mail uses a turn-based **request / reply** protocol. The message `body` (returned as `body_text` when polling) must be a JSON string that contains exactly one field:
-
-| Field | Meaning |
-|-------|---------|
-| `request` | A task or instruction for the receiving agent |
-| `reply` | The result for a previous `request` |
-
-Rules:
-
-- Every message must contain `request` **or** `reply`, not both and not neither
-- After **explicit human consent**, an agent may start a background subagent or worker that polls `GET /api/v1/messages`
-- Polling should be plain script/code, not an AI agent running on empty inboxes; wake the model only when a message needs reasoning
-- When receiving a `request`, the agent must execute it first and send one `reply` with the result
-- Generic acknowledgements such as `Acknowledged your request` are not compliant replies
-
-Request:
-
-```json
-{
-  "to": "peer@team-a.internal",
-  "subject": "task: summarize",
-  "body": "{\"request\": \"Summarize the report and list three follow-ups.\"}"
-}
-```
-
-Reply:
-
-```json
-{
-  "to": "requester@team-a.internal",
-  "subject": "re: task: summarize",
-  "body": "{\"reply\": \"Summary: ...\\nFollow-ups: 1) ... 2) ... 3) ...\"}"
-}
-```
-
-The complete and deployment-specific version is available from `GET /api/v1/skill?lang=en`.
-
-## Inbox worker
-
-The reference worker in [`examples/inbox-worker/`](examples/inbox-worker/) keeps empty polling outside the LLM loop and supports multiple execution modes:
-
-| Mode | Executes requests | LLM token use |
-|------|:-----------------:|:-------------:|
-| `template` | No; clearly marks `NOT EXECUTED` | No |
-| `manual` | Yes, after a human/IDE handles queued work | Only when opened |
-| `command` | Yes, by invoking any configured agent CLI/script | Depends on that program |
-
-`command` mode sends the request to a program through stdin, for example `claude -p`, `cursor-agent -p`, or `python my_agent.py`; stdout becomes the reply.
+Full protocol: `GET /api/v1/skill?lang=en`.
 
 ## Dashboard
 
-Open **`/dashboard/`** in a browser, for example `http://203.0.113.10:8080/dashboard/`.
+Open **`/dashboard/`** for domain topology, connectivity, and profiles. Enter the gateway token in the UI when required for `GET /api/v1/dashboard`.
 
-It shows:
+## Current limitations
 
-- All domains and mailboxes on the gateway
-- Delivery connectivity between domains and mailboxes
-- Each mailbox profile, inbox policy, TTL, and pending-message count
+- **In-memory storage**: restart clears users and messages—not a durable production mailbox.
+- **Agent-to-agent** delivery is in-gateway routing, not MX; `@domain` need not be real DNS unless external SMTP inbound is enabled.
+- **Outbound to external domains** (e.g. `@gmail.com`) is not implemented; SMTP inbound can deliver external mail to **registered** local mailboxes only.
+- On the public internet, use HTTPS (`public-domain`), a gateway token, and minimal exposed ports.
 
-Data API: `GET /api/v1/dashboard`. If a gateway token is configured, pass `Authorization: Bearer <token>`.
+## Security & contributing
 
-## Security and open-source notes
+Do not commit `.env`, `config.yaml`, tokens, private keys, or production domains. Report issues via [`SECURITY.md`](SECURITY.md); see [`CONTRIBUTING.md`](CONTRIBUTING.md). Third-party licenses: [`go.mod`](go.mod).
 
-- For public deployments, enable the gateway token, use HTTPS, and expose only the ports needed for the chosen scenario. In `public-domain`, put Caddy on the public edge and keep `8080` private.
-- This is an MVP with in-memory storage; users and messages are cleared when the process restarts.
-- Registration is rate-limited to **10 requests per client IP per minute**, sending is limited to **2 messages per mailbox per minute**, and external SMTP relay sending is disabled by default and not implemented in the MVP.
-- Do not commit `.env`, `config.yaml`, tokens, private keys, or real deployment domains.
-- Report vulnerabilities privately through [SECURITY.md](SECURITY.md). Contribution guidelines are in [CONTRIBUTING.md](CONTRIBUTING.md).
-- Third-party dependencies keep their own licenses; direct dependencies are listed in [go.mod](go.mod).
-
-## Project structure
+## Project layout
 
 ```text
 .
-├── main.go                  # HTTP API, SMTP, storage
-├── dashboard.go             # GET /api/v1/dashboard + /dashboard/ UI
-├── skill.go                 # GET /api/v1/skill
-├── web/dashboard/           # Embedded dashboard static files
-├── start.sh                 # Scenario-based launcher
-├── AGENTS.md                # Deployment instructions for AI agents
-├── docker-compose.yml       # AgentPost + Caddy profile
+├── main.go, dashboard.go, skill.go
+├── start.sh, docker-compose.yml
+├── web/dashboard/
 ├── deploy/
-│   ├── Caddyfile            # Generated by start.sh for public-domain
-│   └── public-domain.example.md
-├── README.md                # Chinese README
-└── README.en.md             # English README
+├── examples/inbox-worker/
+├── AGENTS.md
+├── README.md / README.en.md
 ```
 
 ## Development
@@ -502,4 +220,4 @@ go run . -config config.yaml
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
