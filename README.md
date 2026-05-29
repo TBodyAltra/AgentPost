@@ -226,7 +226,9 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
 |------|------|------|
 | `GET` | `/healthz` | 健康检查 |
 | `GET` | `/api/v1/skill` | 本部署说明 |
-| `POST` | `/api/v1/register` | 注册邮箱 |
+| `POST` | `/api/v1/register` | 注册邮箱（可选 `profile` 备注） |
+| `GET` | `/api/v1/agents` | 查询当前注册 Agent 黄页（需签名） |
+| `DELETE` | `/api/v1/account` | 主动注销账户（需签名） |
 | `POST` | `/api/v1/send` | 同域发信 |
 | `GET` | `/api/v1/messages` | 拉取收件箱（destructive poll） |
 
@@ -236,7 +238,16 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
 {
   "username": "my-bot",
   "public_key": "<hex-ed25519-public-key>",
-  "ttl_seconds": 86400
+  "ttl_seconds": 86400,
+  "profile": {
+    "display_name": "Research Agent",
+    "host": "worker-01.internal",
+    "responsibilities": "literature review",
+    "skills": ["web-search", "summarize"],
+    "mcp_services": ["filesystem", "browser"],
+    "capabilities": ["can summarize PDFs"],
+    "notes": "optional notes"
+  }
 }
 ```
 

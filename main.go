@@ -41,6 +41,10 @@ const (
 	maxTTLSeconds          = 86400
 	authTimestampTolerance = 5 * time.Minute
 	defaultMaxMessageBytes = 1 << 20
+	maxProfileFieldLen     = 512
+	maxProfileNotesLen     = 2048
+	maxProfileListItems    = 32
+	maxProfileListItemLen  = 128
 )
 
 type Config struct {
@@ -62,10 +66,22 @@ type App struct {
 	limiters map[string]*rate.Limiter
 }
 
+type AgentProfile struct {
+	DisplayName      string   `json:"display_name,omitempty"`
+	Host             string   `json:"host,omitempty"`
+	Responsibilities string   `json:"responsibilities,omitempty"`
+	Skills           []string `json:"skills,omitempty"`
+	MCPServices      []string `json:"mcp_services,omitempty"`
+	Capabilities     []string `json:"capabilities,omitempty"`
+	Notes            string   `json:"notes,omitempty"`
+}
+
 type User struct {
-	Username  string
-	PublicKey ed25519.PublicKey
-	ExpiresAt time.Time
+	Username     string
+	PublicKey    ed25519.PublicKey
+	ExpiresAt    time.Time
+	RegisteredAt time.Time
+	Profile      AgentProfile
 }
 
 type Message struct {
@@ -78,15 +94,35 @@ type Message struct {
 }
 
 type registerRequest struct {
-	Username   string `json:"username"`
-	PublicKey  string `json:"public_key"`
-	TTLSeconds int64  `json:"ttl_seconds"`
+	Username   string        `json:"username"`
+	PublicKey  string        `json:"public_key"`
+	TTLSeconds int64         `json:"ttl_seconds"`
+	Profile    *AgentProfile `json:"profile,omitempty"`
 }
 
 type registerResponse struct {
-	Email     string    `json:"email"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Status    string    `json:"status"`
+	Email        string       `json:"email"`
+	ExpiresAt    time.Time    `json:"expires_at"`
+	RegisteredAt time.Time    `json:"registered_at"`
+	Profile      AgentProfile `json:"profile,omitempty"`
+	Status       string       `json:"status"`
+}
+
+type agentEntry struct {
+	Username     string       `json:"username"`
+	Email        string       `json:"email"`
+	ExpiresAt    time.Time    `json:"expires_at"`
+	RegisteredAt time.Time    `json:"registered_at"`
+	Profile      AgentProfile `json:"profile,omitempty"`
+}
+
+type agentsResponse struct {
+	Agents []agentEntry `json:"agents"`
+}
+
+type unregisterResponse struct {
+	Email  string `json:"email"`
+	Status string `json:"status"`
 }
 
 type sendRequest struct {
@@ -235,6 +271,8 @@ func NewApp(cfg Config) *App {
 func (a *App) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/register", a.handleRegister)
+	mux.HandleFunc("/api/v1/account", a.handleAccount)
+	mux.HandleFunc("/api/v1/agents", a.handleAgents)
 	mux.HandleFunc("/api/v1/send", a.handleSend)
 	mux.HandleFunc("/api/v1/messages", a.handleMessages)
 	mux.HandleFunc("/api/v1/skill", a.handleSkill)
@@ -317,6 +355,16 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		ttl = maxTTLSeconds
 	}
 
+	profile := AgentProfile{}
+	if req.Profile != nil {
+		normalized, err := normalizeAgentProfile(*req.Profile)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+		profile = normalized
+	}
+
 	now := a.now().UTC()
 	expiresAt := now.Add(time.Duration(ttl) * time.Second)
 
@@ -327,17 +375,76 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.users[username] = &User{
-		Username:  username,
-		PublicKey: append(ed25519.PublicKey(nil), publicKey...),
-		ExpiresAt: expiresAt,
+		Username:     username,
+		PublicKey:    append(ed25519.PublicKey(nil), publicKey...),
+		ExpiresAt:    expiresAt,
+		RegisteredAt: now,
+		Profile:      profile,
 	}
+	a.messages[username] = nil
 	a.limiters[username] = rate.NewLimiter(rate.Every(time.Minute/2), 2)
 	a.mu.Unlock()
 
 	writeJSON(w, http.StatusCreated, registerResponse{
-		Email:     a.emailFor(username),
-		ExpiresAt: expiresAt,
-		Status:    "active",
+		Email:        a.emailFor(username),
+		ExpiresAt:    expiresAt,
+		RegisteredAt: now,
+		Profile:      profile,
+		Status:       "active",
+	})
+}
+
+func (a *App) handleAgents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
+		return
+	}
+
+	if _, status, err := a.authenticate(r, nil); err != nil {
+		writeJSON(w, status, errorResponse{Error: err.Error()})
+		return
+	}
+
+	now := a.now().UTC()
+	a.mu.RLock()
+	entries := make([]agentEntry, 0, len(a.users))
+	for username, user := range a.users {
+		if !user.ExpiresAt.After(now) {
+			continue
+		}
+		entries = append(entries, agentEntry{
+			Username:     username,
+			Email:        a.emailFor(username),
+			ExpiresAt:    user.ExpiresAt,
+			RegisteredAt: user.RegisteredAt,
+			Profile:      user.Profile,
+		})
+	}
+	a.mu.RUnlock()
+
+	writeJSON(w, http.StatusOK, agentsResponse{Agents: entries})
+}
+
+func (a *App) handleAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
+		return
+	}
+
+	user, status, err := a.authenticate(r, nil)
+	if err != nil {
+		writeJSON(w, status, errorResponse{Error: err.Error()})
+		return
+	}
+
+	email := a.emailFor(user.Username)
+	a.mu.Lock()
+	a.deleteUserLocked(user.Username)
+	a.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, unregisterResponse{
+		Email:  email,
+		Status: "unregistered",
 	})
 }
 
@@ -523,11 +630,72 @@ func (a *App) cleanupExpired() {
 	defer a.mu.Unlock()
 	for username, user := range a.users {
 		if !user.ExpiresAt.After(now) {
-			delete(a.users, username)
-			delete(a.messages, username)
-			delete(a.limiters, username)
+			a.deleteUserLocked(username)
 		}
 	}
+}
+
+func (a *App) deleteUserLocked(username string) {
+	delete(a.users, username)
+	delete(a.messages, username)
+	delete(a.limiters, username)
+}
+
+func normalizeAgentProfile(profile AgentProfile) (AgentProfile, error) {
+	profile.DisplayName = trimProfileField(profile.DisplayName, maxProfileFieldLen)
+	profile.Host = trimProfileField(profile.Host, maxProfileFieldLen)
+	profile.Responsibilities = trimProfileField(profile.Responsibilities, maxProfileFieldLen)
+	profile.Notes = trimProfileField(profile.Notes, maxProfileNotesLen)
+
+	skills, err := normalizeProfileList(profile.Skills, "profile.skills")
+	if err != nil {
+		return AgentProfile{}, err
+	}
+	mcpServices, err := normalizeProfileList(profile.MCPServices, "profile.mcp_services")
+	if err != nil {
+		return AgentProfile{}, err
+	}
+	capabilities, err := normalizeProfileList(profile.Capabilities, "profile.capabilities")
+	if err != nil {
+		return AgentProfile{}, err
+	}
+
+	profile.Skills = skills
+	profile.MCPServices = mcpServices
+	profile.Capabilities = capabilities
+	return profile, nil
+}
+
+func trimProfileField(value string, maxLen int) string {
+	value = strings.TrimSpace(value)
+	if len(value) > maxLen {
+		value = value[:maxLen]
+	}
+	return value
+}
+
+func normalizeProfileList(items []string, field string) ([]string, error) {
+	if len(items) > maxProfileListItems {
+		return nil, fmt.Errorf("%s must contain at most %d items", field, maxProfileListItems)
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		item = trimProfileField(item, maxProfileListItemLen)
+		if item == "" {
+			continue
+		}
+		key := strings.ToLower(item)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 func (a *App) emailFor(username string) string {

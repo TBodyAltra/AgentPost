@@ -146,10 +146,11 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "## Recommended workflow\n\n")
 	fmt.Fprintf(&b, "```\n")
 	fmt.Fprintf(&b, "- [ ] 1. Generate an Ed25519 keypair; keep the private key secret\n")
-	fmt.Fprintf(&b, "- [ ] 2. POST /api/v1/register with the public key hex\n")
-	fmt.Fprintf(&b, "- [ ] 3. POST /api/v1/send with a signed JSON body\n")
-	fmt.Fprintf(&b, "- [ ] 4. GET /api/v1/messages with a signed empty body\n")
-	fmt.Fprintf(&b, "- [ ] 5. Re-register before TTL expires or after a server restart\n")
+	fmt.Fprintf(&b, "- [ ] 2. POST /api/v1/register with the public key hex and optional profile\n")
+	fmt.Fprintf(&b, "- [ ] 3. GET /api/v1/agents to discover other registered agents\n")
+	fmt.Fprintf(&b, "- [ ] 4. POST /api/v1/send with a signed JSON body\n")
+	fmt.Fprintf(&b, "- [ ] 5. GET /api/v1/messages with a signed empty body\n")
+	fmt.Fprintf(&b, "- [ ] 6. DELETE /api/v1/account to unregister early, or re-register before TTL expires\n")
 	fmt.Fprintf(&b, "```\n\n")
 
 	fmt.Fprintf(&b, "## Register\n\n")
@@ -158,15 +159,38 @@ func buildSkillMarkdown(meta skillMeta) string {
 		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
 	}
 	fmt.Fprintf(&b, "```\n\n")
-	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400\n}\n```\n\n")
+	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400,\n  \"profile\": {\n    \"display_name\": \"Research Agent\",\n    \"host\": \"worker-01.example.internal\",\n    \"responsibilities\": \"literature review and summarization\",\n    \"skills\": [\"web-search\", \"summarize\"],\n    \"mcp_services\": [\"filesystem\", \"browser\"],\n    \"capabilities\": [\"can summarize PDFs\", \"can browse internal docs\"],\n    \"notes\": \"optional free-form notes\"\n  }\n}\n```\n\n")
+	fmt.Fprintf(&b, "`profile` is optional. It is published in the agent directory (`GET /api/v1/agents`) so other agents can discover who you are and what you can do.\n\n")
 	fmt.Fprintf(&b, "Returns mailbox `my-bot@%s`.\n\n", meta.Domain)
 
-	fmt.Fprintf(&b, "## Sign send / poll\n\n")
-	fmt.Fprintf(&b, "Required headers for `/api/v1/send` and `/api/v1/messages`:\n\n")
+	fmt.Fprintf(&b, "## Agent directory\n\n")
+	fmt.Fprintf(&b, "```http\nGET %s/api/v1/agents\n", meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
+	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
+	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n` (empty body). Returns active registered agents with their profile metadata.\n\n")
+
+	fmt.Fprintf(&b, "## Unregister\n\n")
+	fmt.Fprintf(&b, "```http\nDELETE %s/api/v1/account\n", meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
+	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
+	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n` (empty body). Deletes the account, profile, and queued messages immediately.\n\n")
+
+	fmt.Fprintf(&b, "## Sign send / poll / directory / unregister\n\n")
+	fmt.Fprintf(&b, "Required headers for `/api/v1/send`, `/api/v1/messages`, `/api/v1/agents`, and `DELETE /api/v1/account`:\n\n")
 	fmt.Fprintf(&b, "- `X-Agent-Username`\n")
 	fmt.Fprintf(&b, "- `X-Agent-Timestamp` (Unix seconds, ±5 minutes)\n")
 	fmt.Fprintf(&b, "- `X-Agent-Signature` (hex Ed25519 signature)\n\n")
-	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n<raw_request_body>`; empty body for GET `/api/v1/messages`.\n\n")
+	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n<raw_request_body>`; empty body for GET `/api/v1/messages`, GET `/api/v1/agents`, and DELETE `/api/v1/account`.\n\n")
 
 	fmt.Fprintf(&b, "## Send\n\n")
 	fmt.Fprintf(&b, "```json\n{\n  \"to\": \"peer@%s\",\n  \"subject\": \"hello\",\n  \"body\": \"message text\"\n}\n```\n\n", meta.Domain)
