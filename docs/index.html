@@ -144,14 +144,61 @@
       font-size: 0.94rem;
     }
 
-    .language-switch {
+    .lang-segment {
+      display: inline-flex;
+      align-items: center;
       border: 1px solid var(--line);
-      color: var(--text);
-      background: var(--card);
-      padding: 8px 12px;
       border-radius: 999px;
+      overflow: hidden;
+      background: var(--card);
+    }
+
+    .lang-segment button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
       font: inherit;
+      font-size: 0.86rem;
+      font-weight: 650;
+      padding: 8px 11px;
       cursor: pointer;
+      line-height: 1;
+    }
+
+    .lang-segment button:hover {
+      color: var(--text);
+    }
+
+    .lang-segment button.is-active {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .dashboard-showcase {
+      margin-top: 0;
+    }
+
+    .dashboard-frame {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--card-strong);
+      box-shadow: var(--shadow);
+    }
+
+    .dashboard-frame img {
+      display: block;
+      width: 100%;
+      height: auto;
+      vertical-align: middle;
+    }
+
+    .dashboard-frame figcaption {
+      padding: 14px 18px;
+      color: var(--muted);
+      font-size: 0.94rem;
+      border-top: 1px solid var(--line);
     }
 
     .hero {
@@ -489,21 +536,36 @@
       flex-wrap: wrap;
     }
 
+    [data-lang="zh-hant"],
     [data-lang="en"] {
       display: none;
     }
 
-    body.show-en [data-lang="zh"] {
-      display: none;
+    body[data-site-lang="zh-hant"] [data-lang="zh-hans"],
+    body[data-site-lang="zh-hant"] [data-lang="en"],
+    body[data-site-lang="en"] [data-lang="zh-hans"],
+    body[data-site-lang="en"] [data-lang="zh-hant"] {
+      display: none !important;
     }
 
-    body.show-en [data-lang="en"] {
+    body[data-site-lang="zh-hant"] [data-lang="zh-hant"],
+    body[data-site-lang="en"] [data-lang="en"] {
       display: revert;
     }
 
-    body.show-en .grid [data-lang="en"],
-    body.show-en .flow [data-lang="en"] {
+    body[data-site-lang="en"] .grid [data-lang="en"],
+    body[data-site-lang="en"] .flow [data-lang="en"] {
       display: block;
+    }
+
+    body[data-site-lang="zh-hant"] .grid [data-lang="zh-hant"],
+    body[data-site-lang="zh-hant"] .flow [data-lang="zh-hant"] {
+      display: block;
+    }
+
+    body[data-site-lang="zh-hant"] .scenario-table [data-lang="zh-hant"],
+    body[data-site-lang="en"] .scenario-table [data-lang="en"] {
+      display: table-cell;
     }
 
     @media (max-width: 920px) {
@@ -568,14 +630,24 @@
         <span>AgentPost</span>
       </a>
       <div class="nav-links">
-        <a href="#features" data-lang="zh">特性</a>
+        <a href="#dashboard" data-lang="zh-hans">仪表盘</a>
+        <a href="#dashboard" data-lang="zh-hant">儀表盤</a>
+        <a href="#dashboard" data-lang="en">Dashboard</a>
+        <a href="#features" data-lang="zh-hans">特性</a>
+        <a href="#features" data-lang="zh-hant">特性</a>
         <a href="#features" data-lang="en">Features</a>
-        <a href="#flow" data-lang="zh">流程</a>
+        <a href="#flow" data-lang="zh-hans">流程</a>
+        <a href="#flow" data-lang="zh-hant">流程</a>
         <a href="#flow" data-lang="en">Flow</a>
-        <a href="#deploy" data-lang="zh">部署</a>
+        <a href="#deploy" data-lang="zh-hans">部署</a>
+        <a href="#deploy" data-lang="zh-hant">部署</a>
         <a href="#deploy" data-lang="en">Deploy</a>
         <a href="https://github.com/TBodyAltra/AgentPost">GitHub</a>
-        <button class="language-switch" type="button" data-toggle-lang>English</button>
+        <div class="lang-segment" role="group" aria-label="Language">
+          <button type="button" data-lang-pick="zh-hans" class="is-active">简</button>
+          <button type="button" data-lang-pick="zh-hant">繁</button>
+          <button type="button" data-lang-pick="en">EN</button>
+        </div>
       </div>
     </div>
   </nav>
@@ -583,35 +655,44 @@
   <main id="top" class="page">
     <section class="hero" aria-labelledby="hero-title">
       <div>
-        <div class="eyebrow" data-lang="zh">面向 AI Agent 的轻量邮件网关</div>
+        <div class="eyebrow" data-lang="zh-hans">面向 AI Agent 的轻量邮件网关</div>
+<div class="eyebrow" data-lang="zh-hant">面向 AI Agent 的輕量郵件網關</div>
         <div class="eyebrow" data-lang="en">A lightweight mail gateway for AI agents</div>
         <h1 id="hero-title">AgentPost</h1>
-        <p class="lead" data-lang="zh">
+        <p class="lead" data-lang="zh-hans">
           让 Agent 通过 HTTP API 注册临时邮箱、用 Ed25519 签名发信、在没有公网 WebHook 的情况下轮询收件箱，并通过 Skill 获取当前部署实例的连接规则。
+        </p>
+<p class="lead" data-lang="zh-hant">
+          讓 Agent 通過 HTTP API 註冊臨時郵箱、用 Ed25519 簽名發信、在沒有公網 WebHook 的情況下輪詢收件箱，並通過 Skill 獲取當前部署實例的連接規則。
         </p>
         <p class="lead" data-lang="en">
           Give agents temporary email identities, signed HTTP delivery, inbox polling without public webhooks, and deployment-aware skill instructions from a single small gateway.
         </p>
         <div class="hero-actions">
-          <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="zh">查看 GitHub</a>
+          <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="zh-hans">查看 GitHub</a>
+<a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="zh-hant">查看 GitHub</a>
           <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="en">View on GitHub</a>
-          <a class="button secondary" href="https://github.com/TBodyAltra/AgentPost/blob/main/README.md" data-lang="zh">阅读中文 README</a>
+          <a class="button secondary" href="https://github.com/TBodyAltra/AgentPost/blob/main/README.md" data-lang="zh-hans">阅读中文 README</a>
+<a class="button secondary" href="https://github.com/TBodyAltra/AgentPost/blob/main/README.md" data-lang="zh-hant">閱讀中文 README</a>
           <a class="button secondary" href="https://github.com/TBodyAltra/AgentPost/blob/main/README.en.md" data-lang="en">Read README</a>
         </div>
         <div class="stats" aria-label="Project highlights">
           <div class="stat">
             <strong>HTTP</strong>
-            <span data-lang="zh">原生 API</span>
+            <span data-lang="zh-hans">原生 API</span>
+<span data-lang="zh-hant">原生 API</span>
             <span data-lang="en">native APIs</span>
           </div>
           <div class="stat">
             <strong>Ed25519</strong>
-            <span data-lang="zh">无密码签名</span>
+            <span data-lang="zh-hans">无密码签名</span>
+<span data-lang="zh-hant">無密碼簽名</span>
             <span data-lang="en">passwordless signatures</span>
           </div>
           <div class="stat">
             <strong>TTL</strong>
-            <span data-lang="zh">临时身份</span>
+            <span data-lang="zh-hans">临时身份</span>
+<span data-lang="zh-hant">臨時身份</span>
             <span data-lang="en">temporary identities</span>
           </div>
         </div>
@@ -634,38 +715,80 @@
       </div>
     </section>
 
+    <section id="dashboard" class="dashboard-showcase">
+      <div class="section-head">
+        <h2 data-lang="zh-hans">运维互联仪表盘</h2>
+        <h2 data-lang="zh-hant">運維互聯儀表盤</h2>
+        <h2 data-lang="en">Operations dashboard</h2>
+        <p data-lang="zh-hans">部署网关后，用 Token 登录即可查看活跃邮箱、域内互联拓扑与 Agent 资料——与运行中的 <code>/dashboard/</code> 一致。</p>
+        <p data-lang="zh-hant">部署閘道後，用 Token 登入即可查看活躍郵箱、域內互聯拓撲與 Agent 資料——與運行中的 <code>/dashboard/</code> 一致。</p>
+        <p data-lang="en">After deploying the gateway, sign in with your token to inspect active mailboxes, intra-domain topology, and agent profiles—the same UI served at <code>/dashboard/</code>.</p>
+      </div>
+      <figure class="dashboard-frame">
+        <img
+          id="dashboard-screenshot"
+          src="images/dashboard.png"
+          width="1536"
+          height="1024"
+          loading="lazy"
+          decoding="async"
+          alt="AgentPost 仪表盘：活跃邮箱统计、互联拓扑图与邮箱详情面板"
+        >
+        <figcaption data-lang="zh-hans">实时拓扑、跨域策略与 Agent profile 一览；支持简 / 繁 / 英文界面。</figcaption>
+        <figcaption data-lang="zh-hant">即時拓撲、跨域策略與 Agent profile 一覽；支援簡 / 繁 / 英文介面。</figcaption>
+        <figcaption data-lang="en">Live topology, cross-domain policy edges, and agent profiles—with Simplified Chinese, Traditional Chinese, and English UI.</figcaption>
+      </figure>
+    </section>
+
     <section id="features">
       <div class="section-head">
-        <h2 data-lang="zh">为什么是 AgentPost？</h2>
+        <h2 data-lang="zh-hans">为什么是 AgentPost？</h2>
+<h2 data-lang="zh-hant">爲什麼是 AgentPost？</h2>
         <h2 data-lang="en">Why AgentPost?</h2>
-        <p data-lang="zh">它不是传统邮箱服务器，而是为多 Agent 协作和自动化任务收窄过边界的消息网关。</p>
+        <p data-lang="zh-hans">它不是传统邮箱服务器，而是为多 Agent 协作和自动化任务收窄过边界的消息网关。</p>
+<p data-lang="zh-hant">它不是傳統郵箱服務器，而是爲多 Agent 協作和自動化任務收窄過邊界的消息網關。</p>
         <p data-lang="en">It is not a traditional mail server. It is a focused message gateway shaped for multi-agent workflows and automation.</p>
       </div>
       <div class="grid">
-        <article class="card" data-lang="zh">
+        <article class="card" data-lang="zh-hans">
           <div class="card-icon">API</div>
           <h3>HTTP 原生收发</h3>
           <p>注册、发信、拉取消息、发现 Agent 都是 JSON API，适合脚本、SDK 和自动化环境。</p>
+        </article>
+<article class="card" data-lang="zh-hant">
+          <div class="card-icon">API</div>
+          <h3>HTTP 原生收發</h3>
+          <p>註冊、發信、拉取消息、發現 Agent 都是 JSON API，適合腳本、SDK 和自動化環境。</p>
         </article>
         <article class="card" data-lang="en">
           <div class="card-icon">API</div>
           <h3>HTTP-native messaging</h3>
           <p>Registration, sending, polling, and agent discovery are JSON APIs for scripts, SDKs, and automation.</p>
         </article>
-        <article class="card" data-lang="zh">
+        <article class="card" data-lang="zh-hans">
           <div class="card-icon">SIG</div>
           <h3>Ed25519 鉴权</h3>
           <p>Agent 自己持有私钥，请求签名而不是共享密码，更适合机器身份和临时账户。</p>
+        </article>
+<article class="card" data-lang="zh-hant">
+          <div class="card-icon">SIG</div>
+          <h3>Ed25519 鑑權</h3>
+          <p>Agent 自己持有私鑰，請求籤名而不是共享密碼，更適合機器身份和臨時賬戶。</p>
         </article>
         <article class="card" data-lang="en">
           <div class="card-icon">SIG</div>
           <h3>Ed25519 identity</h3>
           <p>Agents keep their private keys and sign requests instead of sharing passwords or long-lived credentials.</p>
         </article>
-        <article class="card" data-lang="zh">
+        <article class="card" data-lang="zh-hans">
           <div class="card-icon">SKL</div>
           <h3>Skill 自动说明</h3>
           <p><code>/api/v1/skill</code> 返回当前部署实例的 URL、域名、Token 要求和使用规则。</p>
+        </article>
+<article class="card" data-lang="zh-hant">
+          <div class="card-icon">SKL</div>
+          <h3>Skill 自動說明</h3>
+          <p><code>/api/v1/skill</code> 返回當前部署實例的 URL、域名、Token 要求和使用規則。</p>
         </article>
         <article class="card" data-lang="en">
           <div class="card-icon">SKL</div>
@@ -677,39 +800,57 @@
 
     <section id="flow">
       <div class="section-head">
-        <h2 data-lang="zh">Agent 使用流程</h2>
+        <h2 data-lang="zh-hans">Agent 使用流程</h2>
+<h2 data-lang="zh-hant">Agent 使用流程</h2>
         <h2 data-lang="en">Agent workflow</h2>
-        <p data-lang="zh">从注册到投递只需要标准 HTTP；Agent 没有公网 IP 时也能通过轮询收件。</p>
+        <p data-lang="zh-hans">从注册到投递只需要标准 HTTP；Agent 没有公网 IP 时也能通过轮询收件。</p>
+<p data-lang="zh-hant">從註冊到投遞只需要標準 HTTP；Agent 沒有公網 IP 時也能通過輪詢收件。</p>
         <p data-lang="en">Everything runs over ordinary HTTP. Agents without public IPs can still receive messages by polling.</p>
       </div>
       <div class="flow">
-        <article class="step" data-lang="zh">
+        <article class="step" data-lang="zh-hans">
           <h3>获取 Skill</h3>
           <p><code>GET /api/v1/skill</code> 学习本实例的 server URL、domain 与安全规则。</p>
+        </article>
+<article class="step" data-lang="zh-hant">
+          <h3>獲取 Skill</h3>
+          <p><code>GET /api/v1/skill</code> 學習本實例的 server URL、domain 與安全規則。</p>
         </article>
         <article class="step" data-lang="en">
           <h3>Fetch skill</h3>
           <p><code>GET /api/v1/skill</code> to learn this instance's URL, domain, and security rules.</p>
         </article>
-        <article class="step" data-lang="zh">
+        <article class="step" data-lang="zh-hans">
           <h3>注册邮箱</h3>
           <p><code>POST /api/v1/register</code> 上传公钥，获得带 TTL 的临时邮箱身份。</p>
+        </article>
+<article class="step" data-lang="zh-hant">
+          <h3>註冊郵箱</h3>
+          <p><code>POST /api/v1/register</code> 上傳公鑰，獲得帶 TTL 的臨時郵箱身份。</p>
         </article>
         <article class="step" data-lang="en">
           <h3>Register mailbox</h3>
           <p><code>POST /api/v1/register</code> with a public key to receive a TTL-bound mailbox.</p>
         </article>
-        <article class="step" data-lang="zh">
+        <article class="step" data-lang="zh-hans">
           <h3>签名发送</h3>
           <p><code>POST /api/v1/send</code> 使用时间戳和原始 body 生成 Ed25519 签名。</p>
+        </article>
+<article class="step" data-lang="zh-hant">
+          <h3>簽名發送</h3>
+          <p><code>POST /api/v1/send</code> 使用時間戳和原始 body 生成 Ed25519 簽名。</p>
         </article>
         <article class="step" data-lang="en">
           <h3>Send signed mail</h3>
           <p><code>POST /api/v1/send</code> with an Ed25519 signature over timestamp and raw body.</p>
         </article>
-        <article class="step" data-lang="zh">
+        <article class="step" data-lang="zh-hans">
           <h3>轮询收件</h3>
           <p><code>GET /api/v1/messages</code> 拉取收件箱，适合后台 Worker 或无公网 Agent。</p>
+        </article>
+<article class="step" data-lang="zh-hant">
+          <h3>輪詢收件</h3>
+          <p><code>GET /api/v1/messages</code> 拉取收件箱，適合後臺 Worker 或無公網 Agent。</p>
         </article>
         <article class="step" data-lang="en">
           <h3>Poll inbox</h3>
@@ -720,18 +861,22 @@
 
     <section id="deploy">
       <div class="section-head">
-        <h2 data-lang="zh">四种部署场景</h2>
+        <h2 data-lang="zh-hans">四种部署场景</h2>
+<h2 data-lang="zh-hant">四種部署場景</h2>
         <h2 data-lang="en">Four deployment scenarios</h2>
-        <p data-lang="zh">HTTP 访问地址和邮箱后缀是两个独立设置：公网 IP 访问时，邮箱仍可使用 <code>example.domain</code> 后缀。</p>
+        <p data-lang="zh-hans">HTTP 访问地址和邮箱后缀是两个独立设置：公网 IP 访问时，邮箱仍可使用 <code>example.domain</code> 后缀。</p>
+<p data-lang="zh-hant">HTTP 訪問地址和郵箱後綴是兩個獨立設置：公網 IP 訪問時，郵箱仍可使用 <code>example.domain</code> 後綴。</p>
         <p data-lang="en">The HTTP URL and mailbox suffix are independent. Agents may connect by public IP while mailboxes still use <code>example.domain</code>.</p>
       </div>
       <table class="scenario-table">
         <thead>
           <tr>
-            <th data-lang="zh">场景</th>
+            <th data-lang="zh-hans">场景</th>
+<th data-lang="zh-hant">場景</th>
             <th data-lang="en">Scenario</th>
             <th>Command</th>
-            <th data-lang="zh">适用情况</th>
+            <th data-lang="zh-hans">适用情况</th>
+<th data-lang="zh-hant">適用情況</th>
             <th data-lang="en">Use when</th>
           </tr>
         </thead>
@@ -739,25 +884,29 @@
           <tr>
             <td>local</td>
             <td><code>./start.sh --scenario local</code></td>
-            <td data-lang="zh">同机开发调试，默认无需 Token。</td>
+            <td data-lang="zh-hans">同机开发调试，默认无需 Token。</td>
+<td data-lang="zh-hant">同機開發調試，默認無需 Token。</td>
             <td data-lang="en">Local development on the same host, token off by default.</td>
           </tr>
           <tr>
             <td>lan</td>
             <td><code>./start.sh --scenario lan --lan-ip 192.168.1.100</code></td>
-            <td data-lang="zh">同一局域网、交换机或 VPN。</td>
+            <td data-lang="zh-hans">同一局域网、交换机或 VPN。</td>
+<td data-lang="zh-hant">同一局域網、交換機或 VPN。</td>
             <td data-lang="en">Same LAN, switch, or VPN.</td>
           </tr>
           <tr>
             <td>public-ip</td>
             <td><code>./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.domain</code></td>
-            <td data-lang="zh">没有可用 HTTPS 域名，使用公网 IP + 8080。</td>
+            <td data-lang="zh-hans">没有可用 HTTPS 域名，使用公网 IP + 8080。</td>
+<td data-lang="zh-hant">沒有可用 HTTPS 域名，使用公網 IP + 8080。</td>
             <td data-lang="en">No working HTTPS domain; use public IP plus port 8080.</td>
           </tr>
           <tr>
             <td>public-domain</td>
             <td><code>./start.sh --scenario public-domain --domain example.domain</code></td>
-            <td data-lang="zh">有 DNS 与 HTTPS，Caddy 反代到 AgentPost。</td>
+            <td data-lang="zh-hans">有 DNS 与 HTTPS，Caddy 反代到 AgentPost。</td>
+<td data-lang="zh-hant">有 DNS 與 HTTPS，Caddy 反代到 AgentPost。</td>
             <td data-lang="en">DNS and HTTPS are available; Caddy proxies to AgentPost.</td>
           </tr>
         </tbody>
@@ -768,10 +917,14 @@
       <div class="split">
         <article class="card notice">
           <div class="card-icon">!</div>
-          <h2 data-lang="zh">安全默认值</h2>
+          <h2 data-lang="zh-hans">安全默认值</h2>
+<h2 data-lang="zh-hant">安全默認值</h2>
           <h2 data-lang="en">Secure defaults</h2>
-          <p data-lang="zh">
+          <p data-lang="zh-hans">
             公网部署默认建议开启网关 Token；注册按客户端 IP 限速，发信按邮箱限速；外部 relay 默认关闭。部署者仍需负责防滥用、DNS/TLS、防火墙与合规。
+          </p>
+<p data-lang="zh-hant">
+            公網部署默認建議開啓網關 Token；註冊按客戶端 IP 限速，發信按郵箱限速；外部 relay 默認關閉。部署者仍需負責防濫用、DNS/TLS、防火牆與合規。
           </p>
           <p data-lang="en">
             Public deployments should enable the gateway token. Registration is rate-limited per client IP, sending is rate-limited per mailbox, and external relay is off by default. Operators remain responsible for abuse prevention, DNS/TLS, firewalling, and compliance.
@@ -800,7 +953,8 @@ GET    /dashboard/</pre>
     <div class="page footer-inner">
       <div>
         <strong>AgentPost</strong>
-        <span data-lang="zh"> - 开源轻量 AI Agent 邮件网关。</span>
+        <span data-lang="zh-hans"> - 开源轻量 AI Agent 邮件网关。</span>
+<span data-lang="zh-hant"> - 開源輕量 AI Agent 郵件網關。</span>
         <span data-lang="en"> - open-source lightweight mail gateway for AI agents.</span>
       </div>
       <div>
@@ -812,23 +966,43 @@ GET    /dashboard/</pre>
   </footer>
 
   <script>
-    const toggle = document.querySelector("[data-toggle-lang]");
-    const storedLanguage = localStorage.getItem("agentpost-site-language");
-    const browserLanguage = navigator.language && navigator.language.toLowerCase().startsWith("en") ? "en" : "zh";
-    const initialLanguage = storedLanguage || browserLanguage;
+    const langButtons = document.querySelectorAll("[data-lang-pick]");
+    let storedLanguage = localStorage.getItem("agentpost-site-language");
+    if (storedLanguage === "zh") storedLanguage = "zh-hans";
+    const nav = navigator.language ? navigator.language.toLowerCase() : "";
 
-    function setLanguage(language) {
-      const isEnglish = language === "en";
-      document.body.classList.toggle("show-en", isEnglish);
-      document.documentElement.lang = isEnglish ? "en" : "zh-CN";
-      toggle.textContent = isEnglish ? "中文" : "English";
-      localStorage.setItem("agentpost-site-language", isEnglish ? "en" : "zh");
+    function detectLanguage() {
+      if (nav.startsWith("en")) return "en";
+      if (nav === "zh-tw" || nav === "zh-hk" || nav === "zh-mo" || nav.includes("hant")) return "zh-hant";
+      if (nav.startsWith("zh")) return "zh-hans";
+      return "zh-hans";
     }
 
-    toggle.addEventListener("click", () => {
-      setLanguage(document.body.classList.contains("show-en") ? "zh" : "en");
+    const initialLanguage = storedLanguage || detectLanguage();
+
+    const dashboardAlt = {
+      "zh-hans": "AgentPost 仪表盘：活跃邮箱统计、互联拓扑图与邮箱详情面板",
+      "zh-hant": "AgentPost 儀表盤：活躍郵箱統計、互聯拓撲圖與郵箱詳情面板",
+      en: "AgentPost dashboard: mailbox metrics, topology graph, and profile panel",
+    };
+
+    function setLanguage(language) {
+      const lang = ["zh-hans", "zh-hant", "en"].includes(language) ? language : "zh-hans";
+      document.body.dataset.siteLang = lang;
+      document.documentElement.lang = lang === "en" ? "en" : (lang === "zh-hant" ? "zh-Hant" : "zh-Hans");
+      langButtons.forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.langPick === lang);
+      });
+      const shot = document.getElementById("dashboard-screenshot");
+      if (shot) shot.alt = dashboardAlt[lang] || dashboardAlt["zh-hans"];
+      localStorage.setItem("agentpost-site-language", lang);
+    }
+
+    langButtons.forEach((button) => {
+      button.addEventListener("click", () => setLanguage(button.dataset.langPick));
     });
 
+    document.body.dataset.siteLang = "zh-hans";
     setLanguage(initialLanguage);
   </script>
 </body>
