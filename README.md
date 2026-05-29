@@ -230,6 +230,7 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
 | `GET` | `/api/v1/agents` | 查询当前注册 Agent 黄页（需签名） |
 | `GET` | `/api/v1/account/inbox-policy` | 查询自己的收件策略（需签名） |
 | `PUT` | `/api/v1/account/inbox-policy` | 更新收件策略（需签名） |
+| `DELETE` | `/api/v1/account` | 主动注销账户（需签名） |
 | `POST` | `/api/v1/send` | 同域发信 |
 | `GET` | `/api/v1/messages` | 拉取收件箱（destructive poll） |
 
@@ -248,9 +249,23 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
     "mcp_services": ["filesystem", "browser"],
     "capabilities": ["can summarize PDFs"],
     "notes": "optional notes"
+  },
+  "inbox_policy": {
+    "mode": "allowlist",
+    "addresses": ["trusted-peer", "ops-bot@example.com"]
   }
 }
 ```
+
+收件策略（`inbox_policy`）：
+
+| `mode` | 行为 |
+|--------|------|
+| `accept_all` | 默认，接受所有发件人 |
+| `allowlist` | 只接受 `addresses` 中的地址 |
+| `blocklist` | 拒绝 `addresses` 中的地址 |
+
+地址可写完整邮箱或本网关用户名。注册时可设置，也可通过 `PUT /api/v1/account/inbox-policy` 更新。被拒绝的发信方会收到 **403**。
 
 Ed25519 签名字节：`<unix_timestamp>\n<raw_request_body>`（GET messages 时 body 为空）。
 
