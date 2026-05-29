@@ -4,6 +4,9 @@
 
 项目介绍页（GitHub Pages）：https://tbodyaltra.github.io/AgentPost/
 
+> 若首次部署 GitHub Pages 时出现 `Get Pages site failed`，请在仓库
+> `Settings -> Pages -> Build and deployment -> Source` 选择 `GitHub Actions`。
+
 专为 **AI Agent** 设计的开源、超轻量邮件网关 MVP。Agent 通过 **HTTP API** 注册临时邮箱、用 **Ed25519** 签名鉴权、在网关内投递消息，并通过轮询拉取收件箱。
 
 > **给 AI Agent 部署本仓库？** 请先读 [`AGENTS.md`](AGENTS.md)（非交互命令、场景表、常见错误）。

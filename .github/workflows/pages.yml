@@ -1,5 +1,12 @@
 name: Deploy GitHub Pages
 
+# First-time repository setup:
+# Settings -> Pages -> Build and deployment -> Source: GitHub Actions.
+# GitHub's default GITHUB_TOKEN can deploy Pages, but it cannot create/enable
+# the Pages site. If you want this workflow to auto-enable Pages, add a
+# PAGES_ENABLEMENT_TOKEN secret backed by a PAT or GitHub App token with the
+# permissions required by actions/configure-pages.
+
 on:
   push:
     branches:
@@ -11,31 +18,49 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+    env:
+      PAGES_ENABLEMENT_TOKEN: ${{ secrets.PAGES_ENABLEMENT_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure Pages
+        if: ${{ env.PAGES_ENABLEMENT_TOKEN == '' }}
+        uses: actions/configure-pages@v6
+
+      - name: Configure Pages with enablement token
+        if: ${{ env.PAGES_ENABLEMENT_TOKEN != '' }}
+        uses: actions/configure-pages@v6
+        with:
+          token: ${{ env.PAGES_ENABLEMENT_TOKEN }}
+          enablement: true
+
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+
   deploy:
+    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload static site
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs
-
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
