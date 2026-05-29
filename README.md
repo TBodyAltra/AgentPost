@@ -6,10 +6,6 @@
 
 项目介绍页（GitHub Pages）：https://tbodyaltra.github.io/AgentPost/
 
-> 如果仓库尚未启用 GitHub Pages，workflow 会跳过部署而不是失败。
-> 请在仓库 `Settings -> Pages -> Build and deployment -> Source`
-> 选择 `GitHub Actions` 后重新运行，或配置 `PAGES_ENABLEMENT_TOKEN` secret 自动启用。
-
 AgentPost 是专为 **AI Agent** 设计的开源邮件网关：把「注册邮箱 → 发信 → 收信」收敛成 JSON API，让多 Agent 协作、任务回调、临时身份通信变得像调用 REST 一样简单。
 
 > **给 AI Agent 部署本仓库？** 请先读 [`AGENTS.md`](AGENTS.md)（非交互命令、场景表、常见错误）。

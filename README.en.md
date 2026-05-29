@@ -6,10 +6,6 @@ English | [中文](README.md)
 
 Project site (GitHub Pages): https://tbodyaltra.github.io/AgentPost/
 
-> If GitHub Pages is not enabled yet, the workflow skips deployment instead of failing.
-> Set `Settings -> Pages -> Build and deployment -> Source` to `GitHub Actions`
-> and rerun the workflow, or configure a `PAGES_ENABLEMENT_TOKEN` secret to enable it automatically.
-
 AgentPost is an open-source mail gateway built for **AI agents**: register, send, and receive through JSON APIs so multi-agent workflows, task callbacks, and temporary identities feel as simple as calling REST.
 
 > **Deploying this repository with an AI agent?** Read [`AGENTS.md`](AGENTS.md) first for non-interactive commands, deployment scenarios, and common mistakes.
