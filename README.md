@@ -5,6 +5,8 @@
 专为 **AI Agent** 设计的开源、超轻量邮件网关 MVP。Agent 通过 **HTTP API** 注册临时邮箱、用 **Ed25519** 签名鉴权、在网关内投递消息，并通过轮询拉取收件箱。
 
 > **给 AI Agent 部署本仓库？** 请先读 [`AGENTS.md`](AGENTS.md)（非交互命令、场景表、常见错误）。
+>
+> **公网部署提醒**：部署者需自行负责防滥用、反垃圾邮件、合规、DNS/TLS 与防火墙配置。公网场景建议开启网关 Token，并只暴露必要端口。
 
 ## 特性
 
@@ -17,6 +19,7 @@
 | Skill API | `GET /api/v1/skill` 返回**本部署**的 URL 与用法 |
 | Dashboard | `/dashboard/` 可视化 domain、邮箱互连与账户详情 |
 | 一键部署 | `./start.sh` 交互式或 `--scenario` 参数化 |
+| 防滥用默认值 | 公网默认网关 Token、注册限速、发信限速、默认不支持外部中继 |
 
 ---
 
@@ -210,6 +213,8 @@ Agent → https://example.domain:443 → Caddy → http://agentpost:8080 → Age
 | 网关 Token | `/api/v1/*`（除 `/healthz`、`/skill`） | 公网建议开启 |
 | Ed25519 签名 | `/api/v1/send`、`/messages` | 始终需要 |
 
+`POST /api/v1/register` 另有每客户端 IP **10 次/分钟**限速；发信为每邮箱 **2 封/分钟**。
+
 ---
 
 ## Agent Skill API
@@ -351,6 +356,17 @@ Ed25519 签名字节：`<unix_timestamp>\n<raw_request_body>`（GET messages 时
 - **Agent 互发不走 MX**，只在网关内存路由
 - **重启清空所有用户与邮件**（内存存储）
 - **网关 Token 不写入磁盘**，由 `./start.sh` 打印一次
+
+---
+
+## 安全与开源说明
+
+- 公网部署请开启网关 Token、使用 HTTPS，并按场景只开放必要端口；`public-domain` 场景建议让 Caddy 对外，保持 `8080` 私有。
+- 本项目是 MVP，默认内存存储；进程重启会清空用户和邮件，不应直接当作持久化生产邮箱。
+- 注册接口按客户端 IP 限速 **10 次/分钟**，发信按邮箱限速 **2 封/分钟**；外部 SMTP relay 默认关闭且 MVP 未实现。
+- 请不要把 `.env`、`config.yaml`、Token、私钥或真实部署域名提交到仓库。
+- 安全漏洞请按 [`SECURITY.md`](SECURITY.md) 私下报告；贡献流程见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+- 第三方依赖遵循其各自许可证；直接依赖列表见 [`go.mod`](go.mod)。
 
 ---
 

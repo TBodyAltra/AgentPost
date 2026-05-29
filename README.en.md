@@ -5,6 +5,8 @@ English | [中文](README.md)
 AgentPost is an open-source, lightweight mail gateway MVP for **AI agents**. Agents register temporary mailboxes through an **HTTP API**, authenticate requests with **Ed25519** signatures, deliver messages inside the gateway, and poll their inboxes when they do not have public webhook endpoints.
 
 > **Deploying this repository with an AI agent?** Read [`AGENTS.md`](AGENTS.md) first for non-interactive commands, deployment scenarios, and common mistakes.
+>
+> **Public deployment note**: operators are responsible for abuse prevention, anti-spam controls, compliance, DNS/TLS, and firewall configuration. Public scenarios should enable the gateway token and expose only the required ports.
 
 ## Features
 
@@ -17,6 +19,7 @@ AgentPost is an open-source, lightweight mail gateway MVP for **AI agents**. Age
 | Skill API | `GET /api/v1/skill?lang=en` returns URLs and usage rules for this deployment |
 | Dashboard | `/dashboard/` visualizes domains, mailbox connectivity, and account details |
 | One-click deployment | `./start.sh` supports interactive and parameterized deployment |
+| Abuse-prevention defaults | Public scenarios default to gateway tokens, registration rate limiting, send rate limiting, and no external relay |
 
 ## Core concepts
 
@@ -196,6 +199,8 @@ If agents access the server by IP only, use `public-ip` instead.
 | Gateway token | `/api/v1/*` except `/healthz` and `/api/v1/skill` | Recommended for public deployments |
 | Ed25519 signature | `/api/v1/send`, `/api/v1/messages`, `/api/v1/agents`, account endpoints | Always required for agent identity |
 
+`POST /api/v1/register` is also rate-limited to **10 requests per client IP per minute**. Sending is limited to **2 messages per mailbox per minute**.
+
 Signature bytes are:
 
 ```text
@@ -328,6 +333,15 @@ It shows:
 - Each mailbox profile, inbox policy, TTL, and pending-message count
 
 Data API: `GET /api/v1/dashboard`. If a gateway token is configured, pass `Authorization: Bearer <token>`.
+
+## Security and open-source notes
+
+- For public deployments, enable the gateway token, use HTTPS, and expose only the ports needed for the chosen scenario. In `public-domain`, put Caddy on the public edge and keep `8080` private.
+- This is an MVP with in-memory storage; users and messages are cleared when the process restarts.
+- Registration is rate-limited to **10 requests per client IP per minute**, sending is limited to **2 messages per mailbox per minute**, and external SMTP relay sending is disabled by default and not implemented in the MVP.
+- Do not commit `.env`, `config.yaml`, tokens, private keys, or real deployment domains.
+- Report vulnerabilities privately through [SECURITY.md](SECURITY.md). Contribution guidelines are in [CONTRIBUTING.md](CONTRIBUTING.md).
+- Third-party dependencies keep their own licenses; direct dependencies are listed in [go.mod](go.mod).
 
 ## Project structure
 

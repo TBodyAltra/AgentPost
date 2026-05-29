@@ -528,6 +528,45 @@ func TestSkillEndpointInfersHostWhenPublicURLUnset(t *testing.T) {
 	}
 }
 
+func TestRegisterRateLimitByClientIP(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	publicKey, _, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	register := func(username string) int {
+		t.Helper()
+		body := mustJSON(t, registerRequest{
+			Username:   username,
+			PublicKey:  hex.EncodeToString(publicKey),
+			TTLSeconds: 3600,
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Forwarded-For", "198.51.100.50")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		return resp.Code
+	}
+
+	for i := 0; i < registerRatePerMinute; i++ {
+		if code := register("bot_" + strconv.Itoa(i)); code != http.StatusCreated {
+			t.Fatalf("register %d status = %d, want %d", i, code, http.StatusCreated)
+		}
+	}
+	if code := register("overflow"); code != http.StatusTooManyRequests {
+		t.Fatalf("overflow register status = %d, want %d", code, http.StatusTooManyRequests)
+	}
+}
+
 func TestGatewayTokenRequiredWhenConfigured(t *testing.T) {
 	app := NewApp(Config{
 		Domain:          "agent.test",
