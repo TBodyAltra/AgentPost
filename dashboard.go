@@ -13,11 +13,11 @@ import (
 var dashboardFS embed.FS
 
 type dashboardResponse struct {
-	GeneratedAt time.Time         `json:"generated_at"`
-	Gateway     dashboardGateway  `json:"gateway"`
-	Domains     []dashboardDomain `json:"domains"`
+	GeneratedAt time.Time          `json:"generated_at"`
+	Gateway     dashboardGateway   `json:"gateway"`
+	Domains     []dashboardDomain  `json:"domains"`
 	Mailboxes   []dashboardMailbox `json:"mailboxes"`
-	Links       []dashboardLink   `json:"links"`
+	Links       []dashboardLink    `json:"links"`
 }
 
 type dashboardGateway struct {

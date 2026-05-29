@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -70,6 +71,69 @@ func TestRegisterSendAndPoll(t *testing.T) {
 	}
 	if got.Messages[0].Subject != "hello" || got.Messages[0].BodyText != "internal delivery works" {
 		t.Fatalf("unexpected message: %+v", got.Messages[0])
+	}
+}
+
+func TestMessagesPollIsDestructive(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	publicKey, privateKey, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	registerBody := mustJSON(t, registerRequest{
+		Username:   "bot_1",
+		PublicKey:  hex.EncodeToString(publicKey),
+		TTLSeconds: 3600,
+	})
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(registerBody))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerResp := httptest.NewRecorder()
+	handler.ServeHTTP(registerResp, registerReq)
+	if registerResp.Code != http.StatusCreated {
+		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())
+	}
+
+	sendBody := mustJSON(t, sendRequest{
+		To:      "bot_1@agent.test",
+		Subject: "destructive poll",
+		Body:    "read once",
+	})
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1@agent.test", privateKey)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusOK {
+		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
+	}
+
+	poll := func() messagesResponse {
+		t.Helper()
+		req := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, "bot_1@agent.test", privateKey)
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		if resp.Code != http.StatusOK {
+			t.Fatalf("poll status = %d, body = %s", resp.Code, resp.Body.String())
+		}
+		var got messagesResponse
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode poll response: %v", err)
+		}
+		return got
+	}
+
+	if got := poll(); len(got.Messages) != 1 {
+		t.Fatalf("first poll message count = %d, want 1", len(got.Messages))
+	}
+	if got := poll(); len(got.Messages) != 0 {
+		t.Fatalf("second poll message count = %d, want 0", len(got.Messages))
 	}
 }
 
@@ -204,6 +268,54 @@ func TestRegisterProfileDirectoryAndUnregister(t *testing.T) {
 	}
 }
 
+func TestRegisterCapsTTLAndUsesDefaultTTL(t *testing.T) {
+	now := time.Date(2026, 5, 29, 12, 0, 0, 0, time.UTC)
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	app.now = func() time.Time { return now }
+	handler := app.routes()
+
+	publicKey, _, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	register := func(username string, ttl int64) registerResponse {
+		t.Helper()
+		body := mustJSON(t, registerRequest{
+			Username:   username,
+			PublicKey:  hex.EncodeToString(publicKey),
+			TTLSeconds: ttl,
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("register %s status = %d, body = %s", username, resp.Code, resp.Body.String())
+		}
+		var got registerResponse
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode register response: %v", err)
+		}
+		return got
+	}
+
+	capped := register("ttl_capped", maxTTLSeconds+3600)
+	if !capped.ExpiresAt.Equal(now.Add(time.Duration(maxTTLSeconds) * time.Second)) {
+		t.Fatalf("capped expires_at = %s, want %s", capped.ExpiresAt, now.Add(time.Duration(maxTTLSeconds)*time.Second))
+	}
+
+	defaulted := register("ttl_default", 0)
+	if !defaulted.ExpiresAt.Equal(now.Add(time.Duration(defaultTTLSeconds) * time.Second)) {
+		t.Fatalf("default expires_at = %s, want %s", defaulted.ExpiresAt, now.Add(time.Duration(defaultTTLSeconds)*time.Second))
+	}
+}
+
 func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
 	app := NewApp(Config{
 		Domain:          "team-a.test",
@@ -294,6 +406,66 @@ func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
 	}
 }
 
+func TestSendRateLimitPerMailbox(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	senderPub, senderPriv, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate sender key: %v", err)
+	}
+	recipientPub, _, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate recipient key: %v", err)
+	}
+
+	register := func(username string, key ed25519.PublicKey) {
+		t.Helper()
+		body := mustJSON(t, registerRequest{
+			Username:   username,
+			PublicKey:  hex.EncodeToString(key),
+			TTLSeconds: 3600,
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("register %s status = %d, body = %s", username, resp.Code, resp.Body.String())
+		}
+	}
+	register("sender", senderPub)
+	register("recipient", recipientPub)
+
+	send := func() int {
+		t.Helper()
+		body := mustJSON(t, sendRequest{
+			To:      "recipient@agent.test",
+			Subject: "limited",
+			Body:    "hello",
+		})
+		req := signedRequest(t, http.MethodPost, "/api/v1/send", body, "sender@agent.test", senderPriv)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		return resp.Code
+	}
+
+	for i := 0; i < 2; i++ {
+		if code := send(); code != http.StatusOK {
+			t.Fatalf("send %d status = %d, want 200", i+1, code)
+		}
+	}
+	if code := send(); code != http.StatusTooManyRequests {
+		t.Fatalf("third send status = %d, want 429", code)
+	}
+}
+
 func TestFreeDomainRegistration(t *testing.T) {
 	app := NewApp(Config{
 		Domain:          "default.test",
@@ -360,6 +532,88 @@ func TestFreeDomainRegistration(t *testing.T) {
 	handler.ServeHTTP(sendResp, sendReq)
 	if sendResp.Code != http.StatusNotFound {
 		t.Fatalf("send to unregistered mailbox status = %d, want 404", sendResp.Code)
+	}
+}
+
+func TestSendRejectsOversizeRequestBody(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: 512,
+	})
+	handler := app.routes()
+
+	publicKey, privateKey, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	registerBody := mustJSON(t, registerRequest{
+		Username:   "bot_1",
+		PublicKey:  hex.EncodeToString(publicKey),
+		TTLSeconds: 3600,
+	})
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(registerBody))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerResp := httptest.NewRecorder()
+	handler.ServeHTTP(registerResp, registerReq)
+	if registerResp.Code != http.StatusCreated {
+		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())
+	}
+
+	sendBody := mustJSON(t, sendRequest{
+		To:      "bot_1@agent.test",
+		Subject: "too large",
+		Body:    strings.Repeat("x", 600),
+	})
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1@agent.test", privateKey)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversize send status = %d, want %d, body = %s", sendResp.Code, http.StatusRequestEntityTooLarge, sendResp.Body.String())
+	}
+}
+
+func TestLoadConfigAppliesEnvOverridesAndDefaults(t *testing.T) {
+	t.Setenv("AGENTPOST_DOMAIN", "Override.Example")
+	t.Setenv("AGENTPOST_HTTP_ADDR", ":19090")
+	t.Setenv("AGENTPOST_ALLOW_EXTERNAL_RELAY", "1")
+	t.Setenv("AGENTPOST_API_TOKEN", "from-env")
+
+	configPath := t.TempDir() + "/config.yaml"
+	if err := os.WriteFile(configPath, []byte(`
+domain: File.Example
+http_addr: ""
+smtp_addr: ":2525"
+allow_external_relay: false
+max_message_bytes: 0
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Domain != "override.example" {
+		t.Fatalf("domain = %q, want override.example", cfg.Domain)
+	}
+	if cfg.HTTPAddr != ":19090" {
+		t.Fatalf("http addr = %q, want :19090", cfg.HTTPAddr)
+	}
+	if cfg.SMTPAddr != ":2525" {
+		t.Fatalf("smtp addr = %q, want :2525", cfg.SMTPAddr)
+	}
+	if !cfg.AllowExternalRelay {
+		t.Fatalf("allow external relay should be true from env override")
+	}
+	if cfg.APIToken != "from-env" {
+		t.Fatalf("api token = %q, want from-env", cfg.APIToken)
+	}
+	if cfg.MaxMessageBytes != defaultMaxMessageBytes {
+		t.Fatalf("max message bytes = %d, want %d", cfg.MaxMessageBytes, defaultMaxMessageBytes)
 	}
 }
 
@@ -528,6 +782,50 @@ func TestSkillEndpointInfersHostWhenPublicURLUnset(t *testing.T) {
 	}
 }
 
+func TestAuthenticateRejectsStaleAndFutureTimestamps(t *testing.T) {
+	now := time.Date(2026, 5, 29, 12, 0, 0, 0, time.UTC)
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	app.now = func() time.Time { return now }
+	handler := app.routes()
+
+	publicKey, privateKey, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	registerBody := mustJSON(t, registerRequest{
+		Username:   "bot_1",
+		PublicKey:  hex.EncodeToString(publicKey),
+		TTLSeconds: 3600,
+	})
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(registerBody))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerResp := httptest.NewRecorder()
+	handler.ServeHTTP(registerResp, registerReq)
+	if registerResp.Code != http.StatusCreated {
+		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())
+	}
+
+	for name, signedAt := range map[string]time.Time{
+		"stale":  now.Add(-authTimestampTolerance - time.Second),
+		"future": now.Add(authTimestampTolerance + time.Second),
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := signedRequestAt(t, http.MethodGet, "/api/v1/messages", nil, "bot_1@agent.test", privateKey, signedAt)
+			resp := httptest.NewRecorder()
+			handler.ServeHTTP(resp, req)
+			if resp.Code != http.StatusUnauthorized {
+				t.Fatalf("messages status = %d, want 401, body = %s", resp.Code, resp.Body.String())
+			}
+		})
+	}
+}
+
 func TestRegisterRateLimitByClientIP(t *testing.T) {
 	app := NewApp(Config{
 		Domain:          "agent.test",
@@ -685,6 +983,11 @@ func mustJSON(t *testing.T, value any) []byte {
 
 func signedRequest(t *testing.T, method, target string, body []byte, identity string, privateKey ed25519.PrivateKey) *http.Request {
 	t.Helper()
+	return signedRequestAt(t, method, target, body, identity, privateKey, time.Now())
+}
+
+func signedRequestAt(t *testing.T, method, target string, body []byte, identity string, privateKey ed25519.PrivateKey, signedAt time.Time) *http.Request {
+	t.Helper()
 	var reader *bytes.Reader
 	if body == nil {
 		reader = bytes.NewReader(nil)
@@ -692,7 +995,7 @@ func signedRequest(t *testing.T, method, target string, body []byte, identity st
 		reader = bytes.NewReader(body)
 	}
 	req := httptest.NewRequest(method, target, reader)
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	timestamp := strconv.FormatInt(signedAt.Unix(), 10)
 	signature := ed25519.Sign(privateKey, signaturePayload(timestamp, body))
 	if strings.Contains(identity, "@") {
 		req.Header.Set("X-Agent-Email", identity)
