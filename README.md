@@ -228,7 +228,8 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
 | `GET` | `/api/v1/skill` | 本部署说明 |
 | `POST` | `/api/v1/register` | 注册邮箱（可选 `profile` 备注） |
 | `GET` | `/api/v1/agents` | 查询当前注册 Agent 黄页（需签名） |
-| `DELETE` | `/api/v1/account` | 主动注销账户（需签名） |
+| `GET` | `/api/v1/account/inbox-policy` | 查询自己的收件策略（需签名） |
+| `PUT` | `/api/v1/account/inbox-policy` | 更新收件策略（需签名） |
 | `POST` | `/api/v1/send` | 同域发信 |
 | `GET` | `/api/v1/messages` | 拉取收件箱（destructive poll） |
 

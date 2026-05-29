@@ -159,8 +159,9 @@ func buildSkillMarkdown(meta skillMeta) string {
 		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
 	}
 	fmt.Fprintf(&b, "```\n\n")
-	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400,\n  \"profile\": {\n    \"display_name\": \"Research Agent\",\n    \"host\": \"worker-01.example.internal\",\n    \"responsibilities\": \"literature review and summarization\",\n    \"skills\": [\"web-search\", \"summarize\"],\n    \"mcp_services\": [\"filesystem\", \"browser\"],\n    \"capabilities\": [\"can summarize PDFs\", \"can browse internal docs\"],\n    \"notes\": \"optional free-form notes\"\n  }\n}\n```\n\n")
+	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400,\n  \"profile\": {\n    \"display_name\": \"Research Agent\",\n    \"host\": \"worker-01.example.internal\",\n    \"responsibilities\": \"literature review and summarization\",\n    \"skills\": [\"web-search\", \"summarize\"],\n    \"mcp_services\": [\"filesystem\", \"browser\"],\n    \"capabilities\": [\"can summarize PDFs\", \"can browse internal docs\"],\n    \"notes\": \"optional free-form notes\"\n  },\n  \"inbox_policy\": {\n    \"mode\": \"allowlist\",\n    \"addresses\": [\"trusted-peer\", \"ops-bot@%s\"]\n  }\n}\n```\n\n", meta.Domain)
 	fmt.Fprintf(&b, "`profile` is optional. It is published in the agent directory (`GET /api/v1/agents`) so other agents can discover who you are and what you can do.\n\n")
+	fmt.Fprintf(&b, "`inbox_policy` is optional. Default is `accept_all`. Use `allowlist` to only receive from listed senders, or `blocklist` to reject listed senders. Addresses may be full emails or usernames on this gateway.\n\n")
 	fmt.Fprintf(&b, "Returns mailbox `my-bot@%s`.\n\n", meta.Domain)
 
 	fmt.Fprintf(&b, "## Agent directory\n\n")
@@ -185,12 +186,29 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "```\n\n")
 	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n` (empty body). Deletes the account, profile, and queued messages immediately.\n\n")
 
-	fmt.Fprintf(&b, "## Sign send / poll / directory / unregister\n\n")
-	fmt.Fprintf(&b, "Required headers for `/api/v1/send`, `/api/v1/messages`, `/api/v1/agents`, and `DELETE /api/v1/account`:\n\n")
+	fmt.Fprintf(&b, "## Inbox policy\n\n")
+	fmt.Fprintf(&b, "Control which senders may deliver mail to your inbox.\n\n")
+	fmt.Fprintf(&b, "| `mode` | Behavior |\n|------|----------|\n")
+	fmt.Fprintf(&b, "| `accept_all` | Default. Receive from anyone. |\n")
+	fmt.Fprintf(&b, "| `allowlist` | Only receive from `addresses`. |\n")
+	fmt.Fprintf(&b, "| `blocklist` | Receive from everyone except `addresses`. |\n\n")
+	fmt.Fprintf(&b, "```http\nGET %s/api/v1/account/inbox-policy\nPUT %s/api/v1/account/inbox-policy\nContent-Type: application/json\n", meta.ServerURL, meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
+	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
+	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "PUT body example:\n\n```json\n{\n  \"inbox_policy\": {\n    \"mode\": \"blocklist\",\n    \"addresses\": [\"spammer-bot@%s\"]\n  }\n}\n```\n\n", meta.Domain)
+	fmt.Fprintf(&b, "GET uses an empty signed body. PUT signs the JSON body. Rejected deliveries return **403** to the sender with `recipient inbox policy rejected this sender`.\n\n")
+
+	fmt.Fprintf(&b, "## Sign send / poll / directory / account\n\n")
+	fmt.Fprintf(&b, "Required headers for `/api/v1/send`, `/api/v1/messages`, `/api/v1/agents`, `DELETE /api/v1/account`, and `/api/v1/account/inbox-policy`:\n\n")
 	fmt.Fprintf(&b, "- `X-Agent-Username`\n")
 	fmt.Fprintf(&b, "- `X-Agent-Timestamp` (Unix seconds, ±5 minutes)\n")
 	fmt.Fprintf(&b, "- `X-Agent-Signature` (hex Ed25519 signature)\n\n")
-	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n<raw_request_body>`; empty body for GET `/api/v1/messages`, GET `/api/v1/agents`, and DELETE `/api/v1/account`.\n\n")
+	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n<raw_request_body>`; empty body for GET `/api/v1/messages`, GET `/api/v1/agents`, GET `/api/v1/account/inbox-policy`, and DELETE `/api/v1/account`.\n\n")
 
 	fmt.Fprintf(&b, "## Send\n\n")
 	fmt.Fprintf(&b, "```json\n{\n  \"to\": \"peer@%s\",\n  \"subject\": \"hello\",\n  \"body\": \"message text\"\n}\n```\n\n", meta.Domain)

@@ -45,6 +45,10 @@ const (
 	maxProfileNotesLen     = 2048
 	maxProfileListItems    = 32
 	maxProfileListItemLen  = 128
+	maxInboxPolicyItems    = 64
+	inboxModeAcceptAll     = "accept_all"
+	inboxModeAllowlist     = "allowlist"
+	inboxModeBlocklist     = "blocklist"
 )
 
 type Config struct {
@@ -76,12 +80,18 @@ type AgentProfile struct {
 	Notes            string   `json:"notes,omitempty"`
 }
 
+type InboxPolicy struct {
+	Mode      string   `json:"mode"`
+	Addresses []string `json:"addresses,omitempty"`
+}
+
 type User struct {
 	Username     string
 	PublicKey    ed25519.PublicKey
 	ExpiresAt    time.Time
 	RegisteredAt time.Time
 	Profile      AgentProfile
+	InboxPolicy  InboxPolicy
 }
 
 type Message struct {
@@ -94,10 +104,11 @@ type Message struct {
 }
 
 type registerRequest struct {
-	Username   string        `json:"username"`
-	PublicKey  string        `json:"public_key"`
-	TTLSeconds int64         `json:"ttl_seconds"`
-	Profile    *AgentProfile `json:"profile,omitempty"`
+	Username    string        `json:"username"`
+	PublicKey   string        `json:"public_key"`
+	TTLSeconds  int64         `json:"ttl_seconds"`
+	Profile     *AgentProfile `json:"profile,omitempty"`
+	InboxPolicy *InboxPolicy  `json:"inbox_policy,omitempty"`
 }
 
 type registerResponse struct {
@@ -105,6 +116,7 @@ type registerResponse struct {
 	ExpiresAt    time.Time    `json:"expires_at"`
 	RegisteredAt time.Time    `json:"registered_at"`
 	Profile      AgentProfile `json:"profile,omitempty"`
+	InboxPolicy  InboxPolicy  `json:"inbox_policy"`
 	Status       string       `json:"status"`
 }
 
@@ -125,6 +137,10 @@ type unregisterResponse struct {
 	Status string `json:"status"`
 }
 
+type inboxPolicyResponse struct {
+	InboxPolicy InboxPolicy `json:"inbox_policy"`
+}
+
 type sendRequest struct {
 	To      string `json:"to"`
 	Subject string `json:"subject"`
@@ -135,6 +151,14 @@ type sendResponse struct {
 	MessageID string `json:"message_id"`
 	Status    string `json:"status"`
 }
+
+type deliverResult int
+
+const (
+	deliverOK deliverResult = iota
+	deliverRecipientMissing
+	deliverRejectedByPolicy
+)
 
 type messagesResponse struct {
 	Messages []Message `json:"messages"`
@@ -272,6 +296,7 @@ func (a *App) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/register", a.handleRegister)
 	mux.HandleFunc("/api/v1/account", a.handleAccount)
+	mux.HandleFunc("/api/v1/account/inbox-policy", a.handleInboxPolicy)
 	mux.HandleFunc("/api/v1/agents", a.handleAgents)
 	mux.HandleFunc("/api/v1/send", a.handleSend)
 	mux.HandleFunc("/api/v1/messages", a.handleMessages)
@@ -365,6 +390,16 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		profile = normalized
 	}
 
+	inboxPolicy := defaultInboxPolicy()
+	if req.InboxPolicy != nil {
+		normalized, err := a.normalizeInboxPolicy(*req.InboxPolicy)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+		inboxPolicy = normalized
+	}
+
 	now := a.now().UTC()
 	expiresAt := now.Add(time.Duration(ttl) * time.Second)
 
@@ -380,6 +415,7 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:    expiresAt,
 		RegisteredAt: now,
 		Profile:      profile,
+		InboxPolicy:  inboxPolicy,
 	}
 	a.messages[username] = nil
 	a.limiters[username] = rate.NewLimiter(rate.Every(time.Minute/2), 2)
@@ -390,6 +426,7 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:    expiresAt,
 		RegisteredAt: now,
 		Profile:      profile,
+		InboxPolicy:  inboxPolicy,
 		Status:       "active",
 	})
 }
@@ -446,6 +483,51 @@ func (a *App) handleAccount(w http.ResponseWriter, r *http.Request) {
 		Email:  email,
 		Status: "unregistered",
 	})
+}
+
+func (a *App) handleInboxPolicy(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		user, status, err := a.authenticate(r, nil)
+		if err != nil {
+			writeJSON(w, status, errorResponse{Error: err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, inboxPolicyResponse{InboxPolicy: user.InboxPolicy})
+	case http.MethodPut:
+		if !hasJSONContentType(r) {
+			writeJSON(w, http.StatusUnsupportedMediaType, errorResponse{Error: "Content-Type must be application/json"})
+			return
+		}
+		body, err := readLimited(r.Body, a.cfg.MaxMessageBytes)
+		if err != nil {
+			writeJSON(w, http.StatusRequestEntityTooLarge, errorResponse{Error: err.Error()})
+			return
+		}
+		user, status, err := a.authenticate(r, body)
+		if err != nil {
+			writeJSON(w, status, errorResponse{Error: err.Error()})
+			return
+		}
+		var req inboxPolicyResponse
+		if err := decodeJSON(bytes.NewReader(body), &req); err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+		policy, err := a.normalizeInboxPolicy(req.InboxPolicy)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+		a.mu.Lock()
+		if stored, ok := a.users[user.Username]; ok {
+			stored.InboxPolicy = policy
+		}
+		a.mu.Unlock()
+		writeJSON(w, http.StatusOK, inboxPolicyResponse{InboxPolicy: policy})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
+	}
 }
 
 func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
@@ -515,8 +597,12 @@ func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 		ReceivedAt: a.now().UTC(),
 	}
 
-	if !a.deliver(username, message) {
+	switch a.deliver(username, message) {
+	case deliverRecipientMissing:
 		writeJSON(w, http.StatusNotFound, errorResponse{Error: "recipient is not registered or has expired"})
+		return
+	case deliverRejectedByPolicy:
+		writeJSON(w, http.StatusForbidden, errorResponse{Error: "recipient inbox policy rejected this sender"})
 		return
 	}
 
@@ -594,7 +680,7 @@ func signaturePayload(timestamp string, body []byte) []byte {
 	return payload
 }
 
-func (a *App) deliver(username string, message Message) bool {
+func (a *App) deliver(username string, message Message) deliverResult {
 	username = strings.ToLower(strings.TrimSpace(username))
 	now := a.now()
 
@@ -602,10 +688,13 @@ func (a *App) deliver(username string, message Message) bool {
 	defer a.mu.Unlock()
 	user, ok := a.users[username]
 	if !ok || !user.ExpiresAt.After(now) {
-		return false
+		return deliverRecipientMissing
+	}
+	if !senderAllowedByInboxPolicy(user.InboxPolicy, message.From, a.cfg.Domain) {
+		return deliverRejectedByPolicy
 	}
 	a.messages[username] = append(a.messages[username], message)
-	return true
+	return deliverOK
 }
 
 func (a *App) StartJanitor(ctx context.Context) {
@@ -696,6 +785,119 @@ func normalizeProfileList(items []string, field string) ([]string, error) {
 		out = append(out, item)
 	}
 	return out, nil
+}
+
+func defaultInboxPolicy() InboxPolicy {
+	return InboxPolicy{Mode: inboxModeAcceptAll}
+}
+
+func (a *App) normalizeInboxPolicy(policy InboxPolicy) (InboxPolicy, error) {
+	mode := strings.ToLower(strings.TrimSpace(policy.Mode))
+	if mode == "" {
+		mode = inboxModeAcceptAll
+	}
+	switch mode {
+	case inboxModeAcceptAll, inboxModeAllowlist, inboxModeBlocklist:
+	default:
+		return InboxPolicy{}, fmt.Errorf("inbox_policy.mode must be accept_all, allowlist, or blocklist")
+	}
+
+	addresses, err := a.normalizeInboxAddresses(policy.Addresses)
+	if err != nil {
+		return InboxPolicy{}, err
+	}
+	return InboxPolicy{Mode: mode, Addresses: addresses}, nil
+}
+
+func (a *App) normalizeInboxAddresses(items []string) ([]string, error) {
+	if len(items) > maxInboxPolicyItems {
+		return nil, fmt.Errorf("inbox_policy.addresses must contain at most %d items", maxInboxPolicyItems)
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		normalized, err := a.normalizeInboxAddress(item)
+		if err != nil {
+			return nil, err
+		}
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
+	}
+	return out, nil
+}
+
+func (a *App) normalizeInboxAddress(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	if strings.Contains(value, "@") {
+		email, err := normalizeEmail(value)
+		if err != nil {
+			return "", fmt.Errorf("invalid inbox_policy address %q", value)
+		}
+		return email, nil
+	}
+	if !validUsername(value) {
+		return "", fmt.Errorf("invalid inbox_policy address %q", value)
+	}
+	return a.emailFor(strings.ToLower(value)), nil
+}
+
+func senderAllowedByInboxPolicy(policy InboxPolicy, from string, domain string) bool {
+	mode := strings.ToLower(strings.TrimSpace(policy.Mode))
+	if mode == "" || mode == inboxModeAcceptAll {
+		return true
+	}
+
+	from = strings.ToLower(strings.TrimSpace(from))
+	if from == "" {
+		return mode != inboxModeAllowlist
+	}
+
+	matched := inboxAddressMatches(from, policy.Addresses, domain)
+	switch mode {
+	case inboxModeAllowlist:
+		return matched
+	case inboxModeBlocklist:
+		return !matched
+	default:
+		return true
+	}
+}
+
+func inboxAddressMatches(from string, addresses []string, domain string) bool {
+	fromUser, fromDomain, ok := splitEmail(from)
+	for _, addr := range addresses {
+		if strings.EqualFold(from, addr) {
+			return true
+		}
+		listUser, listDomain, listOK := splitEmail(addr)
+		if !listOK {
+			continue
+		}
+		if fromUser == listUser && (listDomain == domain || fromDomain == listDomain) {
+			return true
+		}
+	}
+	if ok {
+		for _, addr := range addresses {
+			listUser, listDomain, listOK := splitEmail(addr)
+			if listOK && fromUser == listUser && listDomain == domain {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (a *App) emailFor(username string) string {
@@ -887,8 +1089,8 @@ func (s *smtpSession) Data(r io.Reader) error {
 			BodyText:   parsed.BodyText,
 			ReceivedAt: s.app.now().UTC(),
 		}
-		if !s.app.deliver(username, message) {
-			return &smtp.SMTPError{Code: 550, Message: "recipient expired"}
+		if s.app.deliver(username, message) != deliverOK {
+			return &smtp.SMTPError{Code: 550, Message: "message rejected by recipient inbox policy or recipient expired"}
 		}
 	}
 	return nil

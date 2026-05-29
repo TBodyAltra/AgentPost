@@ -204,6 +204,96 @@ func TestRegisterProfileDirectoryAndUnregister(t *testing.T) {
 	}
 }
 
+func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubAllowed, privAllowed, _ := ed25519.GenerateKey(crand.Reader)
+	pubBlocked, privBlocked, _ := ed25519.GenerateKey(crand.Reader)
+	pubTarget, privTarget, _ := ed25519.GenerateKey(crand.Reader)
+
+	registerUser := func(username string, key ed25519.PublicKey, policy InboxPolicy) {
+		t.Helper()
+		body := mustJSON(t, registerRequest{
+			Username:    username,
+			PublicKey:   hex.EncodeToString(key),
+			TTLSeconds:  3600,
+			InboxPolicy: &policy,
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("register %s status = %d, body = %s", username, resp.Code, resp.Body.String())
+		}
+	}
+
+	registerUser("allowed", pubAllowed, InboxPolicy{Mode: inboxModeAcceptAll})
+	registerUser("blocked", pubBlocked, InboxPolicy{Mode: inboxModeAcceptAll})
+	registerUser("target", pubTarget, InboxPolicy{
+		Mode:      inboxModeAllowlist,
+		Addresses: []string{"allowed@agent.test"},
+	})
+
+	send := func(fromUser string, priv ed25519.PrivateKey, to string) int {
+		t.Helper()
+		body := mustJSON(t, sendRequest{To: to, Subject: "test", Body: "hi"})
+		req := signedRequest(t, http.MethodPost, "/api/v1/send", body, fromUser, priv)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		return resp.Code
+	}
+
+	if code := send("allowed", privAllowed, "target@agent.test"); code != http.StatusOK {
+		t.Fatalf("allowed sender status = %d, want 200", code)
+	}
+	if code := send("blocked", privBlocked, "target@agent.test"); code != http.StatusForbidden {
+		t.Fatalf("blocked sender status = %d, want 403", code)
+	}
+
+	policyBody := mustJSON(t, inboxPolicyResponse{
+		InboxPolicy: InboxPolicy{
+			Mode:      inboxModeBlocklist,
+			Addresses: []string{"blocked"},
+		},
+	})
+	putReq := signedRequest(t, http.MethodPut, "/api/v1/account/inbox-policy", policyBody, "target", privTarget)
+	putReq.Header.Set("Content-Type", "application/json")
+	putResp := httptest.NewRecorder()
+	handler.ServeHTTP(putResp, putReq)
+	if putResp.Code != http.StatusOK {
+		t.Fatalf("update inbox policy status = %d, body = %s", putResp.Code, putResp.Body.String())
+	}
+
+	if code := send("allowed", privAllowed, "target@agent.test"); code != http.StatusOK {
+		t.Fatalf("allowed sender after blocklist update status = %d, want 200", code)
+	}
+	if code := send("blocked", privBlocked, "target@agent.test"); code != http.StatusForbidden {
+		t.Fatalf("blocklisted sender status = %d, want 403", code)
+	}
+
+	getReq := signedRequest(t, http.MethodGet, "/api/v1/account/inbox-policy", nil, "target", privTarget)
+	getResp := httptest.NewRecorder()
+	handler.ServeHTTP(getResp, getReq)
+	if getResp.Code != http.StatusOK {
+		t.Fatalf("get inbox policy status = %d", getResp.Code)
+	}
+	var got inboxPolicyResponse
+	if err := json.NewDecoder(getResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode inbox policy: %v", err)
+	}
+	if got.InboxPolicy.Mode != inboxModeBlocklist || len(got.InboxPolicy.Addresses) != 1 {
+		t.Fatalf("unexpected inbox policy: %+v", got.InboxPolicy)
+	}
+}
+
 func TestSkillEndpoint(t *testing.T) {
 	t.Setenv("AGENTPOST_PUBLIC_URL", "https://gateway.example.com")
 	t.Setenv("AGENTPOST_SCENARIO", "public-domain")
