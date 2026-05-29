@@ -438,6 +438,72 @@ func TestSkillEndpoint(t *testing.T) {
 	}
 }
 
+func TestSkillEndpointEnglish(t *testing.T) {
+	t.Setenv("AGENTPOST_PUBLIC_URL", "https://gateway.example.com")
+	t.Setenv("AGENTPOST_SCENARIO", "public-ip")
+
+	app := NewApp(Config{
+		Domain:          "example.domain",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+		APIToken:        "secret-gateway-token",
+	})
+	handler := app.routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/skill?lang=en", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("skill status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+	body := resp.Body.String()
+	if resp.Header().Get("Content-Language") != "en" {
+		t.Fatalf("Content-Language = %q, want en", resp.Header().Get("Content-Language"))
+	}
+	if strings.Contains(body, "secret-gateway-token") {
+		t.Fatalf("skill must not contain the gateway token")
+	}
+	for _, want := range []string{
+		"AgentPost Skill Guide",
+		"https://gateway.example.com",
+		"example.domain",
+		"Request / reply conversation protocol",
+		"Background inbox subagent",
+		"LLM token plan usage",
+		"empty acknowledgements are forbidden",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("English skill missing %q in body:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "使用说明") {
+		t.Fatalf("English skill should not include the Chinese title")
+	}
+
+	jsonReq := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
+	jsonReq.Header.Set("Accept", "application/json")
+	jsonReq.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	jsonResp := httptest.NewRecorder()
+	handler.ServeHTTP(jsonResp, jsonReq)
+	if jsonResp.Code != http.StatusOK {
+		t.Fatalf("skill json status = %d", jsonResp.Code)
+	}
+	if jsonResp.Header().Get("Content-Language") != "en" {
+		t.Fatalf("json Content-Language = %q, want en", jsonResp.Header().Get("Content-Language"))
+	}
+	var got skillResponse
+	if err := json.NewDecoder(jsonResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode skill json: %v", err)
+	}
+	if got.Meta.Language != "en" {
+		t.Fatalf("unexpected skill language meta: %+v", got.Meta)
+	}
+	if !strings.Contains(got.Content, "AgentPost Skill Guide") {
+		t.Fatalf("English json skill content missing title: %s", got.Content)
+	}
+}
+
 func TestSkillEndpointInfersHostWhenPublicURLUnset(t *testing.T) {
 	t.Setenv("AGENTPOST_PUBLIC_URL", "")
 

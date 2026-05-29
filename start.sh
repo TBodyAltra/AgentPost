@@ -45,7 +45,7 @@ Deployment scenarios (--scenario):
 
 Options:
   --scenario NAME       Deployment scenario (see above)
-  --domain NAME         Mailbox @ suffix (e.g. agent.local, example.com)
+  --domain NAME         Mailbox @ suffix (e.g. agent.local, example.domain)
   --public-url URL      Override AGENTPOST_PUBLIC_URL written to .env
   --lan-ip IP           LAN IP for scenario=lan
   --public-ip IP        Public IP for scenario=public-ip
@@ -71,9 +71,9 @@ Examples:
   ./start.sh configure                          # interactive, write .env only
   ./start.sh --scenario local
   ./start.sh --scenario lan --lan-ip 192.168.1.100 --no-token
-  ./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain agentpost.cn
-  ./start.sh --scenario public-domain --domain example.com --smtp
-  AGENTPOST_API_TOKEN=$(openssl rand -hex 32) ./start.sh --scenario public-domain --domain example.com
+  ./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.domain
+  ./start.sh --scenario public-domain --domain example.domain --smtp
+  AGENTPOST_API_TOKEN=$(openssl rand -hex 32) ./start.sh --scenario public-domain --domain example.domain
 EOF
 }
 

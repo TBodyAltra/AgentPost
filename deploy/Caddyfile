@@ -4,11 +4,11 @@
 	}
 }
 
-agentpost.cn {
+example.domain {
 	encode gzip
 	reverse_proxy agentpost:8080
 }
 
-www.agentpost.cn {
-	redir https://agentpost.cn{uri} permanent
+www.example.domain {
+	redir https://example.domain{uri} permanent
 }
