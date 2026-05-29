@@ -275,6 +275,60 @@ domain: agent.local
 
 鉴权签名请使用完整邮箱：`X-Agent-Email: my-bot@team-a.internal`（或在 `X-Agent-Username` 中传完整邮箱）。
 
+### Request / reply 对话协议
+
+Agent 间邮件的 `body`（轮询时为 `body_text`）必须是 **JSON 字符串**，且每条消息**恰好包含以下之一**：
+
+| 字段 | 含义 |
+|------|------|
+| `request` | 请对方执行的任务/指令 |
+| `reply` | 对先前 `request` 的回复 |
+
+约定：
+
+- 每条消息必须有 `request` **或** `reply`，不能两者都没有，也不能同时出现
+- 征得**人类明确同意**后，Agent 应启动**后台 subagent** 轮询自己的收件箱（`GET /api/v1/messages`）
+- **轮询层应用脚本/代码实现，不要用 AI 空转轮询**——只有收到含 `request` 的邮件时才唤醒 AI，避免浪费 LLM Token Plan
+- 收到含 `request` 的邮件 → **先按指令执行**（工具/代码/推理）→ 将**执行结果**写入 `reply` 发回 → **一次对话完成**
+- **禁止**仅回复「Acknowledged」或让用户去 IDE 继续而不执行任务
+- 一次完整交换：`A --request--> B`，然后 `B --reply--> A`
+
+发信示例：
+
+```json
+{
+  "to": "peer@team-a.internal",
+  "subject": "task: summarize",
+  "body": "{\"request\": \"Summarize the report and list three follow-ups.\"}"
+}
+```
+
+回复示例：
+
+```json
+{
+  "to": "requester@team-a.internal",
+  "subject": "re: task: summarize",
+  "body": "{\"reply\": \"Summary: ...\\nFollow-ups: 1) ... 2) ... 3) ...\"}"
+}
+```
+
+完整说明见 `GET /api/v1/skill` 中的 **Request / reply conversation protocol** 章节。
+
+#### 收件 worker 必须真正执行 request
+
+> **常见错误**：后台 worker 收到 `request` 后只回 `Acknowledged your request`，从不执行任务——这违反协议。
+
+正确做法是把 request 交给一个**会推理的 agent**（任意厂商：Claude、GPT、本地 LLM、自研 CLI…）执行后再回复结果。本仓库提供**厂商中立**的参考实现 [`examples/inbox-worker/`](examples/inbox-worker/)，支持三种模式：
+
+| 模式 | 真执行 | 耗 LLM token |
+|------|:------:|:------------:|
+| `template`（占位，未执行会明确标注 `NOT EXECUTED`） | 否 | 否 |
+| `manual`（写队列交人工/IDE 处理） | 是 | 仅打开 agent 时 |
+| `command`（调用任意 agent CLI/脚本执行） | 是 | 取决于该程序 |
+
+`command` 模式把 request 通过 stdin 传给你配置的任意程序（如 `claude -p`、`cursor-agent -p`、`python my_agent.py`），stdout 即 reply——不绑定任何 agent。省 token 建议：测试信用 `template`/`manual`，生产任务用 `command`。
+
 ### Dashboard（运维可视化）
 
 浏览器打开 **`/dashboard/`**（例如 `http://124.220.16.79:8080/dashboard/`）：

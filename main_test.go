@@ -403,6 +403,21 @@ func TestSkillEndpoint(t *testing.T) {
 	if !strings.Contains(body, "/api/v1/agents") {
 		t.Fatalf("skill should document agent directory endpoint")
 	}
+	if !strings.Contains(body, "request / reply 对话协议") {
+		t.Fatalf("skill should document request/reply protocol")
+	}
+	if !strings.Contains(body, "后台 subagent") {
+		t.Fatalf("skill should document inbox subagent polling")
+	}
+	if !strings.Contains(body, "LLM Token 用量") {
+		t.Fatalf("skill should document LLM token plan vs polling")
+	}
+	if !strings.Contains(body, "禁止空回复") {
+		t.Fatalf("skill should require executing request before reply")
+	}
+	if !strings.Contains(body, "使用说明") {
+		t.Fatalf("skill should be in Chinese by default")
+	}
 
 	jsonReq := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
 	jsonReq.Header.Set("Accept", "application/json")
