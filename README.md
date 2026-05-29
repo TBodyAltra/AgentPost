@@ -25,9 +25,9 @@
 | 配置 | 作用 | 示例 |
 |------|------|------|
 | **`AGENTPOST_PUBLIC_URL`**（skill 里的 `server_url`） | Agent **怎么连 HTTP** | `http://203.0.113.10:8080` |
-| **`AGENTPOST_DOMAIN`**（邮箱 `@` 后缀） | 邮箱**长什么样** | `agentpost.cn` |
+| **`AGENTPOST_DOMAIN`**（邮箱 `@` 后缀） | 邮箱**长什么样** | `example.com` |
 
-二者可以完全不同。例如：域名未备案、只能 `IP:8080` 访问，邮箱仍可以是 `bot@agentpost.cn`。
+二者可以完全不同。例如：域名未备案、只能 `IP:8080` 访问，邮箱仍可以是 `bot@example.com`。
 
 ### Skill 与部署参数一致
 
@@ -74,7 +74,7 @@ chmod +x start.sh
 
 # 公网 IP（域名未备案、只能 IP:8080）
 ./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 --domain agentpost.cn
+  --public-ip 203.0.113.10 --domain example.com
 
 # 公网 HTTPS 域名
 ./start.sh --non-interactive --scenario public-domain --domain example.com --smtp
@@ -147,12 +147,12 @@ Agent 分散在不同网络；需要 HTTPS 与可选外部收信。
 2. 防火墙 **80 / 443**（Caddy 申请证书）；SMTP 需 **25**  
 3. Caddy 将 `https://example.com` 反代到 AgentPost `:8080`
 
-详细 DNS 清单见 [`deploy/agentpost.cn.md`](deploy/agentpost.cn.md)。
+详细 DNS 清单见 [`deploy/public-domain.example.md`](deploy/public-domain.example.md)。
 
 架构：
 
 ```text
-Agent → https://example.com:443 → Caddy → http://agentpost:8080 → AgentPost
+Agent → https://example.com:443 → Caddy → http://example:8080 → gateway
 ```
 
 仅 IP 访问时不要选此场景；选 `public-ip`。
@@ -363,7 +363,7 @@ Ed25519 签名字节：`<unix_timestamp>\n<raw_request_body>`（GET messages 时
 ├── docker-compose.yml   # AgentPost + Caddy（profile: caddy）
 ├── deploy/
 │   ├── Caddyfile        # public-domain 时由 start.sh 生成
-│   └── agentpost.cn.md  # 域名部署 DNS 示例
+│   └── public-domain.example.md  # 公网域名部署示例
 └── README.md
 ```
 

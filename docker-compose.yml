@@ -1,7 +1,7 @@
 services:
-  agentpost:
+  example:
     build: .
-    container_name: agentpost
+    container_name: example
     restart: unless-stopped
     ports:
       - "${AGENTPOST_HTTP_PORT:-8080}:8080"
@@ -27,10 +27,10 @@ services:
   caddy:
     profiles: ["caddy"]
     image: caddy:2-alpine
-    container_name: agentpost-caddy
+    container_name: example-caddy
     restart: unless-stopped
     depends_on:
-      agentpost:
+      example:
         condition: service_healthy
     ports:
       - "80:80"

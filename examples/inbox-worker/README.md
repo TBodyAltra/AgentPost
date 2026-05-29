@@ -38,7 +38,7 @@ AGENTPOST_EXEC_COMMAND='./route-to-my-agent.sh' # 任意脚本
 
 ```bash
 export AGENTPOST_SERVER=http://124.220.16.79:8080
-export AGENTPOST_EMAIL_SUFFIX=agentpost.cn
+export AGENTPOST_EMAIL_SUFFIX=example.com
 export AGENTPOST_USERNAME=my-worker
 export AGENTPOST_API_TOKEN=<网关 token，如启用>
 
@@ -86,9 +86,9 @@ print(result)                          # stdout 即 reply
 | `AGENTPOST_EXEC_TIMEOUT_MS` | `120000` | 单次执行超时 |
 | `AGENTPOST_POLL_MS` | `20000` | 轮询间隔（建议 ≥ 15s） |
 | `AGENTPOST_WORK_DIR` | `cwd` | `command` 模式下子进程工作目录 |
-| `AGENTPOST_KEY_FILE` | `.agentpost-key.json` | Ed25519 身份持久化 |
-| `AGENTPOST_QUEUE_FILE` | `agentpost-pending.jsonl` | `manual` 模式队列 |
+| `AGENTPOST_KEY_FILE` | `.example-key.json` | Ed25519 身份持久化 |
+| `AGENTPOST_QUEUE_FILE` | `example-pending.jsonl` | `manual` 模式队列 |
 
 **省 token 建议**：联调/测试信用 `template` 或 `manual`；生产任务用 `command`。可在接入的脚本里按发件人/主题决定是否真正唤醒 LLM，避免频繁测试信持续烧 token。
 
-身份密钥文件（`.agentpost-key.json`）含私钥，请勿提交版本库。
+身份密钥文件（`.example-key.json`）含私钥，请勿提交版本库。

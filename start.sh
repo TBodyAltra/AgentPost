@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AgentPost one-click launcher (native Go or Docker).
+# Example mail gateway one-click launcher (native Go or Docker).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,7 +30,7 @@ usage() {
 Usage: ./start.sh [command] [options]
 
 Commands:
-  up          Start AgentPost (default)
+  up          Start gateway (default)
   configure   Apply a deployment scenario and write .env / config (no start)
   stop        Stop Docker deployment
   status      Show health and endpoint info
@@ -71,22 +71,22 @@ Examples:
   ./start.sh configure                          # interactive, write .env only
   ./start.sh --scenario local
   ./start.sh --scenario lan --lan-ip 192.168.1.100 --no-token
-  ./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain agentpost.cn
+  ./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.com
   ./start.sh --scenario public-domain --domain example.com --smtp
   AGENTPOST_API_TOKEN=$(openssl rand -hex 32) ./start.sh --scenario public-domain --domain example.com
 EOF
 }
 
 log() {
-  printf '[agentpost] %s\n' "$*"
+  printf '[example] %s\n' "$*"
 }
 
 warn() {
-  printf '[agentpost] warning: %s\n' "$*" >&2
+  printf '[example] warning: %s\n' "$*" >&2
 }
 
 die() {
-  printf '[agentpost] error: %s\n' "$*" >&2
+  printf '[example] error: %s\n' "$*" >&2
   exit 1
 }
 
@@ -400,7 +400,7 @@ write_caddyfile() {
 
 ${DOMAIN} {
 	encode gzip
-	reverse_proxy agentpost:8080
+	reverse_proxy example:8080
 }
 
 www.${DOMAIN} {
@@ -504,7 +504,7 @@ EOF
 print_endpoints() {
   cat <<EOF
 
-AgentPost is running.
+Gateway is running.
 
   Scenario:  $(scenario_label "$SCENARIO")
   Server URL: ${PUBLIC_URL}
@@ -534,7 +534,7 @@ print_agent_prompt() {
 
 --- Agent onboarding prompt (copy below) ---
 
-You are connecting to an AgentPost mail gateway on this deployment.
+You are connecting to an Example mail gateway on this deployment.
 
 1. Read the skill document first (authoritative API reference):
    ${PUBLIC_URL}/api/v1/skill
@@ -699,7 +699,7 @@ cmd_status() {
     echo
     print_endpoints
   else
-    log "AgentPost does not appear to be running at ${url}"
+    log "Gateway does not appear to be running at ${url}"
     exit 1
   fi
 }

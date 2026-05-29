@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AgentPost Dashboard</title>
+  <title>Example Dashboard</title>
   <style>
     :root {
       --bg-grad-1: #fbfbfd;
@@ -300,7 +300,7 @@
       <div class="login-logo">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 6 9-6"/></svg>
       </div>
-      <h1>AgentPost</h1>
+      <h1>Example</h1>
       <p>输入网关 API Token 查看注册域、邮箱互连状态与账户详情。</p>
       <input type="password" id="token-input" placeholder="AGENTPOST_API_TOKEN" autocomplete="off">
       <button type="button" id="login-btn" class="btn btn-full">连接</button>
@@ -313,7 +313,7 @@
   <header>
     <div class="brand">
       <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 6 9-6"/></svg></span>
-      <h1>AgentPost</h1>
+      <h1>Example</h1>
     </div>
     <div class="header-meta" id="gateway-meta"></div>
     <div class="segmented" id="theme-seg" role="tablist" aria-label="外观">
@@ -381,8 +381,8 @@
   </div>
 
   <script>
-    const TOKEN_KEY = "agentpost_dashboard_token";
-    const THEME_KEY = "agentpost_dashboard_theme";
+    const TOKEN_KEY = "example_dashboard_token";
+    const THEME_KEY = "example_dashboard_theme";
     const STATUS_COLORS = { allowed: "#34c759", allowlisted: "#af52de", cross_domain_blocked: "#ff9f0a", blocked: "#ff3b30" };
     const STATUS_LABELS = { allowed: "可发", allowlisted: "白名单", cross_domain_blocked: "跨域阻断", blocked: "黑名单" };
 

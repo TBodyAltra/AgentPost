@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// AgentPost reference inbox worker — AGENT-AGNOSTIC.
+// Example reference inbox worker — AGENT-AGNOSTIC.
 //
 // Why this file exists:
 //   A naive worker that always replies "Acknowledged your request" VIOLATES the
-//   AgentPost request/reply protocol. The protocol requires the recipient to
+//   Example request/reply protocol. The protocol requires the recipient to
 //   EXECUTE the request and put the real result in `reply`. This worker shows
 //   the correct shape and works with ANY agent runtime — Claude, GPT, a local
 //   LLM, a custom CLI, etc. It is NOT tied to any specific vendor or SDK.
@@ -41,10 +41,10 @@ const USERNAME = process.env.AGENTPOST_USERNAME || "worker";
 const DOMAIN = process.env.AGENTPOST_DOMAIN || SUFFIX;
 const EMAIL = process.env.AGENTPOST_EMAIL || `${USERNAME}@${DOMAIN}`;
 const GATEWAY_TOKEN = process.env.AGENTPOST_API_TOKEN || "";
-const KEY_FILE = process.env.AGENTPOST_KEY_FILE || path.join(process.cwd(), ".agentpost-key.json");
+const KEY_FILE = process.env.AGENTPOST_KEY_FILE || path.join(process.cwd(), ".example-key.json");
 const POLL_MS = Number(process.env.AGENTPOST_POLL_MS || 20000);
 const EXECUTOR = (process.env.AGENTPOST_EXECUTOR || "template").toLowerCase();
-const QUEUE_FILE = process.env.AGENTPOST_QUEUE_FILE || path.join(process.cwd(), "agentpost-pending.jsonl");
+const QUEUE_FILE = process.env.AGENTPOST_QUEUE_FILE || path.join(process.cwd(), "example-pending.jsonl");
 const WORK_DIR = process.env.AGENTPOST_WORK_DIR || process.cwd();
 // Command executor: any agent CLI/program. Request arrives on stdin and as
 // $AGENTPOST_REQUEST; stdout is used as the reply. Example values:
@@ -142,7 +142,7 @@ function executeWithCommand(from, requestText) {
       return;
     }
     const prompt =
-      `You received an AgentPost request from ${from}.\n\n` +
+      `You received an Example request from ${from}.\n\n` +
       `REQUEST:\n${requestText}\n\n` +
       `Execute the request, then output ONLY the result text (no preamble). ` +
       `It will be placed verbatim into the reply.`;
@@ -240,7 +240,7 @@ async function handleMessage(privateKey, msg) {
 // ---------- Main loop ----------
 
 async function main() {
-  log(`AgentPost inbox worker — server=${SERVER} email=${EMAIL} mode=${EXECUTOR} poll=${POLL_MS}ms`);
+  log(`Example inbox worker — server=${SERVER} email=${EMAIL} mode=${EXECUTOR} poll=${POLL_MS}ms`);
   if (EXECUTOR === "command" && !EXEC_COMMAND) {
     log("WARNING: AGENTPOST_EXECUTOR=command but AGENTPOST_EXEC_COMMAND is unset; requests cannot be executed.");
   }

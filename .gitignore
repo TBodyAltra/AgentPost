@@ -1,5 +1,5 @@
 .env
 config.yaml
-/agentpost
-.agentpost-key.json
-agentpost-pending.jsonl
+/example
+.example-key.json
+example-pending.jsonl

@@ -190,7 +190,7 @@ func main() {
 
 	errCh := make(chan error, 2)
 	go func() {
-		log.Printf("AgentPost HTTP listening on %s (default domain %s)", cfg.HTTPAddr, cfg.Domain)
+		log.Printf("Example HTTP listening on %s (default domain %s)", cfg.HTTPAddr, cfg.Domain)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -199,7 +199,7 @@ func main() {
 	if cfg.SMTPAddr != "" {
 		smtpServer := newSMTPServer(app)
 		go func() {
-			log.Printf("AgentPost SMTP listening on %s", cfg.SMTPAddr)
+			log.Printf("Example SMTP listening on %s", cfg.SMTPAddr)
 			if err := smtpServer.ListenAndServe(); err != nil {
 				errCh <- err
 			}
@@ -352,7 +352,7 @@ func extractGatewayToken(r *http.Request) string {
 			return strings.TrimSpace(auth[len(prefix):])
 		}
 	}
-	if v := strings.TrimSpace(r.Header.Get("X-AgentPost-Token")); v != "" {
+	if v := strings.TrimSpace(r.Header.Get("X-Example-Token")); v != "" {
 		return v
 	}
 	return ""

@@ -95,8 +95,8 @@ func normalizeListenPort(httpAddr string) string {
 func buildSkillMarkdown(meta skillMeta) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "# AgentPost 使用说明（Skill）\n\n")
-	fmt.Fprintf(&b, "AgentPost 是面向 AI Agent 的 HTTP 邮件网关，本文档描述**本部署实例**的连接方式与使用规则。\n\n")
+	fmt.Fprintf(&b, "# Example 使用说明（Skill）\n\n")
+	fmt.Fprintf(&b, "Example 是面向 AI Agent 的 HTTP 邮件网关，本文档描述**本部署实例**的连接方式与使用规则。\n\n")
 	if meta.DeploymentScenario != "" {
 		fmt.Fprintf(&b, "部署场景：**`%s`**（安装时通过 `./start.sh` 设定）。\n\n", meta.DeploymentScenario)
 	}
@@ -271,12 +271,12 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "- [ ] 发送 reply 后视为本轮对话结束\n")
 	fmt.Fprintf(&b, "```\n\n")
 	fmt.Fprintf(&b, "### 轮询与 LLM Token 用量（重要）\n\n")
-	fmt.Fprintf(&b, "AgentPost 的 `GET /api/v1/messages` 是**普通 HTTP 请求**，不会消耗 Cursor / LLM 的 **Token Plan**（模型推理额度）。\n\n")
+	fmt.Fprintf(&b, "Example 的 `GET /api/v1/messages` 是**普通 HTTP 请求**，不会消耗 Cursor / LLM 的 **Token Plan**（模型推理额度）。\n\n")
 	fmt.Fprintf(&b, "但若**每次轮询都启动一次 AI Agent**（哪怕收件箱为空也跑完整推理），会**持续消耗 Token Plan**，造成浪费。\n\n")
 	fmt.Fprintf(&b, "**禁止**：用 AI Agent 循环执行「查收件箱 → 空 → 再等 → 再查」——空轮询不应调用模型。\n\n")
 	fmt.Fprintf(&b, "**推荐架构**（两层分离）：\n\n")
 	fmt.Fprintf(&b, "```\n")
-	fmt.Fprintf(&b, "[脚本 / cron / 无 LLM 的 worker]  --HTTP 轮询-->  AgentPost\n")
+	fmt.Fprintf(&b, "[脚本 / cron / 无 LLM 的 worker]  --HTTP 轮询-->  Example\n")
 	fmt.Fprintf(&b, "        |\n")
 	fmt.Fprintf(&b, "        有含 request 的邮件\n")
 	fmt.Fprintf(&b, "        v\n")

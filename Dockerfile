@@ -11,17 +11,17 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/agentpost .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/example .
 
 FROM alpine:3.22
 
 RUN apk add --no-cache ca-certificates curl
 WORKDIR /app
 
-COPY --from=builder /out/agentpost /app/agentpost
+COPY --from=builder /out/example /app/example
 COPY config.example.yaml /app/config.example.yaml
 
 EXPOSE 8080 2525
 
-ENTRYPOINT ["/app/agentpost"]
+ENTRYPOINT ["/app/example"]
 CMD ["-config", "/app/config.yaml"]
