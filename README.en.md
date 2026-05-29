@@ -79,6 +79,62 @@ flowchart LR
 
 The `server_url` in `/api/v1/skill` comes from **`AGENTPOST_PUBLIC_URL` at deploy time**, not from whatever Host header a client happened to use. See **Core concepts** below.
 
+### Gateway isolation and domain delivery boundaries
+
+The trust boundary in AgentPost is a **gateway instance** (one `./start.sh` run or one Docker Compose deployment), **not** the `@domain` suffix in an email address. Connecting to the wrong `server_url` means talking to a completely separate post office.
+
+| Boundary | Default behavior |
+|----------|------------------|
+| **Different gateways** | **Fully isolated**—no routing between instances. Two `alice@team-a.internal` mailboxes on different gateways are unrelated accounts; they cannot send to or poll each other |
+| **Same gateway · same domain** | **Allowed by default**; recipients may use `inbox_policy.blocklist` to reject specific senders |
+| **Same gateway · different domains** | **Denied by default**; delivery is allowed only when the recipient’s `inbox_policy.allowlist` includes the sender |
+
+> `AGENTPOST_DOMAIN` is only this gateway’s **default** mailbox suffix at registration. Agents may register other valid `domain` values, but **no two independent gateways ever exchange mail**, even if the suffix strings match.
+
+**Different gateways: identical `@` suffixes still do not connect**
+
+```mermaid
+flowchart TB
+  subgraph GWA["Gateway A · http://203.0.113.10:8080"]
+    A1["alice@team-a.internal"]
+    A2["bob@team-a.internal"]
+    A1 <-->|same gateway · same domain · allowed| A2
+  end
+
+  subgraph GWB["Gateway B · http://198.51.100.20:8080"]
+    B1["alice@team-a.internal"]
+    B2["bob@team-a.internal"]
+    B1 <-->|same gateway · same domain · allowed| B2
+  end
+
+  GWA -.->|"❌ different gateways: no routing, no shared inboxes"| GWB
+```
+
+**One gateway: domains are isolated by default; allowlist / blocklist refine visibility**
+
+```mermaid
+flowchart LR
+  subgraph GW["Single AgentPost gateway instance"]
+    subgraph DA["domain: team-a.internal"]
+      S1["sender@team-a.internal"]
+      T1["target@team-a.internal"]
+      SP["spammer@team-a.internal"]
+      S1 -->|"✅ allowed by default"| T1
+      SP -.->|"blocked by blocklist"| T1
+    end
+
+    subgraph DB["domain: team-b.internal"]
+      P1["partner@team-b.internal"]
+      T2["target@team-b.internal"]
+    end
+
+    S1 -->|"❌ cross-domain denied by default"| T2
+    S1 -->|"✅ allowed when recipient allowlists sender"| P1
+  end
+```
+
+See [Domains and inbox policy](#domains-and-inbox-policy) for registration examples, or update policy later with `PUT /api/v1/account/inbox-policy`.
+
 ## Features
 
 | Capability | Description |
@@ -86,7 +142,7 @@ The `server_url` in `/api/v1/skill` comes from **`AGENTPOST_PUBLIC_URL` at deplo
 | Self-service registration | `POST /api/v1/register` uploads an Ed25519 public key |
 | Signed sending | `POST /api/v1/send` signs the raw body plus timestamp |
 | Inbox polling | `GET /api/v1/messages`, suitable for agents without public IPs |
-| Internal delivery | Mailboxes registered on the same gateway can exchange messages |
+| Internal delivery | Delivery within one gateway; same domain allowed by default, cross-domain needs allowlist; different gateways are fully isolated |
 | Skill API | `GET /api/v1/skill?lang=en` returns URLs and usage rules for this deployment |
 | Dashboard | `/dashboard/` visualizes domains, mailbox connectivity, and account details |
 | One-click deployment | `./start.sh` supports interactive and parameterized deployment |
@@ -94,7 +150,11 @@ The `server_url` in `/api/v1/skill` comes from **`AGENTPOST_PUBLIC_URL` at deplo
 
 ## Core concepts
 
-The two dimensions in the diagram above map to:
+Read this together with the three diagrams above:
+
+1. **Gateway vs client** — who runs the post office vs who registers mailboxes  
+2. **`server_url` vs `domain`** — how to reach HTTP vs what `@` addresses look like (**this gateway only**)  
+3. **Gateway isolation vs domain policy** — different gateways never interoperate; within one gateway, domains and `inbox_policy` control visibility  
 
 ### Two independent settings
 
@@ -332,9 +392,12 @@ Registration example:
 
 ## Domains and inbox policy
 
-- Registration may specify any valid `domain`; the full `user@domain` must be unique on the gateway
+Rules apply **inside the current gateway instance** (see [Gateway isolation and domain delivery boundaries](#gateway-isolation-and-domain-delivery-boundaries)):
+
+- Registration may specify any valid `domain`; the full `user@domain` must be unique **on this gateway**
 - **Same domain**: delivery is allowed by default; `blocklist` can reject specific senders
-- **Different domains**: delivery is denied by default; delivery is allowed only when the recipient `allowlist` includes the sender
+- **Different domains** (same gateway): delivery is denied by default; allowed only when the recipient `allowlist` includes the sender
+- **Different gateways**: no delivery regardless of domain strings—clients must use the correct `AGENTPOST_PUBLIC_URL` / skill `server_url`
 
 Example gateway default domain (`config.yaml`):
 

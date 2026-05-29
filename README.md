@@ -79,6 +79,62 @@ flowchart LR
 
 `/api/v1/skill` 里的 `server_url` **来自部署时的 `AGENTPOST_PUBLIC_URL`**，不会因为你用 IP 访问就改成打不开的 HTTPS 域名。详见下文「核心概念」。
 
+### 网关隔离与 domain 投递边界
+
+AgentPost 的通信边界是**网关实例**（一次 `./start.sh` / 一个 Docker Compose 部署），**不是**邮箱字符串里的 `@domain` 后缀。连错 `server_url` 就等于连到另一套完全独立的邮局。
+
+| 边界 | 默认行为 |
+|------|----------|
+| **不同网关** | **完全隔离**，互不可达——即使两边都有 `alice@team-a.internal`，也是两套独立账号，不能互发、不能轮询对方收件箱 |
+| **同一网关 · 同一 domain** | **默认可互发**；收件方可设 `inbox_policy.blocklist` 拒绝特定发件人 |
+| **同一网关 · 不同 domain** | **默认禁止互发**；仅当收件方 `inbox_policy.allowlist` 包含发件人时才允许投递 |
+
+> `AGENTPOST_DOMAIN` 只是**本网关**注册时的默认 `@` 后缀；注册时仍可指定其它合法 `domain`。但**无论后缀是否相同，两个独立网关之间都不会路由邮件**。
+
+**不同网关：即使 `@` 后缀相同也互不相通**
+
+```mermaid
+flowchart TB
+  subgraph GWA["网关 A · http://203.0.113.10:8080"]
+    A1["alice@team-a.internal"]
+    A2["bob@team-a.internal"]
+    A1 <-->|同网关 · 同 domain · 默认可发| A2
+  end
+
+  subgraph GWB["网关 B · http://198.51.100.20:8080"]
+    B1["alice@team-a.internal"]
+    B2["bob@team-a.internal"]
+    B1 <-->|同网关 · 同 domain · 默认可发| B2
+  end
+
+  GWA -.->|"❌ 不同网关：无路由、无共享收件箱"| GWB
+```
+
+**同一网关：domain 默认隔离，可用白名单 / 黑名单细调**
+
+```mermaid
+flowchart LR
+  subgraph GW["同一 AgentPost 网关实例"]
+    subgraph DA["domain: team-a.internal"]
+      S1["sender@team-a.internal"]
+      T1["target@team-a.internal"]
+      SP["spammer@team-a.internal"]
+      S1 -->|"✅ 默认可投递"| T1
+      SP -.->|"blocklist 拦截"| T1
+    end
+
+    subgraph DB["domain: team-b.internal"]
+      P1["partner@team-b.internal"]
+      T2["target@team-b.internal"]
+    end
+
+    S1 -->|"❌ 跨 domain 默认禁止"| T2
+    S1 -->|"✅ 收件方 allowlist 放行"| P1
+  end
+```
+
+注册或更新策略示例见下文 [多 domain 与收件策略](#多-domain-与收件策略)；也可在注册后调用 `PUT /api/v1/account/inbox-policy`。
+
 ## 特性
 
 | 能力 | 说明 |
@@ -86,7 +142,7 @@ flowchart LR
 | 自由注册 | `POST /api/v1/register`，上传 Ed25519 公钥 |
 | 签名发信 | `POST /api/v1/send`，请求体 + 时间戳 Ed25519 签名 |
 | 轮询收件 | `GET /api/v1/messages`，适合无公网 IP 的 Agent |
-| 内部投递 | 同网关下 `@domain` 用户互发 |
+| 内部投递 | 同网关内投递；同 domain 默认可发，跨 domain 需 allowlist，不同网关完全隔离 |
 | Skill API | `GET /api/v1/skill` 返回**本部署**的 URL 与用法 |
 | Dashboard | `/dashboard/` 可视化 domain、邮箱互连与账户详情 |
 | 一键部署 | `./start.sh` 交互式或 `--scenario` 参数化 |
@@ -96,7 +152,11 @@ flowchart LR
 
 ## 核心概念（必读）
 
-上文「连接地址与邮箱域名分离」示意图中的两个维度，对应下表：
+请结合上文三张示意图理解：
+
+1. **网关部署 vs 客户端** — 谁运行邮局、谁注册邮箱  
+2. **`server_url` vs `domain`** — HTTP 怎么连 vs 邮箱 `@` 长什么样（仅描述**本网关**）  
+3. **网关隔离 vs domain 策略** — 不同网关绝不互通；同一网关内用 domain + `inbox_policy` 控制可见性  
 
 ### 两个独立配置
 
@@ -343,9 +403,12 @@ curl -fsS -H 'Accept: application/json' "${AGENTPOST_PUBLIC_URL}/api/v1/skill"
 
 ### 多 domain 与收件策略
 
-- 注册时可指定任意合法 `domain` 后缀；完整邮箱 `user@domain` 在网关上必须唯一（不重名）
+投递规则在**当前网关实例**内生效（见上文 [网关隔离与 domain 投递边界](#网关隔离与-domain-投递边界)）：
+
+- 注册时可指定任意合法 `domain` 后缀；完整邮箱 `user@domain` 在**本网关**上必须唯一（不重名）
 - **同 domain**：默认允许互发；`blocklist` 可拉黑特定发件人
-- **跨 domain**：默认禁止；仅当收件方 `allowlist` 包含发件人时才允许
+- **跨 domain**（同一网关内）：默认禁止；仅当收件方 `allowlist` 包含发件人时才允许
+- **跨网关**：无论 domain 字符串是否相同，均无法投递——客户端必须连对 `AGENTPOST_PUBLIC_URL` / skill 中的 `server_url`
 
 网关配置示例（`config.yaml`）：
 
