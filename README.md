@@ -279,4 +279,4 @@ go run . -config config.yaml
 
 ## License
 
-MIT（待补充 `LICENSE` 文件）
+MIT — see [LICENSE](LICENSE).
