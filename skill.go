@@ -14,10 +14,9 @@ type skillResponse struct {
 }
 
 type skillMeta struct {
-	ServerURL          string   `json:"server_url"`
-	Domain             string   `json:"domain"`
-	AllowedDomains     []string `json:"allowed_domains,omitempty"`
-	DeploymentScenario string   `json:"deployment_scenario,omitempty"`
+	ServerURL          string `json:"server_url"`
+	Domain             string `json:"domain"`
+	DeploymentScenario string `json:"deployment_scenario,omitempty"`
 	PublicURLSource    string `json:"public_url_source"`
 	GatewayToken       bool   `json:"gateway_token_required"`
 	SMTPEnabled        bool   `json:"smtp_inbound_enabled"`
@@ -36,7 +35,6 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 	meta := skillMeta{
 		ServerURL:          serverURL,
 		Domain:             a.cfg.Domain,
-		AllowedDomains:     append([]string(nil), a.cfg.AllowedDomains...),
 		DeploymentScenario: strings.TrimSpace(os.Getenv("AGENTPOST_SCENARIO")),
 		PublicURLSource:    urlSource,
 		GatewayToken:       strings.TrimSpace(a.cfg.APIToken) != "",
@@ -111,10 +109,8 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "## Endpoints\n\n")
 	fmt.Fprintf(&b, "| Variable | Value |\n|----------|-------|\n")
 	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` |\n", meta.ServerURL)
-	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` (default; register may choose another allowed domain) |\n\n", meta.Domain)
-	if len(meta.AllowedDomains) > 0 {
-		fmt.Fprintf(&b, "Allowed mailbox domains on this gateway: `%s`.\n\n", strings.Join(meta.AllowedDomains, "`, `"))
-	}
+	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` (default when `domain` is omitted at register) |\n\n", meta.Domain)
+	fmt.Fprintf(&b, "Agents may choose **any valid mailbox domain** at register time; the full address `user@domain` must be unique on this gateway.\n\n")
 
 	switch meta.DeploymentScenario {
 	case "public-ip":
@@ -129,6 +125,8 @@ func buildSkillMarkdown(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "Health check:\n\n```bash\ncurl -fsS %s/healthz\n```\n\n", meta.ServerURL)
 	fmt.Fprintf(&b, "Fetch this skill again:\n\n```bash\ncurl -fsS %s/api/v1/skill\n```\n\n", meta.ServerURL)
+	fmt.Fprintf(&b, "Operator dashboard (domains, mailbox interconnect, account details):\n\n```\n%s/dashboard/\n```\n\n", meta.ServerURL)
+	fmt.Fprintf(&b, "Dashboard data API: `GET %s/api/v1/dashboard` (gateway token when configured).\n\n", meta.ServerURL)
 
 	if meta.GatewayToken {
 		fmt.Fprintf(&b, "## Gateway token\n\n")
@@ -165,7 +163,7 @@ func buildSkillMarkdown(meta skillMeta) string {
 	}
 	fmt.Fprintf(&b, "```\n\n")
 	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"domain\": \"team-a.internal\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400,\n  \"profile\": {\n    \"display_name\": \"Research Agent\",\n    \"host\": \"worker-01.example.internal\",\n    \"responsibilities\": \"literature review and summarization\",\n    \"skills\": [\"web-search\", \"summarize\"],\n    \"mcp_services\": [\"filesystem\", \"browser\"],\n    \"capabilities\": [\"can summarize PDFs\", \"can browse internal docs\"],\n    \"notes\": \"optional free-form notes\"\n  },\n  \"inbox_policy\": {\n    \"blocklist\": [\"spammer@team-a.internal\"],\n    \"allowlist\": [\"trusted@team-b.internal\"]\n  }\n}\n```\n\n")
-	fmt.Fprintf(&b, "`domain` is optional at register time and defaults to `%s`. Agents on the same gateway may choose different allowed domains.\n\n", meta.Domain)
+	fmt.Fprintf(&b, "`domain` is optional at register time and defaults to `%s`. Any valid domain suffix is allowed; only the full mailbox `user@domain` must be unique.\n\n", meta.Domain)
 	fmt.Fprintf(&b, "`profile` is optional. It is published in the agent directory (`GET /api/v1/agents`) so other agents can discover who you are and what you can do.\n\n")
 	fmt.Fprintf(&b, "`inbox_policy` is optional.\n\n")
 	fmt.Fprintf(&b, "- **Same domain:** agents can send/receive by default; add senders to `blocklist` to reject them.\n")
@@ -226,7 +224,7 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "- Max TTL: **%d** seconds (24h).\n", meta.MaxTTLSeconds)
 	fmt.Fprintf(&b, "- Max message size: **%d** bytes.\n", meta.MaxMessageBytes)
 	fmt.Fprintf(&b, "- Rate limit: **2 sends/minute** per sender.\n")
-	fmt.Fprintf(&b, "- `to` must use `@%s`; the HTTP host and email suffix are independent.\n", meta.Domain)
+	fmt.Fprintf(&b, "- `to` must be a registered mailbox on this gateway; the HTTP host and email suffix are independent.\n")
 	fmt.Fprintf(&b, "- External relay is disabled in the MVP.\n")
 
 	return b.String()

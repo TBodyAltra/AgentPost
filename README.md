@@ -13,6 +13,7 @@
 | 轮询收件 | `GET /api/v1/messages`，适合无公网 IP 的 Agent |
 | 内部投递 | 同网关下 `@domain` 用户互发 |
 | Skill API | `GET /api/v1/skill` 返回**本部署**的 URL 与用法 |
+| Dashboard | `/dashboard/` 可视化 domain、邮箱互连与账户详情 |
 | 一键部署 | `./start.sh` 交互式或 `--scenario` 参数化 |
 
 ---
@@ -260,7 +261,7 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
 
 ### 多 domain 与收件策略
 
-- 注册时可指定 `domain`（须在网关 `allowed_domains` 列表中；未配置时仅允许默认 `domain`）
+- 注册时可指定任意合法 `domain` 后缀；完整邮箱 `user@domain` 在网关上必须唯一（不重名）
 - **同 domain**：默认允许互发；`blocklist` 可拉黑特定发件人
 - **跨 domain**：默认禁止；仅当收件方 `allowlist` 包含发件人时才允许
 
@@ -268,13 +269,21 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
 
 ```yaml
 domain: agent.local
-allowed_domains:
-  - agent.local
-  - team-a.internal
-  - team-b.internal
 ```
 
+`domain` 为注册时省略 `domain` 字段的默认值，不限制 agent 可选择的 domain。
+
 鉴权签名请使用完整邮箱：`X-Agent-Email: my-bot@team-a.internal`（或在 `X-Agent-Username` 中传完整邮箱）。
+
+### Dashboard（运维可视化）
+
+浏览器打开 **`/dashboard/`**（例如 `http://124.220.16.79:8080/dashboard/`）：
+
+- 当前网关下所有 **domain** 及每个 domain 下的邮箱
+- **domain 间 / 邮箱间** 投递互连状态（同域默认、跨域白名单、黑名单阻断）
+- 每个邮箱的 profile、inbox policy、TTL、待收邮件数
+
+数据接口：`GET /api/v1/dashboard`（若配置了网关 Token，需 `Authorization: Bearer <token>`）。页面会提示输入 Token 并保存在浏览器 session 中。
 
 Ed25519 签名字节：`<unix_timestamp>\n<raw_request_body>`（GET messages 时 body 为空）。
 
@@ -292,7 +301,9 @@ Ed25519 签名字节：`<unix_timestamp>\n<raw_request_body>`（GET messages 时
 ```text
 .
 ├── main.go              # HTTP API、SMTP、存储
+├── dashboard.go         # GET /api/v1/dashboard + /dashboard/ UI
 ├── skill.go             # GET /api/v1/skill
+├── web/dashboard/       # 嵌入式 Dashboard 静态页面
 ├── start.sh             # 场景化部署脚本
 ├── AGENTS.md            # 给 AI Agent 的部署说明
 ├── docker-compose.yml   # AgentPost + Caddy（profile: caddy）
