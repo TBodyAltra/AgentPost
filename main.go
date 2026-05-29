@@ -49,13 +49,12 @@ const (
 )
 
 type Config struct {
-	Domain             string   `yaml:"domain"`
-	AllowedDomains     []string `yaml:"allowed_domains"`
-	HTTPAddr           string   `yaml:"http_addr"`
-	SMTPAddr           string   `yaml:"smtp_addr"`
-	AllowExternalRelay bool     `yaml:"allow_external_relay"`
-	MaxMessageBytes    int64    `yaml:"max_message_bytes"`
-	APIToken           string   `yaml:"-"`
+	Domain             string `yaml:"domain"`
+	HTTPAddr           string `yaml:"http_addr"`
+	SMTPAddr           string `yaml:"smtp_addr"`
+	AllowExternalRelay bool   `yaml:"allow_external_relay"`
+	MaxMessageBytes    int64  `yaml:"max_message_bytes"`
+	APIToken           string `yaml:"-"`
 }
 
 type App struct {
@@ -191,7 +190,7 @@ func main() {
 
 	errCh := make(chan error, 2)
 	go func() {
-		log.Printf("AgentPost HTTP listening on %s (default domain %s, allowed domains: %s)", cfg.HTTPAddr, cfg.Domain, strings.Join(cfg.AllowedDomains, ", "))
+		log.Printf("AgentPost HTTP listening on %s (default domain %s)", cfg.HTTPAddr, cfg.Domain)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -268,27 +267,6 @@ func normalizeConfigDomains(cfg *Config) {
 	if cfg.Domain == "" {
 		cfg.Domain = defaultDomain
 	}
-	if len(cfg.AllowedDomains) == 0 {
-		cfg.AllowedDomains = []string{cfg.Domain}
-		return
-	}
-	seen := make(map[string]struct{}, len(cfg.AllowedDomains))
-	out := make([]string, 0, len(cfg.AllowedDomains))
-	for _, domain := range cfg.AllowedDomains {
-		domain = strings.ToLower(strings.TrimSpace(domain))
-		if domain == "" || !validMailboxDomain(domain) {
-			continue
-		}
-		if _, ok := seen[domain]; ok {
-			continue
-		}
-		seen[domain] = struct{}{}
-		out = append(out, domain)
-	}
-	if len(out) == 0 {
-		out = []string{cfg.Domain}
-	}
-	cfg.AllowedDomains = out
 }
 
 func applyEnvOverrides(cfg *Config) {
@@ -306,16 +284,6 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("AGENTPOST_API_TOKEN"); v != "" {
 		cfg.APIToken = v
-	}
-	if v := os.Getenv("AGENTPOST_ALLOWED_DOMAINS"); v != "" {
-		parts := strings.Split(v, ",")
-		cfg.AllowedDomains = nil
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if part != "" {
-				cfg.AllowedDomains = append(cfg.AllowedDomains, part)
-			}
-		}
 	}
 }
 
@@ -342,6 +310,11 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("/api/v1/send", a.handleSend)
 	mux.HandleFunc("/api/v1/messages", a.handleMessages)
 	mux.HandleFunc("/api/v1/skill", a.handleSkill)
+	mux.HandleFunc("/api/v1/dashboard", a.handleDashboardAPI)
+	mux.Handle("/dashboard/", a.dashboardHandler())
+	mux.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/dashboard/", http.StatusFound)
+	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -413,10 +386,6 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	if !validMailboxDomain(domain) {
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "domain must be a valid mailbox suffix"})
-		return
-	}
-	if !a.domainAllowed(domain) {
-		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "domain is not allowed on this gateway"})
 		return
 	}
 	mailbox := mailboxKey(username, domain)
@@ -636,9 +605,9 @@ func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !a.domainAllowed(domain) {
+	if !a.mailboxRegistered(username, domain) {
 		if !a.cfg.AllowExternalRelay {
-			writeJSON(w, http.StatusForbidden, errorResponse{Error: "external relay is disabled"})
+			writeJSON(w, http.StatusNotFound, errorResponse{Error: "recipient is not registered or has expired"})
 			return
 		}
 		writeJSON(w, http.StatusNotImplemented, errorResponse{Error: "external relay is not implemented in the MVP"})
@@ -948,14 +917,12 @@ func addressListMatches(from string, addresses []string, recipientDomain string)
 	return false
 }
 
-func (a *App) domainAllowed(domain string) bool {
-	domain = strings.ToLower(strings.TrimSpace(domain))
-	for _, allowed := range a.cfg.AllowedDomains {
-		if domain == allowed {
-			return true
-		}
-	}
-	return false
+func (a *App) mailboxRegistered(username, domain string) bool {
+	now := a.now()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	user, ok := a.users[mailboxKey(username, domain)]
+	return ok && user.ExpiresAt.After(now)
 }
 
 func (a *App) parseAgentMailbox(identity string) (string, error) {
@@ -1171,7 +1138,7 @@ func (s *smtpSession) Rcpt(to string, _ *smtp.RcptOptions) error {
 		return &smtp.SMTPError{Code: 553, Message: "invalid recipient address"}
 	}
 	username, domain, ok := splitEmail(normalized)
-	if !ok || !s.app.domainAllowed(domain) {
+	if !ok || !validMailboxDomain(domain) {
 		return &smtp.SMTPError{Code: 550, Message: "recipient is not local"}
 	}
 	if !s.app.localUserActive(username, domain) {

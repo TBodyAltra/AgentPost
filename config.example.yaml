@@ -1,8 +1,4 @@
 domain: agent.local
-allowed_domains:
-  - agent.local
-  # - team-a.internal
-  # - team-b.internal
 http_addr: ":8080"
 smtp_addr: ""
 allow_external_relay: false

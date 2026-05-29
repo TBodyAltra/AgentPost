@@ -207,7 +207,6 @@ func TestRegisterProfileDirectoryAndUnregister(t *testing.T) {
 func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
 	app := NewApp(Config{
 		Domain:          "team-a.test",
-		AllowedDomains:  []string{"team-a.test", "team-b.test"},
 		HTTPAddr:        ":0",
 		SMTPAddr:        "",
 		MaxMessageBytes: defaultMaxMessageBytes,
@@ -295,6 +294,75 @@ func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
 	}
 }
 
+func TestFreeDomainRegistration(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "default.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubA, privA, _ := ed25519.GenerateKey(crand.Reader)
+	pubB, _, _ := ed25519.GenerateKey(crand.Reader)
+	pubPeer, privPeer, _ := ed25519.GenerateKey(crand.Reader)
+
+	register := func(username, domain string, key ed25519.PublicKey) int {
+		t.Helper()
+		body := mustJSON(t, registerRequest{
+			Username:   username,
+			Domain:     domain,
+			PublicKey:  hex.EncodeToString(key),
+			TTLSeconds: 3600,
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		return resp.Code
+	}
+
+	if code := register("bot", "custom-team.internal", pubA); code != http.StatusCreated {
+		t.Fatalf("register custom domain status = %d, want 201", code)
+	}
+	if code := register("peer", "custom-team.internal", pubPeer); code != http.StatusCreated {
+		t.Fatalf("register peer on custom domain status = %d, want 201", code)
+	}
+	if code := register("bot", "other-space.local", pubB); code != http.StatusCreated {
+		t.Fatalf("register another custom domain status = %d, want 201", code)
+	}
+	if code := register("bot", "custom-team.internal", pubB); code != http.StatusConflict {
+		t.Fatalf("duplicate mailbox status = %d, want 409", code)
+	}
+
+	sendBody := mustJSON(t, sendRequest{To: "peer@custom-team.internal", Subject: "hi", Body: "hello"})
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot@custom-team.internal", privA)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusOK {
+		t.Fatalf("same custom-domain send status = %d, want 200", sendResp.Code)
+	}
+
+	sendBody = mustJSON(t, sendRequest{To: "bot@other-space.local", Subject: "hi", Body: "hello"})
+	sendReq = signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot@custom-team.internal", privA)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp = httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusForbidden {
+		t.Fatalf("cross-domain send without allowlist status = %d, want 403", sendResp.Code)
+	}
+
+	sendBody = mustJSON(t, sendRequest{To: "nobody@unregistered.test", Subject: "hi", Body: "hello"})
+	sendReq = signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "peer@custom-team.internal", privPeer)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp = httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusNotFound {
+		t.Fatalf("send to unregistered mailbox status = %d, want 404", sendResp.Code)
+	}
+}
+
 func TestSkillEndpoint(t *testing.T) {
 	t.Setenv("AGENTPOST_PUBLIC_URL", "https://gateway.example.com")
 	t.Setenv("AGENTPOST_SCENARIO", "public-domain")
@@ -334,6 +402,21 @@ func TestSkillEndpoint(t *testing.T) {
 	}
 	if !strings.Contains(body, "/api/v1/agents") {
 		t.Fatalf("skill should document agent directory endpoint")
+	}
+	if !strings.Contains(body, "request / reply 对话协议") {
+		t.Fatalf("skill should document request/reply protocol")
+	}
+	if !strings.Contains(body, "后台 subagent") {
+		t.Fatalf("skill should document inbox subagent polling")
+	}
+	if !strings.Contains(body, "LLM Token 用量") {
+		t.Fatalf("skill should document LLM token plan vs polling")
+	}
+	if !strings.Contains(body, "禁止空回复") {
+		t.Fatalf("skill should require executing request before reply")
+	}
+	if !strings.Contains(body, "使用说明") {
+		t.Fatalf("skill should be in Chinese by default")
 	}
 
 	jsonReq := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)

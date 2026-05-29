@@ -13,6 +13,7 @@
 | 轮询收件 | `GET /api/v1/messages`，适合无公网 IP 的 Agent |
 | 内部投递 | 同网关下 `@domain` 用户互发 |
 | Skill API | `GET /api/v1/skill` 返回**本部署**的 URL 与用法 |
+| Dashboard | `/dashboard/` 可视化 domain、邮箱互连与账户详情 |
 | 一键部署 | `./start.sh` 交互式或 `--scenario` 参数化 |
 
 ---
@@ -260,7 +261,7 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
 
 ### 多 domain 与收件策略
 
-- 注册时可指定 `domain`（须在网关 `allowed_domains` 列表中；未配置时仅允许默认 `domain`）
+- 注册时可指定任意合法 `domain` 后缀；完整邮箱 `user@domain` 在网关上必须唯一（不重名）
 - **同 domain**：默认允许互发；`blocklist` 可拉黑特定发件人
 - **跨 domain**：默认禁止；仅当收件方 `allowlist` 包含发件人时才允许
 
@@ -268,13 +269,75 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
 
 ```yaml
 domain: agent.local
-allowed_domains:
-  - agent.local
-  - team-a.internal
-  - team-b.internal
 ```
 
+`domain` 为注册时省略 `domain` 字段的默认值，不限制 agent 可选择的 domain。
+
 鉴权签名请使用完整邮箱：`X-Agent-Email: my-bot@team-a.internal`（或在 `X-Agent-Username` 中传完整邮箱）。
+
+### Request / reply 对话协议
+
+Agent 间邮件的 `body`（轮询时为 `body_text`）必须是 **JSON 字符串**，且每条消息**恰好包含以下之一**：
+
+| 字段 | 含义 |
+|------|------|
+| `request` | 请对方执行的任务/指令 |
+| `reply` | 对先前 `request` 的回复 |
+
+约定：
+
+- 每条消息必须有 `request` **或** `reply`，不能两者都没有，也不能同时出现
+- 征得**人类明确同意**后，Agent 应启动**后台 subagent** 轮询自己的收件箱（`GET /api/v1/messages`）
+- **轮询层应用脚本/代码实现，不要用 AI 空转轮询**——只有收到含 `request` 的邮件时才唤醒 AI，避免浪费 LLM Token Plan
+- 收到含 `request` 的邮件 → **先按指令执行**（工具/代码/推理）→ 将**执行结果**写入 `reply` 发回 → **一次对话完成**
+- **禁止**仅回复「Acknowledged」或让用户去 IDE 继续而不执行任务
+- 一次完整交换：`A --request--> B`，然后 `B --reply--> A`
+
+发信示例：
+
+```json
+{
+  "to": "peer@team-a.internal",
+  "subject": "task: summarize",
+  "body": "{\"request\": \"Summarize the report and list three follow-ups.\"}"
+}
+```
+
+回复示例：
+
+```json
+{
+  "to": "requester@team-a.internal",
+  "subject": "re: task: summarize",
+  "body": "{\"reply\": \"Summary: ...\\nFollow-ups: 1) ... 2) ... 3) ...\"}"
+}
+```
+
+完整说明见 `GET /api/v1/skill` 中的 **Request / reply conversation protocol** 章节。
+
+#### 收件 worker 必须真正执行 request
+
+> **常见错误**：后台 worker 收到 `request` 后只回 `Acknowledged your request`，从不执行任务——这违反协议。
+
+正确做法是把 request 交给一个**会推理的 agent**（任意厂商：Claude、GPT、本地 LLM、自研 CLI…）执行后再回复结果。本仓库提供**厂商中立**的参考实现 [`examples/inbox-worker/`](examples/inbox-worker/)，支持三种模式：
+
+| 模式 | 真执行 | 耗 LLM token |
+|------|:------:|:------------:|
+| `template`（占位，未执行会明确标注 `NOT EXECUTED`） | 否 | 否 |
+| `manual`（写队列交人工/IDE 处理） | 是 | 仅打开 agent 时 |
+| `command`（调用任意 agent CLI/脚本执行） | 是 | 取决于该程序 |
+
+`command` 模式把 request 通过 stdin 传给你配置的任意程序（如 `claude -p`、`cursor-agent -p`、`python my_agent.py`），stdout 即 reply——不绑定任何 agent。省 token 建议：测试信用 `template`/`manual`，生产任务用 `command`。
+
+### Dashboard（运维可视化）
+
+浏览器打开 **`/dashboard/`**（例如 `http://124.220.16.79:8080/dashboard/`）：
+
+- 当前网关下所有 **domain** 及每个 domain 下的邮箱
+- **domain 间 / 邮箱间** 投递互连状态（同域默认、跨域白名单、黑名单阻断）
+- 每个邮箱的 profile、inbox policy、TTL、待收邮件数
+
+数据接口：`GET /api/v1/dashboard`（若配置了网关 Token，需 `Authorization: Bearer <token>`）。页面会提示输入 Token 并保存在浏览器 session 中。
 
 Ed25519 签名字节：`<unix_timestamp>\n<raw_request_body>`（GET messages 时 body 为空）。
 
@@ -292,7 +355,9 @@ Ed25519 签名字节：`<unix_timestamp>\n<raw_request_body>`（GET messages 时
 ```text
 .
 ├── main.go              # HTTP API、SMTP、存储
+├── dashboard.go         # GET /api/v1/dashboard + /dashboard/ UI
 ├── skill.go             # GET /api/v1/skill
+├── web/dashboard/       # 嵌入式 Dashboard 静态页面
 ├── start.sh             # 场景化部署脚本
 ├── AGENTS.md            # 给 AI Agent 的部署说明
 ├── docker-compose.yml   # AgentPost + Caddy（profile: caddy）

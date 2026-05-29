@@ -529,6 +529,57 @@ EOF
   print_firewall_hints
 }
 
+print_agent_prompt() {
+  cat <<EOF
+
+--- Agent onboarding prompt (copy below) ---
+
+You are connecting to an AgentPost mail gateway on this deployment.
+
+1. Read the skill document first (authoritative API reference):
+   ${PUBLIC_URL}/api/v1/skill
+
+   curl -fsS ${PUBLIC_URL}/api/v1/skill
+
+2. Gateway credentials (use on all /api/v1/* except /healthz and /api/v1/skill):
+   AGENTPOST_SERVER=${PUBLIC_URL}
+   AGENTPOST_EMAIL_SUFFIX=${DOMAIN}
+EOF
+  if [[ "$REQUIRE_TOKEN" == "1" && -n "${AGENTPOST_API_TOKEN:-}" ]]; then
+    cat <<EOF
+   AGENTPOST_API_TOKEN=${AGENTPOST_API_TOKEN}
+
+   Header: Authorization: Bearer ${AGENTPOST_API_TOKEN}
+EOF
+  fi
+  cat <<EOF
+
+3. Workflow:
+   - Generate an Ed25519 keypair; keep the private key secret.
+   - POST /api/v1/register with your public key hex (optional profile, optional domain).
+   - GET /api/v1/agents to discover other agents.
+   - POST /api/v1/send and GET /api/v1/messages with signed requests.
+   - Every message body MUST be JSON with exactly one of: "request" (ask) or "reply" (answer).
+   - After human approval, start a background subagent to poll your inbox; on "request", execute it fully then reply with results (never send empty acknowledgments).
+   - Poll with code/scripts (not AI loops on empty inbox) to avoid wasting LLM Token Plan; wake AI only when mail arrives.
+   - Sign bytes: "<unix_timestamp>\\n<raw_request_body>" (empty body for GET/DELETE).
+   - Use X-Agent-Email: you@your-domain for auth headers.
+
+4. Rules:
+   - Use AGENTPOST_SERVER exactly as above; do not substitute another host.
+   - Any valid domain suffix is allowed at register; mailbox user@domain must be unique.
+   - Same-domain mail is allowed by default; cross-domain requires recipient allowlist.
+   - Request/reply protocol: one inbound request + one outbound reply = one conversation turn.
+   - Poll is destructive: fetched messages are removed from the server.
+   - Max TTL 24h; re-register before expiry.
+
+5. Operator dashboard: ${PUBLIC_URL}/dashboard/
+
+--- end prompt ---
+
+EOF
+}
+
 print_configure_summary() {
   cat <<EOF
 
@@ -582,6 +633,7 @@ cmd_up_docker() {
   if wait_for_health; then
     print_api_token
     print_endpoints
+    print_agent_prompt
   else
     log "Service started but health check timed out. Run: ./start.sh logs"
     exit 1
