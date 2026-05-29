@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	smtp "github.com/emersion/go-smtp"
 )
 
 func TestRegisterSendAndPoll(t *testing.T) {
@@ -617,6 +619,309 @@ max_message_bytes: 0
 	}
 }
 
+func TestRegisterNormalizesProfileAndInboxPolicy(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	publicKey, _, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	body := mustJSON(t, registerRequest{
+		Username:   "bot_1",
+		PublicKey:  hex.EncodeToString(publicKey),
+		TTLSeconds: 3600,
+		Profile: &AgentProfile{
+			DisplayName:      "  Research Bot  ",
+			Host:             strings.Repeat("h", maxProfileFieldLen+10),
+			Responsibilities: "  summarization  ",
+			Skills:           []string{" search ", "Search", "", "summarize"},
+			MCPServices:      []string{" filesystem ", "filesystem"},
+			Capabilities:     []string{" can read pdfs ", "can read PDFs"},
+			Notes:            "  useful notes  ",
+		},
+		InboxPolicy: &InboxPolicy{
+			Blocklist: []string{" noisy_bot ", "NOISY_BOT@AGENT.TEST", ""},
+			Allowlist: []string{
+				" Partner@Other.Team ",
+				"partner@other.team",
+			},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("register status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+
+	var got registerResponse
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode register response: %v", err)
+	}
+	if got.Profile.DisplayName != "Research Bot" || got.Profile.Responsibilities != "summarization" || got.Profile.Notes != "useful notes" {
+		t.Fatalf("profile string fields were not normalized: %+v", got.Profile)
+	}
+	if len(got.Profile.Host) != maxProfileFieldLen {
+		t.Fatalf("profile host length = %d, want %d", len(got.Profile.Host), maxProfileFieldLen)
+	}
+	if want := []string{"search", "summarize"}; len(got.Profile.Skills) != len(want) || got.Profile.Skills[0] != want[0] || got.Profile.Skills[1] != want[1] {
+		t.Fatalf("profile skills = %#v, want %#v", got.Profile.Skills, want)
+	}
+	if len(got.Profile.MCPServices) != 1 || got.Profile.MCPServices[0] != "filesystem" {
+		t.Fatalf("profile MCP services not deduplicated: %#v", got.Profile.MCPServices)
+	}
+	if len(got.Profile.Capabilities) != 1 || got.Profile.Capabilities[0] != "can read pdfs" {
+		t.Fatalf("profile capabilities not normalized: %#v", got.Profile.Capabilities)
+	}
+	if len(got.InboxPolicy.Blocklist) != 1 || got.InboxPolicy.Blocklist[0] != "noisy_bot@agent.test" {
+		t.Fatalf("blocklist = %#v, want shorthand normalized to default domain", got.InboxPolicy.Blocklist)
+	}
+	if len(got.InboxPolicy.Allowlist) != 1 || got.InboxPolicy.Allowlist[0] != "partner@other.team" {
+		t.Fatalf("allowlist = %#v, want lower-cased unique address", got.InboxPolicy.Allowlist)
+	}
+}
+
+func TestRegisterRejectsInvalidInputs(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	publicKey, _, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		body        []byte
+		contentType string
+		wantStatus  int
+	}{
+		{
+			name: "missing content type",
+			body: mustJSON(t, registerRequest{
+				Username:  "bot_1",
+				PublicKey: hex.EncodeToString(publicKey),
+			}),
+			wantStatus: http.StatusUnsupportedMediaType,
+		},
+		{
+			name: "invalid username",
+			body: mustJSON(t, registerRequest{
+				Username:  "Bot.1",
+				PublicKey: hex.EncodeToString(publicKey),
+			}),
+			contentType: "application/json",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name: "invalid domain",
+			body: mustJSON(t, registerRequest{
+				Username:  "bot_1",
+				Domain:    "-bad.example",
+				PublicKey: hex.EncodeToString(publicKey),
+			}),
+			contentType: "application/json",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name: "invalid public key",
+			body: mustJSON(t, registerRequest{
+				Username:  "bot_1",
+				PublicKey: "abcd",
+			}),
+			contentType: "application/json",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name:        "unknown json field",
+			body:        []byte(`{"username":"bot_1","public_key":"` + hex.EncodeToString(publicKey) + `","extra":true}`),
+			contentType: "application/json",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name:        "multiple json values",
+			body:        []byte(`{"username":"bot_1","public_key":"` + hex.EncodeToString(publicKey) + `"}` + "\n{}"),
+			contentType: "application/json",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name: "too many profile items",
+			body: mustJSON(t, registerRequest{
+				Username:  "bot_1",
+				PublicKey: hex.EncodeToString(publicKey),
+				Profile: &AgentProfile{
+					Skills: make([]string, maxProfileListItems+1),
+				},
+			}),
+			contentType: "application/json",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name: "invalid policy address",
+			body: mustJSON(t, registerRequest{
+				Username:  "bot_1",
+				PublicKey: hex.EncodeToString(publicKey),
+				InboxPolicy: &InboxPolicy{
+					Allowlist: []string{"not an address"},
+				},
+			}),
+			contentType: "application/json",
+			wantStatus:  http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(tt.body))
+			req.RemoteAddr = "198.51.100.10:12345"
+			if tt.contentType != "" {
+				req.Header.Set("Content-Type", tt.contentType)
+			}
+			resp := httptest.NewRecorder()
+			handler.ServeHTTP(resp, req)
+			if resp.Code != tt.wantStatus {
+				t.Fatalf("register status = %d, want %d, body = %s", resp.Code, tt.wantStatus, resp.Body.String())
+			}
+		})
+	}
+}
+
+func TestExpiredAccountCleanupRemovesMessagesAndAllowsReregistration(t *testing.T) {
+	now := time.Date(2026, 5, 29, 12, 0, 0, 0, time.UTC)
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	app.now = func() time.Time { return now }
+	handler := app.routes()
+
+	oldPublic, oldPrivate, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate old key: %v", err)
+	}
+	newPublic, newPrivate, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate new key: %v", err)
+	}
+
+	register := func(key ed25519.PublicKey, ttl int64) int {
+		t.Helper()
+		body := mustJSON(t, registerRequest{
+			Username:   "temp",
+			PublicKey:  hex.EncodeToString(key),
+			TTLSeconds: ttl,
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		return resp.Code
+	}
+	if code := register(oldPublic, 1); code != http.StatusCreated {
+		t.Fatalf("initial register status = %d, want 201", code)
+	}
+
+	sendBody := mustJSON(t, sendRequest{To: "temp@agent.test", Subject: "queued", Body: "expire me"})
+	sendReq := signedRequestAt(t, http.MethodPost, "/api/v1/send", sendBody, "temp@agent.test", oldPrivate, now)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusOK {
+		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
+	}
+
+	now = now.Add(2 * time.Second)
+	app.cleanupExpired()
+	if code := register(newPublic, 3600); code != http.StatusCreated {
+		t.Fatalf("reregister after cleanup status = %d, want 201", code)
+	}
+
+	oldPoll := signedRequestAt(t, http.MethodGet, "/api/v1/messages", nil, "temp@agent.test", oldPrivate, now)
+	oldPollResp := httptest.NewRecorder()
+	handler.ServeHTTP(oldPollResp, oldPoll)
+	if oldPollResp.Code != http.StatusUnauthorized {
+		t.Fatalf("old key poll status = %d, want 401", oldPollResp.Code)
+	}
+
+	newPoll := signedRequestAt(t, http.MethodGet, "/api/v1/messages", nil, "temp@agent.test", newPrivate, now)
+	newPollResp := httptest.NewRecorder()
+	handler.ServeHTTP(newPollResp, newPoll)
+	if newPollResp.Code != http.StatusOK {
+		t.Fatalf("new key poll status = %d, body = %s", newPollResp.Code, newPollResp.Body.String())
+	}
+	var got messagesResponse
+	if err := json.NewDecoder(newPollResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode messages: %v", err)
+	}
+	if len(got.Messages) != 0 {
+		t.Fatalf("expired account messages leaked into new registration: %+v", got.Messages)
+	}
+}
+
+func TestExternalRelayFlagOnlyChangesMissingRecipientResponse(t *testing.T) {
+	tests := []struct {
+		name               string
+		allowExternalRelay bool
+		wantStatus         int
+	}{
+		{name: "external relay disabled", allowExternalRelay: false, wantStatus: http.StatusNotFound},
+		{name: "external relay enabled but unimplemented", allowExternalRelay: true, wantStatus: http.StatusNotImplemented},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := NewApp(Config{
+				Domain:             "agent.test",
+				HTTPAddr:           ":0",
+				SMTPAddr:           "",
+				AllowExternalRelay: tt.allowExternalRelay,
+				MaxMessageBytes:    defaultMaxMessageBytes,
+			})
+			handler := app.routes()
+
+			publicKey, privateKey, err := ed25519.GenerateKey(crand.Reader)
+			if err != nil {
+				t.Fatalf("generate key: %v", err)
+			}
+			registerBody := mustJSON(t, registerRequest{
+				Username:  "sender",
+				PublicKey: hex.EncodeToString(publicKey),
+			})
+			registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(registerBody))
+			registerReq.Header.Set("Content-Type", "application/json")
+			registerResp := httptest.NewRecorder()
+			handler.ServeHTTP(registerResp, registerReq)
+			if registerResp.Code != http.StatusCreated {
+				t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())
+			}
+
+			sendBody := mustJSON(t, sendRequest{To: "human@example.net", Subject: "relay", Body: "hello"})
+			sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "sender@agent.test", privateKey)
+			sendReq.Header.Set("Content-Type", "application/json")
+			sendResp := httptest.NewRecorder()
+			handler.ServeHTTP(sendResp, sendReq)
+			if sendResp.Code != tt.wantStatus {
+				t.Fatalf("send status = %d, want %d, body = %s", sendResp.Code, tt.wantStatus, sendResp.Body.String())
+			}
+		})
+	}
+}
+
 func TestSkillEndpoint(t *testing.T) {
 	t.Setenv("AGENTPOST_PUBLIC_URL", "https://gateway.example.com")
 	t.Setenv("AGENTPOST_SCENARIO", "public-domain")
@@ -969,6 +1274,180 @@ func TestSMTPHTMLIsConvertedToText(t *testing.T) {
 	}
 	if parsed.BodyText == "" || parsed.BodyText == string(raw) {
 		t.Fatalf("HTML was not converted to text: %q", parsed.BodyText)
+	}
+}
+
+func TestMIMEParserPrefersPlainTextAndDecodesHeaders(t *testing.T) {
+	raw := []byte("From: =?utf-8?q?Human?= <human@example.com>\r\n" +
+		"To: bot_1@agent.test\r\n" +
+		"Subject: =?utf-8?q?Hello_=E2=9C=93?=\r\n" +
+		"Content-Type: multipart/alternative; boundary=abc123\r\n" +
+		"\r\n" +
+		"--abc123\r\n" +
+		"Content-Type: text/html; charset=utf-8\r\n" +
+		"\r\n" +
+		"<p>html fallback</p>\r\n" +
+		"--abc123\r\n" +
+		"Content-Type: text/plain; charset=utf-8\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"\r\n" +
+		"cGxhaW4gdGV4dCB3aW5z\r\n" +
+		"--abc123--\r\n")
+
+	parsed, err := parseMIMEMessage(raw)
+	if err != nil {
+		t.Fatalf("parse MIME: %v", err)
+	}
+	if parsed.From != "human@example.com" {
+		t.Fatalf("from = %q, want human@example.com", parsed.From)
+	}
+	if parsed.Subject != "Hello ✓" {
+		t.Fatalf("subject = %q, want decoded header", parsed.Subject)
+	}
+	if parsed.BodyText != "plain text wins" {
+		t.Fatalf("body text = %q, want plain text part", parsed.BodyText)
+	}
+}
+
+func TestSMTPDataDeliversToMultipleRegisteredRecipients(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubA, privA, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key A: %v", err)
+	}
+	pubB, privB, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key B: %v", err)
+	}
+
+	register := func(username string, key ed25519.PublicKey) {
+		t.Helper()
+		body := mustJSON(t, registerRequest{
+			Username:  username,
+			PublicKey: hex.EncodeToString(key),
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("register %s status = %d, body = %s", username, resp.Code, resp.Body.String())
+		}
+	}
+	register("bot_a", pubA)
+	register("bot_b", pubB)
+
+	session := &smtpSession{app: app}
+	if err := session.Mail("human@agent.test", nil); err != nil {
+		t.Fatalf("MAIL FROM failed: %v", err)
+	}
+	for _, rcpt := range []string{"bot_a@agent.test", "bot_b@agent.test"} {
+		if err := session.Rcpt(rcpt, nil); err != nil {
+			t.Fatalf("RCPT TO %s failed: %v", rcpt, err)
+		}
+	}
+	raw := "From: human@agent.test\r\n" +
+		"To: bot_a@agent.test, bot_b@agent.test\r\n" +
+		"Subject: SMTP delivery\r\n" +
+		"Content-Type: text/plain; charset=utf-8\r\n" +
+		"\r\n" +
+		"hello from smtp"
+	if err := session.Data(strings.NewReader(raw)); err != nil {
+		t.Fatalf("DATA failed: %v", err)
+	}
+
+	poll := func(email string, privateKey ed25519.PrivateKey) Message {
+		t.Helper()
+		req := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, email, privateKey)
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		if resp.Code != http.StatusOK {
+			t.Fatalf("poll %s status = %d, body = %s", email, resp.Code, resp.Body.String())
+		}
+		var got messagesResponse
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode poll response: %v", err)
+		}
+		if len(got.Messages) != 1 {
+			t.Fatalf("%s message count = %d, want 1", email, len(got.Messages))
+		}
+		return got.Messages[0]
+	}
+
+	for email, privateKey := range map[string]ed25519.PrivateKey{
+		"bot_a@agent.test": privA,
+		"bot_b@agent.test": privB,
+	} {
+		message := poll(email, privateKey)
+		if message.From != "human@agent.test" || message.Subject != "SMTP delivery" || message.BodyText != "hello from smtp" {
+			t.Fatalf("unexpected SMTP message for %s: %+v", email, message)
+		}
+	}
+}
+
+func TestSMTPDataRejectsRecipientInboxPolicy(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	publicKey, privateKey, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	registerBody := mustJSON(t, registerRequest{
+		Username:  "target",
+		PublicKey: hex.EncodeToString(publicKey),
+		InboxPolicy: &InboxPolicy{
+			Blocklist: []string{"human@agent.test"},
+		},
+	})
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(registerBody))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerResp := httptest.NewRecorder()
+	handler.ServeHTTP(registerResp, registerReq)
+	if registerResp.Code != http.StatusCreated {
+		t.Fatalf("register status = %d, body = %s", registerResp.Code, registerResp.Body.String())
+	}
+
+	session := &smtpSession{app: app}
+	if err := session.Mail("human@agent.test", nil); err != nil {
+		t.Fatalf("MAIL FROM failed: %v", err)
+	}
+	if err := session.Rcpt("target@agent.test", nil); err != nil {
+		t.Fatalf("RCPT TO failed: %v", err)
+	}
+	err = session.Data(strings.NewReader("From: human@agent.test\r\nSubject: blocked\r\n\r\nblocked"))
+	if err == nil {
+		t.Fatalf("DATA should fail when recipient policy rejects the sender")
+	}
+	smtpErr, ok := err.(*smtp.SMTPError)
+	if !ok || smtpErr.Code != 550 {
+		t.Fatalf("DATA error = %#v, want SMTP 550", err)
+	}
+
+	pollReq := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, "target@agent.test", privateKey)
+	pollResp := httptest.NewRecorder()
+	handler.ServeHTTP(pollResp, pollReq)
+	if pollResp.Code != http.StatusOK {
+		t.Fatalf("poll status = %d, body = %s", pollResp.Code, pollResp.Body.String())
+	}
+	var got messagesResponse
+	if err := json.NewDecoder(pollResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode messages: %v", err)
+	}
+	if len(got.Messages) != 0 {
+		t.Fatalf("blocked SMTP message was delivered: %+v", got.Messages)
 	}
 }
 
