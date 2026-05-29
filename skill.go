@@ -14,13 +14,15 @@ type skillResponse struct {
 }
 
 type skillMeta struct {
-	ServerURL       string `json:"server_url"`
-	Domain          string `json:"domain"`
-	GatewayToken    bool   `json:"gateway_token_required"`
-	SMTPEnabled     bool   `json:"smtp_inbound_enabled"`
-	Storage         string `json:"storage"`
-	MaxTTLSeconds   int64  `json:"max_ttl_seconds"`
-	MaxMessageBytes int64  `json:"max_message_bytes"`
+	ServerURL          string `json:"server_url"`
+	Domain             string `json:"domain"`
+	DeploymentScenario string `json:"deployment_scenario,omitempty"`
+	PublicURLSource    string `json:"public_url_source"`
+	GatewayToken       bool   `json:"gateway_token_required"`
+	SMTPEnabled        bool   `json:"smtp_inbound_enabled"`
+	Storage            string `json:"storage"`
+	MaxTTLSeconds      int64  `json:"max_ttl_seconds"`
+	MaxMessageBytes    int64  `json:"max_message_bytes"`
 }
 
 func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
@@ -29,15 +31,17 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	serverURL := a.resolveServerURL(r)
+	serverURL, urlSource := a.resolveServerURL(r)
 	meta := skillMeta{
-		ServerURL:       serverURL,
-		Domain:          a.cfg.Domain,
-		GatewayToken:    strings.TrimSpace(a.cfg.APIToken) != "",
-		SMTPEnabled:     strings.TrimSpace(a.cfg.SMTPAddr) != "",
-		Storage:         "in-memory",
-		MaxTTLSeconds:   maxTTLSeconds,
-		MaxMessageBytes: a.cfg.MaxMessageBytes,
+		ServerURL:          serverURL,
+		Domain:             a.cfg.Domain,
+		DeploymentScenario: strings.TrimSpace(os.Getenv("AGENTPOST_SCENARIO")),
+		PublicURLSource:    urlSource,
+		GatewayToken:       strings.TrimSpace(a.cfg.APIToken) != "",
+		SMTPEnabled:        strings.TrimSpace(a.cfg.SMTPAddr) != "",
+		Storage:            "in-memory",
+		MaxTTLSeconds:      maxTTLSeconds,
+		MaxMessageBytes:    a.cfg.MaxMessageBytes,
 	}
 	content := buildSkillMarkdown(meta)
 
@@ -55,9 +59,9 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(content))
 }
 
-func (a *App) resolveServerURL(r *http.Request) string {
+func (a *App) resolveServerURL(r *http.Request) (string, string) {
 	if v := strings.TrimSpace(os.Getenv("AGENTPOST_PUBLIC_URL")); v != "" {
-		return strings.TrimRight(v, "/")
+		return strings.TrimRight(v, "/"), "deployment_env"
 	}
 	if r != nil {
 		host := strings.TrimSpace(r.Host)
@@ -69,10 +73,10 @@ func (a *App) resolveServerURL(r *http.Request) string {
 			if fwd := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); fwd != "" {
 				scheme = strings.TrimSpace(strings.Split(fwd, ",")[0])
 			}
-			return scheme + "://" + host
+			return scheme + "://" + host, "request_host"
 		}
 	}
-	return "http://127.0.0.1" + normalizeListenPort(a.cfg.HTTPAddr)
+	return "http://127.0.0.1" + normalizeListenPort(a.cfg.HTTPAddr), "default"
 }
 
 func normalizeListenPort(httpAddr string) string {
@@ -93,11 +97,30 @@ func buildSkillMarkdown(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "# AgentPost skill\n\n")
 	fmt.Fprintf(&b, "AgentPost is an HTTP mail gateway for AI agents on **this deployment**.\n\n")
+	if meta.DeploymentScenario != "" {
+		fmt.Fprintf(&b, "Deployment scenario: **`%s`** (set at install time via `./start.sh`).\n\n", meta.DeploymentScenario)
+	}
+	if meta.PublicURLSource == "deployment_env" {
+		fmt.Fprintf(&b, "> `AGENTPOST_SERVER` below comes from **`AGENTPOST_PUBLIC_URL`** at deploy time. Use it exactly — do not substitute another host (e.g. a blocked domain or a different IP).\n\n")
+	} else if meta.PublicURLSource == "request_host" {
+		fmt.Fprintf(&b, "> `AGENTPOST_SERVER` was inferred from the HTTP request because `AGENTPOST_PUBLIC_URL` is unset. For production, redeploy with `./start.sh --scenario ...` so skill URLs stay stable.\n\n")
+	}
 
 	fmt.Fprintf(&b, "## Endpoints\n\n")
 	fmt.Fprintf(&b, "| Variable | Value |\n|----------|-------|\n")
 	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` |\n", meta.ServerURL)
 	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` |\n\n", meta.Domain)
+
+	switch meta.DeploymentScenario {
+	case "public-ip":
+		fmt.Fprintf(&b, "This deployment uses **public IP + port** (no HTTPS domain). Common when the domain is not filed for ICP (未备案). Open firewall port **%s**.\n\n", portFromURL(meta.ServerURL))
+	case "lan":
+		fmt.Fprintf(&b, "This deployment uses a **LAN IP**. Agents must reach the gateway on the private network; no public DNS is required.\n\n")
+	case "local":
+		fmt.Fprintf(&b, "This deployment is **local** (`127.0.0.1`). Only processes on the same machine can connect.\n\n")
+	case "public-domain":
+		fmt.Fprintf(&b, "This deployment uses **HTTPS on a public domain** (typically via Caddy). Agents should use `https://`, not raw `:8080` on the public internet.\n\n")
+	}
 
 	fmt.Fprintf(&b, "Health check:\n\n```bash\ncurl -fsS %s/healthz\n```\n\n", meta.ServerURL)
 	fmt.Fprintf(&b, "Fetch this skill again:\n\n```bash\ncurl -fsS %s/api/v1/skill\n```\n\n", meta.ServerURL)
@@ -158,4 +181,24 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "- External relay is disabled in the MVP.\n")
 
 	return b.String()
+}
+
+func portFromURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "8080"
+	}
+	if idx := strings.LastIndex(raw, ":"); idx >= 0 && idx < len(raw)-1 {
+		port := raw[idx+1:]
+		if slash := strings.Index(port, "/"); slash >= 0 {
+			port = port[:slash]
+		}
+		if port != "" {
+			return port
+		}
+	}
+	if strings.HasPrefix(strings.ToLower(raw), "https://") {
+		return "443"
+	}
+	return "8080"
 }
