@@ -1,5 +1,7 @@
 # AgentPost
 
+**Connect every agent over one lightweight HTTP mail lane—self-register mailboxes, sign messages, poll inboxes, no IMAP and no traditional mail stack.**
+
 English | [中文](README.md)
 
 Project site (GitHub Pages): https://tbodyaltra.github.io/AgentPost/
@@ -8,11 +10,74 @@ Project site (GitHub Pages): https://tbodyaltra.github.io/AgentPost/
 > Set `Settings -> Pages -> Build and deployment -> Source` to `GitHub Actions`
 > and rerun the workflow, or configure a `PAGES_ENABLEMENT_TOKEN` secret to enable it automatically.
 
-AgentPost is an open-source, lightweight mail gateway MVP for **AI agents**. Agents register temporary mailboxes through an **HTTP API**, authenticate requests with **Ed25519** signatures, deliver messages inside the gateway, and poll their inboxes when they do not have public webhook endpoints.
+AgentPost is an open-source mail gateway built for **AI agents**: register, send, and receive through JSON APIs so multi-agent workflows, task callbacks, and temporary identities feel as simple as calling REST.
 
 > **Deploying this repository with an AI agent?** Read [`AGENTS.md`](AGENTS.md) first for non-interactive commands, deployment scenarios, and common mistakes.
 >
 > **Public deployment note**: operators are responsible for abuse prevention, anti-spam controls, compliance, DNS/TLS, and firewall configuration. Public scenarios should enable the gateway token and expose only the required ports.
+
+## Why AgentPost
+
+| Advantage | Details |
+|-----------|---------|
+| **Lightweight** | Single Go binary, low memory; no IMAP or heavy folder/anti-spam stack—start with Docker or `./start.sh` |
+| **Agent-native** | HTTP + JSON + Ed25519 signatures; machines manage keys, no human-style passwords |
+| **Temporary mailboxes** | TTL on registration; identities expire automatically for one-off tasks and sandboxes |
+| **Receive without a public IP** | Poll `GET /api/v1/messages`; agents do not need inbound webhooks |
+| **Two roles, one API** | Run the **gateway** (server) or act as a **client** against an existing instance—both can be automated by agents |
+| **Safe defaults** | Public deployments default to gateway tokens, registration/send rate limits, and no external SMTP relay |
+| **Deployment-aware discovery** | `GET /api/v1/skill` returns this instance’s real URLs and rules so clients do not guess wrong hosts |
+
+## Architecture at a glance
+
+### Gateway deployment vs client agents
+
+This repository serves two roles: **running the gateway** (the post office server) and **using the gateway** (agents that register mailboxes). Both can be driven by agents via HTTP APIs and `start.sh`.
+
+```mermaid
+flowchart TB
+  subgraph deploy["Server side: deploy AgentPost (agent-automatable)"]
+    OP["./start.sh --scenario …\nor docker compose up"]
+    GW["AgentPost gateway\nregister · send · messages · skill"]
+    OP --> GW
+  end
+
+  subgraph clients["Client side: workload agents (use an existing gateway)"]
+    A1["Agent A\nregister → bot-a@example.domain"]
+    A2["Agent B\nsend / poll inbox"]
+    A3["Agent C\nGET /api/v1/skill discovery"]
+  end
+
+  A1 & A2 & A3 -->|"Ed25519-signed HTTP JSON"| GW
+  GW -->|"deliver within same @domain"| A1
+  GW --> A2
+```
+
+Typical flow: a deploy agent reads `GET /api/v1/skill` → workload agents `POST /register` → collaborate with `POST /send` and `GET /messages`.
+
+### Separating reachability (`server_url`) from mailbox domain (`domain`)
+
+**How agents reach HTTP** and **what addresses look like** are independent. They are often set differently on purpose (for example IP-only access while mailboxes still use `@example.domain`).
+
+```mermaid
+flowchart LR
+  subgraph how["① How to reach the gateway — AGENTPOST_PUBLIC_URL"]
+    URL["server_url\nhttp://203.0.113.10:8080"]
+  end
+
+  subgraph what["② What mailboxes look like — AGENTPOST_DOMAIN"]
+    MAIL["alice@example.domain\nbob@example.domain"]
+  end
+
+  AG["Downstream agent"] -->|"HTTP goes here"| URL
+  URL --> GW2["AgentPost"]
+  GW2 -->|"composed at register"| MAIL
+
+  NOTE["Common: domain blocked / no HTTPS yet\nuse IP:8080 while keeping a logical @ suffix"]
+  URL -.-> NOTE
+```
+
+The `server_url` in `/api/v1/skill` comes from **`AGENTPOST_PUBLIC_URL` at deploy time**, not from whatever Host header a client happened to use. See **Core concepts** below.
 
 ## Features
 
@@ -28,6 +93,8 @@ AgentPost is an open-source, lightweight mail gateway MVP for **AI agents**. Age
 | Abuse-prevention defaults | Public scenarios default to gateway tokens, registration rate limiting, send rate limiting, and no external relay |
 
 ## Core concepts
+
+The two dimensions in the diagram above map to:
 
 ### Two independent settings
 

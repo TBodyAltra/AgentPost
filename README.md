@@ -1,5 +1,7 @@
 # AgentPost（智能体邮局）
 
+**用一条轻量 HTTP 通道连接所有 Agent——各自注册临时邮箱、签名互发、轮询收信，无需 IMAP 与传统邮件栈。**
+
 [English](README.en.md) | 中文
 
 项目介绍页（GitHub Pages）：https://tbodyaltra.github.io/AgentPost/
@@ -8,11 +10,74 @@
 > 请在仓库 `Settings -> Pages -> Build and deployment -> Source`
 > 选择 `GitHub Actions` 后重新运行，或配置 `PAGES_ENABLEMENT_TOKEN` secret 自动启用。
 
-专为 **AI Agent** 设计的开源、超轻量邮件网关 MVP。Agent 通过 **HTTP API** 注册临时邮箱、用 **Ed25519** 签名鉴权、在网关内投递消息，并通过轮询拉取收件箱。
+AgentPost 是专为 **AI Agent** 设计的开源邮件网关：把「注册邮箱 → 发信 → 收信」收敛成 JSON API，让多 Agent 协作、任务回调、临时身份通信变得像调用 REST 一样简单。
 
 > **给 AI Agent 部署本仓库？** 请先读 [`AGENTS.md`](AGENTS.md)（非交互命令、场景表、常见错误）。
 >
 > **公网部署提醒**：部署者需自行负责防滥用、反垃圾邮件、合规、DNS/TLS 与防火墙配置。公网场景建议开启网关 Token，并只暴露必要端口。
+
+## 为什么选 AgentPost
+
+| 优势 | 说明 |
+|------|------|
+| **超轻量** | Go 单二进制，内存占用低；无 IMAP、无繁重文件夹/反垃圾栈，Docker 或 `./start.sh` 即可起服 |
+| **Agent 原生** | HTTP + JSON + Ed25519 签名，机器身份自管密钥，无需人类式密码 |
+| **临时邮箱** | 注册时设 TTL，到期自动释放，适合一次性任务与沙箱协作 |
+| **无公网也能收** | 轮询 `GET /api/v1/messages`，Agent 不必暴露 WebHook |
+| **双角色同一套 API** | 既可 **部署网关**（服务端），也可只作 **客户端** 连已有实例——两类工作都可交给 Agent 完成 |
+| **安全默认** | 公网默认网关 Token、注册/发信限速、默认禁止外部 SMTP 中继 |
+| **部署可发现** | `GET /api/v1/skill` 返回**本实例**真实 URL 与规则，避免配错域名或 IP |
+
+## 架构一览
+
+### 网关部署 vs 客户端 Agent
+
+同一项目里有两个角色：**运行网关**（邮局服务器）与 **使用网关**（注册邮箱的 Agent）。二者都可通过 HTTP API / `start.sh` 由 Agent 自动化完成。
+
+```mermaid
+flowchart TB
+  subgraph deploy["服务端：部署 AgentPost（可由 Agent 执行）"]
+    OP["./start.sh --scenario …\n或 docker compose up"]
+    GW["AgentPost 网关\nregister · send · messages · skill"]
+    OP --> GW
+  end
+
+  subgraph clients["客户端：业务 Agent（连已有网关）"]
+    A1["Agent A\n注册 → bot-a@example.domain"]
+    A2["Agent B\n发信 / 轮询收件"]
+    A3["Agent C\nGET /api/v1/skill 自发现"]
+  end
+
+  A1 & A2 & A3 -->|"Ed25519 签名 + HTTP JSON"| GW
+  GW -->|"同网关内 @domain 互投"| A1
+  GW --> A2
+```
+
+典型流程：部署 Agent 先 `GET /api/v1/skill` 了解本实例地址 → 业务 Agent `POST /register` 拿邮箱 → `POST /send` / `GET /messages` 协作。
+
+### 连接地址（`server_url`）与邮箱域名（`domain`）分离
+
+**怎么连 HTTP** 和 **邮箱 @ 后缀长什么样** 是两个独立配置，可以故意不一致（例如只能用 IP 访问，但邮箱仍显示 `@example.domain`）。
+
+```mermaid
+flowchart LR
+  subgraph how["① 怎么连网关 — AGENTPOST_PUBLIC_URL"]
+    URL["server_url\nhttp://203.0.113.10:8080"]
+  end
+
+  subgraph what["② 邮箱长什么样 — AGENTPOST_DOMAIN"]
+    MAIL["alice@example.domain\nbob@example.domain"]
+  end
+
+  AG["下游 Agent"] -->|"HTTP 请求走这里"| URL
+  URL --> GW2["AgentPost"]
+  GW2 -->|"注册时拼出地址"| MAIL
+
+  NOTE["常见：域名未备案 / 无 HTTPS\n仍用 IP:8080 访问，@ 后缀用逻辑域名"]
+  URL -.-> NOTE
+```
+
+`/api/v1/skill` 里的 `server_url` **来自部署时的 `AGENTPOST_PUBLIC_URL`**，不会因为你用 IP 访问就改成打不开的 HTTPS 域名。详见下文「核心概念」。
 
 ## 特性
 
@@ -30,6 +95,8 @@
 ---
 
 ## 核心概念（必读）
+
+上文「连接地址与邮箱域名分离」示意图中的两个维度，对应下表：
 
 ### 两个独立配置
 
