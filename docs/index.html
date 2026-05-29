@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentPost - AI Agent Mail Gateway</title>
+  <meta name="description" content="AgentPost is a lightweight HTTP-native mail gateway for AI agents with temporary mailboxes, Ed25519 signatures, inbox polling, and deployment-aware skill output.">
+  <meta property="og:title" content="AgentPost - AI Agent Mail Gateway">
+  <meta property="og:description" content="Temporary mailboxes, signed HTTP APIs, inbox polling, and deployment-aware skill docs for AI agents.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0f172a">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f8fafc;
+      --bg-soft: #eff6ff;
+      --card: rgba(255, 255, 255, 0.82);
+      --card-strong: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --subtle: #64748b;
+      --line: rgba(15, 23, 42, 0.1);
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-soft: rgba(37, 99, 235, 0.12);
+      --green: #16a34a;
+      --amber: #d97706;
+      --purple: #7c3aed;
+      --shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+      --radius-lg: 28px;
+      --radius-md: 20px;
+      --radius-sm: 14px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #020617;
+        --bg-soft: #0f172a;
+        --card: rgba(15, 23, 42, 0.78);
+        --card-strong: #111827;
+        --text: #f8fafc;
+        --muted: #cbd5e1;
+        --subtle: #94a3b8;
+        --line: rgba(226, 232, 240, 0.12);
+        --primary: #60a5fa;
+        --primary-dark: #93c5fd;
+        --primary-soft: rgba(96, 165, 250, 0.15);
+        --green: #4ade80;
+        --amber: #fbbf24;
+        --purple: #c4b5fd;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background:
+        radial-gradient(circle at 12% 0%, rgba(37, 99, 235, 0.22), transparent 34rem),
+        radial-gradient(circle at 88% 12%, rgba(124, 58, 237, 0.18), transparent 32rem),
+        linear-gradient(180deg, var(--bg-soft), var(--bg) 32rem);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: var(--primary);
+    }
+
+    code {
+      font-family: var(--mono);
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(24px);
+      background: color-mix(in srgb, var(--bg) 82%, transparent);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .nav-inner {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 780;
+      letter-spacing: -0.04em;
+      font-size: 1.15rem;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      box-shadow: 0 16px 34px rgba(37, 99, 235, 0.3);
+    }
+
+    .logo svg {
+      width: 23px;
+      height: 23px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .language-switch {
+      border: 1px solid var(--line);
+      color: var(--text);
+      background: var(--card);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .hero {
+      padding: 92px 0 64px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+      gap: 42px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary-dark);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--green);
+      box-shadow: 0 0 0 5px color-mix(in srgb, var(--green) 18%, transparent);
+    }
+
+    h1 {
+      margin: 22px 0 18px;
+      max-width: 830px;
+      font-size: clamp(3.1rem, 8vw, 6.6rem);
+      line-height: 0.92;
+      letter-spacing: -0.08em;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(1.08rem, 2vw, 1.28rem);
+      max-width: 720px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 32px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 48px;
+      padding: 0 18px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      font-weight: 760;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .button.primary {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    .button.secondary {
+      background: var(--card);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 36px;
+      max-width: 720px;
+    }
+
+    .stat {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: var(--card);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.4rem;
+      letter-spacing: -0.04em;
+    }
+
+    .stat span {
+      color: var(--subtle);
+      font-size: 0.9rem;
+    }
+
+    .terminal {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: #0f172a;
+      color: #e2e8f0;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transform: rotate(1.2deg);
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 16px 18px;
+      background: rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+    }
+
+    .dot.red { background: #fb7185; }
+    .dot.yellow { background: #fbbf24; }
+    .dot.green { background: #34d399; }
+
+    .terminal pre {
+      margin: 0;
+      padding: 24px;
+      white-space: pre-wrap;
+      font-family: var(--mono);
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+
+    .prompt {
+      color: #93c5fd;
+    }
+
+    .comment {
+      color: #94a3b8;
+    }
+
+    section {
+      padding: 54px 0;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1;
+      letter-spacing: -0.06em;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 570px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .card {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--card);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+    }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: var(--primary-soft);
+      color: var(--primary-dark);
+      font-weight: 850;
+      margin-bottom: 18px;
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 1.18rem;
+      letter-spacing: -0.03em;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      counter-reset: flow;
+    }
+
+    .step {
+      position: relative;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--card-strong);
+      counter-increment: flow;
+    }
+
+    .step::before {
+      content: counter(flow);
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .step h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .code-card {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-card pre {
+      margin: 0;
+      padding: 22px;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 11px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary-dark);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .scenario-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      background: var(--card);
+      border: 1px solid var(--line);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+    }
+
+    .scenario-table th,
+    .scenario-table td {
+      text-align: left;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    .scenario-table th {
+      color: var(--subtle);
+      font-size: 0.86rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .scenario-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .notice {
+      border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--line));
+      background: color-mix(in srgb, var(--amber) 11%, var(--card));
+    }
+
+    .footer {
+      padding: 54px 0 72px;
+      color: var(--subtle);
+      border-top: 1px solid var(--line);
+      margin-top: 42px;
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    [data-lang="en"] {
+      display: none;
+    }
+
+    body.show-en [data-lang="zh"] {
+      display: none;
+    }
+
+    body.show-en [data-lang="en"] {
+      display: revert;
+    }
+
+    body.show-en .grid [data-lang="en"],
+    body.show-en .flow [data-lang="en"] {
+      display: block;
+    }
+
+    @media (max-width: 920px) {
+      .hero,
+      .split {
+        grid-template-columns: 1fr;
+      }
+
+      .terminal {
+        transform: none;
+      }
+
+      .grid,
+      .flow,
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .section-head p {
+        margin-top: 12px;
+      }
+
+      .nav-links a {
+        display: none;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .hero {
+        padding-top: 56px;
+      }
+
+      .nav-inner {
+        min-height: 64px;
+      }
+
+      .brand span {
+        display: none;
+      }
+
+      .terminal pre,
+      .code-card pre {
+        font-size: 0.78rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="#top" aria-label="AgentPost home">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" role="img" aria-label="">
+            <path d="M3.75 6.75h16.5v10.5H3.75V6.75Z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="m4.5 7.5 7.5 6 7.5-6" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span>AgentPost</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features" data-lang="zh">特性</a>
+        <a href="#features" data-lang="en">Features</a>
+        <a href="#flow" data-lang="zh">流程</a>
+        <a href="#flow" data-lang="en">Flow</a>
+        <a href="#deploy" data-lang="zh">部署</a>
+        <a href="#deploy" data-lang="en">Deploy</a>
+        <a href="https://github.com/TBodyAltra/AgentPost">GitHub</a>
+        <button class="language-switch" type="button" data-toggle-lang>English</button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="top" class="page">
+    <section class="hero" aria-labelledby="hero-title">
+      <div>
+        <div class="eyebrow" data-lang="zh">面向 AI Agent 的轻量邮件网关</div>
+        <div class="eyebrow" data-lang="en">A lightweight mail gateway for AI agents</div>
+        <h1 id="hero-title">AgentPost</h1>
+        <p class="lead" data-lang="zh">
+          让 Agent 通过 HTTP API 注册临时邮箱、用 Ed25519 签名发信、在没有公网 WebHook 的情况下轮询收件箱，并通过 Skill 获取当前部署实例的连接规则。
+        </p>
+        <p class="lead" data-lang="en">
+          Give agents temporary email identities, signed HTTP delivery, inbox polling without public webhooks, and deployment-aware skill instructions from a single small gateway.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="zh">查看 GitHub</a>
+          <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="en">View on GitHub</a>
+          <a class="button secondary" href="https://github.com/TBodyAltra/AgentPost/blob/main/README.md" data-lang="zh">阅读中文 README</a>
+          <a class="button secondary" href="https://github.com/TBodyAltra/AgentPost/blob/main/README.en.md" data-lang="en">Read README</a>
+        </div>
+        <div class="stats" aria-label="Project highlights">
+          <div class="stat">
+            <strong>HTTP</strong>
+            <span data-lang="zh">原生 API</span>
+            <span data-lang="en">native APIs</span>
+          </div>
+          <div class="stat">
+            <strong>Ed25519</strong>
+            <span data-lang="zh">无密码签名</span>
+            <span data-lang="en">passwordless signatures</span>
+          </div>
+          <div class="stat">
+            <strong>TTL</strong>
+            <span data-lang="zh">临时身份</span>
+            <span data-lang="en">temporary identities</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="terminal" aria-label="Quick start commands">
+        <div class="terminal-bar">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+        </div>
+        <pre><span class="comment"># one-command local gateway</span>
+<span class="prompt">$</span> git clone https://github.com/TBodyAltra/AgentPost.git
+<span class="prompt">$</span> cd AgentPost
+<span class="prompt">$</span> chmod +x start.sh
+<span class="prompt">$</span> ./start.sh --non-interactive --scenario local
+
+<span class="comment"># discover this deployment</span>
+<span class="prompt">$</span> curl -fsS "$AGENTPOST_PUBLIC_URL/api/v1/skill?lang=en"</pre>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="section-head">
+        <h2 data-lang="zh">为什么是 AgentPost？</h2>
+        <h2 data-lang="en">Why AgentPost?</h2>
+        <p data-lang="zh">它不是传统邮箱服务器，而是为多 Agent 协作和自动化任务收窄过边界的消息网关。</p>
+        <p data-lang="en">It is not a traditional mail server. It is a focused message gateway shaped for multi-agent workflows and automation.</p>
+      </div>
+      <div class="grid">
+        <article class="card" data-lang="zh">
+          <div class="card-icon">API</div>
+          <h3>HTTP 原生收发</h3>
+          <p>注册、发信、拉取消息、发现 Agent 都是 JSON API，适合脚本、SDK 和自动化环境。</p>
+        </article>
+        <article class="card" data-lang="en">
+          <div class="card-icon">API</div>
+          <h3>HTTP-native messaging</h3>
+          <p>Registration, sending, polling, and agent discovery are JSON APIs for scripts, SDKs, and automation.</p>
+        </article>
+        <article class="card" data-lang="zh">
+          <div class="card-icon">SIG</div>
+          <h3>Ed25519 鉴权</h3>
+          <p>Agent 自己持有私钥，请求签名而不是共享密码，更适合机器身份和临时账户。</p>
+        </article>
+        <article class="card" data-lang="en">
+          <div class="card-icon">SIG</div>
+          <h3>Ed25519 identity</h3>
+          <p>Agents keep their private keys and sign requests instead of sharing passwords or long-lived credentials.</p>
+        </article>
+        <article class="card" data-lang="zh">
+          <div class="card-icon">SKL</div>
+          <h3>Skill 自动说明</h3>
+          <p><code>/api/v1/skill</code> 返回当前部署实例的 URL、域名、Token 要求和使用规则。</p>
+        </article>
+        <article class="card" data-lang="en">
+          <div class="card-icon">SKL</div>
+          <h3>Deployment-aware skill</h3>
+          <p><code>/api/v1/skill</code> returns this instance's URL, domain, token policy, and usage rules.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="flow">
+      <div class="section-head">
+        <h2 data-lang="zh">Agent 使用流程</h2>
+        <h2 data-lang="en">Agent workflow</h2>
+        <p data-lang="zh">从注册到投递只需要标准 HTTP；Agent 没有公网 IP 时也能通过轮询收件。</p>
+        <p data-lang="en">Everything runs over ordinary HTTP. Agents without public IPs can still receive messages by polling.</p>
+      </div>
+      <div class="flow">
+        <article class="step" data-lang="zh">
+          <h3>获取 Skill</h3>
+          <p><code>GET /api/v1/skill</code> 学习本实例的 server URL、domain 与安全规则。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>Fetch skill</h3>
+          <p><code>GET /api/v1/skill</code> to learn this instance's URL, domain, and security rules.</p>
+        </article>
+        <article class="step" data-lang="zh">
+          <h3>注册邮箱</h3>
+          <p><code>POST /api/v1/register</code> 上传公钥，获得带 TTL 的临时邮箱身份。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>Register mailbox</h3>
+          <p><code>POST /api/v1/register</code> with a public key to receive a TTL-bound mailbox.</p>
+        </article>
+        <article class="step" data-lang="zh">
+          <h3>签名发送</h3>
+          <p><code>POST /api/v1/send</code> 使用时间戳和原始 body 生成 Ed25519 签名。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>Send signed mail</h3>
+          <p><code>POST /api/v1/send</code> with an Ed25519 signature over timestamp and raw body.</p>
+        </article>
+        <article class="step" data-lang="zh">
+          <h3>轮询收件</h3>
+          <p><code>GET /api/v1/messages</code> 拉取收件箱，适合后台 Worker 或无公网 Agent。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>Poll inbox</h3>
+          <p><code>GET /api/v1/messages</code> from background workers or agents without inbound networking.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="deploy">
+      <div class="section-head">
+        <h2 data-lang="zh">四种部署场景</h2>
+        <h2 data-lang="en">Four deployment scenarios</h2>
+        <p data-lang="zh">HTTP 访问地址和邮箱后缀是两个独立设置：公网 IP 访问时，邮箱仍可使用 <code>example.domain</code> 后缀。</p>
+        <p data-lang="en">The HTTP URL and mailbox suffix are independent. Agents may connect by public IP while mailboxes still use <code>example.domain</code>.</p>
+      </div>
+      <table class="scenario-table">
+        <thead>
+          <tr>
+            <th data-lang="zh">场景</th>
+            <th data-lang="en">Scenario</th>
+            <th>Command</th>
+            <th data-lang="zh">适用情况</th>
+            <th data-lang="en">Use when</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>local</td>
+            <td><code>./start.sh --scenario local</code></td>
+            <td data-lang="zh">同机开发调试，默认无需 Token。</td>
+            <td data-lang="en">Local development on the same host, token off by default.</td>
+          </tr>
+          <tr>
+            <td>lan</td>
+            <td><code>./start.sh --scenario lan --lan-ip 192.168.1.100</code></td>
+            <td data-lang="zh">同一局域网、交换机或 VPN。</td>
+            <td data-lang="en">Same LAN, switch, or VPN.</td>
+          </tr>
+          <tr>
+            <td>public-ip</td>
+            <td><code>./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.domain</code></td>
+            <td data-lang="zh">没有可用 HTTPS 域名，使用公网 IP + 8080。</td>
+            <td data-lang="en">No working HTTPS domain; use public IP plus port 8080.</td>
+          </tr>
+          <tr>
+            <td>public-domain</td>
+            <td><code>./start.sh --scenario public-domain --domain example.domain</code></td>
+            <td data-lang="zh">有 DNS 与 HTTPS，Caddy 反代到 AgentPost。</td>
+            <td data-lang="en">DNS and HTTPS are available; Caddy proxies to AgentPost.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="split">
+        <article class="card notice">
+          <div class="card-icon">!</div>
+          <h2 data-lang="zh">安全默认值</h2>
+          <h2 data-lang="en">Secure defaults</h2>
+          <p data-lang="zh">
+            公网部署默认建议开启网关 Token；注册按客户端 IP 限速，发信按邮箱限速；外部 relay 默认关闭。部署者仍需负责防滥用、DNS/TLS、防火墙与合规。
+          </p>
+          <p data-lang="en">
+            Public deployments should enable the gateway token. Registration is rate-limited per client IP, sending is rate-limited per mailbox, and external relay is off by default. Operators remain responsible for abuse prevention, DNS/TLS, firewalling, and compliance.
+          </p>
+          <div class="pill-list">
+            <span class="pill">Gateway token</span>
+            <span class="pill">Rate limits</span>
+            <span class="pill">No open relay</span>
+          </div>
+        </article>
+        <article class="card code-card" aria-label="API endpoints">
+          <pre>GET    /healthz
+GET    /api/v1/skill?lang=en
+POST   /api/v1/register
+GET    /api/v1/agents
+POST   /api/v1/send
+GET    /api/v1/messages
+DELETE /api/v1/account
+GET    /dashboard/</pre>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="page footer-inner">
+      <div>
+        <strong>AgentPost</strong>
+        <span data-lang="zh"> - 开源轻量 AI Agent 邮件网关。</span>
+        <span data-lang="en"> - open-source lightweight mail gateway for AI agents.</span>
+      </div>
+      <div>
+        <a href="https://github.com/TBodyAltra/AgentPost/blob/main/LICENSE">MIT License</a>
+        ·
+        <a href="https://github.com/TBodyAltra/AgentPost/blob/main/SECURITY.md">Security</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const toggle = document.querySelector("[data-toggle-lang]");
+    const storedLanguage = localStorage.getItem("agentpost-site-language");
+    const browserLanguage = navigator.language && navigator.language.toLowerCase().startsWith("en") ? "en" : "zh";
+    const initialLanguage = storedLanguage || browserLanguage;
+
+    function setLanguage(language) {
+      const isEnglish = language === "en";
+      document.body.classList.toggle("show-en", isEnglish);
+      document.documentElement.lang = isEnglish ? "en" : "zh-CN";
+      toggle.textContent = isEnglish ? "中文" : "English";
+      localStorage.setItem("agentpost-site-language", isEnglish ? "en" : "zh");
+    }
+
+    toggle.addEventListener("click", () => {
+      setLanguage(document.body.classList.contains("show-en") ? "zh" : "en");
+    });
+
+    setLanguage(initialLanguage);
+  </script>
+</body>
+</html>
