@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestPagesWorkflowSkipsWhenPagesIsUnavailable(t *testing.T) {
+func TestPagesWorkflowDeploysDocsSite(t *testing.T) {
 	data, err := os.ReadFile(".github/workflows/pages.yml")
 	if err != nil {
 		t.Fatalf("read Pages workflow: %v", err)
@@ -16,25 +16,35 @@ func TestPagesWorkflowSkipsWhenPagesIsUnavailable(t *testing.T) {
 	workflow := string(data)
 
 	for _, want := range []string{
-		"Check GitHub Pages availability",
-		`echo "enabled=false" >> "${GITHUB_OUTPUT}"`,
-		"This repository does not have GitHub Pages enabled yet.",
-		`if: ${{ steps.pages.outputs.enabled == 'true' }}`,
-		`if: ${{ needs.build.outputs.pages_enabled == 'true' }}`,
+		"name: Deploy GitHub Pages",
+		"uses: actions/configure-pages@v6",
+		"uses: actions/upload-pages-artifact@v5",
+		"uses: actions/deploy-pages@v5",
+		"path: docs",
+		"name: github-pages",
 	} {
 		if !strings.Contains(workflow, want) {
 			t.Fatalf("Pages workflow missing %q", want)
 		}
 	}
-	if strings.Contains(workflow, "enablement: true") {
-		t.Fatalf("configure-pages must not try to create the Pages site with the default GITHUB_TOKEN")
+
+	for _, forbidden := range []string{
+		"PAGES_ENABLEMENT_TOKEN",
+		"Check GitHub Pages availability",
+		"pages_enabled",
+		"enabled=false",
+		"enablement: true",
+	} {
+		if strings.Contains(workflow, forbidden) {
+			t.Fatalf("Pages workflow must not contain %q", forbidden)
+		}
 	}
 
 	var parsed struct {
-		Jobs map[string]struct {
-			Outputs map[string]string `yaml:"outputs"`
-			If      string            `yaml:"if"`
-			Steps   []struct {
+		Permissions map[string]string `yaml:"permissions"`
+		Jobs        map[string]struct {
+			If    string `yaml:"if"`
+			Steps []struct {
 				Name string `yaml:"name"`
 				If   string `yaml:"if"`
 				Uses string `yaml:"uses"`
@@ -45,21 +55,19 @@ func TestPagesWorkflowSkipsWhenPagesIsUnavailable(t *testing.T) {
 		t.Fatalf("parse Pages workflow YAML: %v", err)
 	}
 
-	build := parsed.Jobs["build"]
-	if got := build.Outputs["pages_enabled"]; got != "${{ steps.pages.outputs.enabled }}" {
-		t.Fatalf("build pages_enabled output = %q", got)
+	if parsed.Permissions["pages"] != "write" || parsed.Permissions["id-token"] != "write" {
+		t.Fatalf("Pages workflow permissions = %#v", parsed.Permissions)
 	}
+
+	build := parsed.Jobs["build"]
 	for _, step := range build.Steps {
-		switch step.Name {
-		case "Configure Pages", "Upload static site":
-			if step.If != "${{ steps.pages.outputs.enabled == 'true' }}" {
-				t.Fatalf("%s step if = %q, want enabled gate", step.Name, step.If)
-			}
+		if step.If != "" {
+			t.Fatalf("build step %q must not be gated: if=%q", step.Name, step.If)
 		}
 	}
 
 	deploy := parsed.Jobs["deploy"]
-	if deploy.If != "${{ needs.build.outputs.pages_enabled == 'true' }}" {
-		t.Fatalf("deploy job if = %q, want pages_enabled gate", deploy.If)
+	if deploy.If != "" {
+		t.Fatalf("deploy job must not be gated: if=%q", deploy.If)
 	}
 }
