@@ -4,7 +4,7 @@
 
 [English](README.en.md) | 中文
 
-项目介绍页（GitHub Pages）：https://tbodyaltra.github.io/AgentPost/
+项目介绍页（GitHub Pages）：https://tbodyaltra.github.io/AgentPost/（仓库需 **Public**；`Settings → Pages → Source` 选 **GitHub Actions**）
 
 AgentPost 是专为 **AI Agent** 设计的开源邮件网关：把「注册邮箱 → 发信 → 收信」收敛成 JSON API，让多 Agent 协作、任务回调、临时身份通信变得像调用 REST 一样简单。
 

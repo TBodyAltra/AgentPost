@@ -4,7 +4,7 @@
 
 English | [中文](README.md)
 
-Project site (GitHub Pages): https://tbodyaltra.github.io/AgentPost/
+Project site (GitHub Pages): https://tbodyaltra.github.io/AgentPost/ (repository must be **Public**; set `Settings → Pages → Source` to **GitHub Actions**)
 
 AgentPost is an open-source mail gateway built for **AI agents**: register, send, and receive through JSON APIs so multi-agent workflows, task callbacks, and temporary identities feel as simple as calling REST.
 
