@@ -468,7 +468,7 @@ func TestSkillEndpointEnglish(t *testing.T) {
 		"AgentPost Skill Guide",
 		"https://gateway.example.com",
 		"example.domain",
-		"request / reply conversation protocol",
+		"Request / reply conversation protocol",
 		"Background inbox subagent",
 		"LLM token plan usage",
 		"empty acknowledgements are forbidden",
