@@ -14,9 +14,10 @@ type skillResponse struct {
 }
 
 type skillMeta struct {
-	ServerURL          string `json:"server_url"`
-	Domain             string `json:"domain"`
-	DeploymentScenario string `json:"deployment_scenario,omitempty"`
+	ServerURL          string   `json:"server_url"`
+	Domain             string   `json:"domain"`
+	AllowedDomains     []string `json:"allowed_domains,omitempty"`
+	DeploymentScenario string   `json:"deployment_scenario,omitempty"`
 	PublicURLSource    string `json:"public_url_source"`
 	GatewayToken       bool   `json:"gateway_token_required"`
 	SMTPEnabled        bool   `json:"smtp_inbound_enabled"`
@@ -35,6 +36,7 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 	meta := skillMeta{
 		ServerURL:          serverURL,
 		Domain:             a.cfg.Domain,
+		AllowedDomains:     append([]string(nil), a.cfg.AllowedDomains...),
 		DeploymentScenario: strings.TrimSpace(os.Getenv("AGENTPOST_SCENARIO")),
 		PublicURLSource:    urlSource,
 		GatewayToken:       strings.TrimSpace(a.cfg.APIToken) != "",
@@ -109,7 +111,10 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "## Endpoints\n\n")
 	fmt.Fprintf(&b, "| Variable | Value |\n|----------|-------|\n")
 	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` |\n", meta.ServerURL)
-	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` |\n\n", meta.Domain)
+	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` (default; register may choose another allowed domain) |\n\n", meta.Domain)
+	if len(meta.AllowedDomains) > 0 {
+		fmt.Fprintf(&b, "Allowed mailbox domains on this gateway: `%s`.\n\n", strings.Join(meta.AllowedDomains, "`, `"))
+	}
 
 	switch meta.DeploymentScenario {
 	case "public-ip":
@@ -146,10 +151,11 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "## Recommended workflow\n\n")
 	fmt.Fprintf(&b, "```\n")
 	fmt.Fprintf(&b, "- [ ] 1. Generate an Ed25519 keypair; keep the private key secret\n")
-	fmt.Fprintf(&b, "- [ ] 2. POST /api/v1/register with the public key hex\n")
-	fmt.Fprintf(&b, "- [ ] 3. POST /api/v1/send with a signed JSON body\n")
-	fmt.Fprintf(&b, "- [ ] 4. GET /api/v1/messages with a signed empty body\n")
-	fmt.Fprintf(&b, "- [ ] 5. Re-register before TTL expires or after a server restart\n")
+	fmt.Fprintf(&b, "- [ ] 2. POST /api/v1/register with the public key hex and optional profile\n")
+	fmt.Fprintf(&b, "- [ ] 3. GET /api/v1/agents to discover other registered agents\n")
+	fmt.Fprintf(&b, "- [ ] 4. POST /api/v1/send with a signed JSON body\n")
+	fmt.Fprintf(&b, "- [ ] 5. GET /api/v1/messages with a signed empty body\n")
+	fmt.Fprintf(&b, "- [ ] 6. DELETE /api/v1/account to unregister early, or re-register before TTL expires\n")
 	fmt.Fprintf(&b, "```\n\n")
 
 	fmt.Fprintf(&b, "## Register\n\n")
@@ -158,15 +164,58 @@ func buildSkillMarkdown(meta skillMeta) string {
 		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
 	}
 	fmt.Fprintf(&b, "```\n\n")
-	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400\n}\n```\n\n")
+	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"domain\": \"team-a.internal\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400,\n  \"profile\": {\n    \"display_name\": \"Research Agent\",\n    \"host\": \"worker-01.example.internal\",\n    \"responsibilities\": \"literature review and summarization\",\n    \"skills\": [\"web-search\", \"summarize\"],\n    \"mcp_services\": [\"filesystem\", \"browser\"],\n    \"capabilities\": [\"can summarize PDFs\", \"can browse internal docs\"],\n    \"notes\": \"optional free-form notes\"\n  },\n  \"inbox_policy\": {\n    \"blocklist\": [\"spammer@team-a.internal\"],\n    \"allowlist\": [\"trusted@team-b.internal\"]\n  }\n}\n```\n\n")
+	fmt.Fprintf(&b, "`domain` is optional at register time and defaults to `%s`. Agents on the same gateway may choose different allowed domains.\n\n", meta.Domain)
+	fmt.Fprintf(&b, "`profile` is optional. It is published in the agent directory (`GET /api/v1/agents`) so other agents can discover who you are and what you can do.\n\n")
+	fmt.Fprintf(&b, "`inbox_policy` is optional.\n\n")
+	fmt.Fprintf(&b, "- **Same domain:** agents can send/receive by default; add senders to `blocklist` to reject them.\n")
+	fmt.Fprintf(&b, "- **Different domains:** delivery is blocked by default; add senders to `allowlist` to accept cross-domain mail.\n\n")
 	fmt.Fprintf(&b, "Returns mailbox `my-bot@%s`.\n\n", meta.Domain)
 
-	fmt.Fprintf(&b, "## Sign send / poll\n\n")
-	fmt.Fprintf(&b, "Required headers for `/api/v1/send` and `/api/v1/messages`:\n\n")
-	fmt.Fprintf(&b, "- `X-Agent-Username`\n")
+	fmt.Fprintf(&b, "## Agent directory\n\n")
+	fmt.Fprintf(&b, "```http\nGET %s/api/v1/agents\n", meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
+	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
+	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n` (empty body). Returns active registered agents with their profile metadata.\n\n")
+
+	fmt.Fprintf(&b, "## Unregister\n\n")
+	fmt.Fprintf(&b, "```http\nDELETE %s/api/v1/account\n", meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
+	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
+	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n` (empty body). Deletes the account, profile, and queued messages immediately.\n\n")
+
+	fmt.Fprintf(&b, "## Inbox policy\n\n")
+	fmt.Fprintf(&b, "Control which senders may deliver mail to your inbox.\n\n")
+	fmt.Fprintf(&b, "| Case | Default | Override |\n|------|---------|----------|\n")
+	fmt.Fprintf(&b, "| Same mailbox domain | Allow | `blocklist` rejects listed senders |\n")
+	fmt.Fprintf(&b, "| Different mailbox domain | Block | `allowlist` accepts listed senders |\n\n")
+	fmt.Fprintf(&b, "```http\nGET %s/api/v1/account/inbox-policy\nPUT %s/api/v1/account/inbox-policy\nContent-Type: application/json\n", meta.ServerURL, meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
+	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
+	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "PUT body example:\n\n```json\n{\n  \"inbox_policy\": {\n    \"blocklist\": [\"noisy-bot@team-a.internal\"],\n    \"allowlist\": [\"partner@team-b.internal\"]\n  }\n}\n```\n\n")
+	fmt.Fprintf(&b, "Use full `user@domain` emails in policy lists for cross-domain rules. GET uses an empty signed body. PUT signs the JSON body. Sign with `X-Agent-Email: you@your-domain` (or full email in `X-Agent-Username`). Rejected deliveries return **403** to the sender.\n\n")
+
+	fmt.Fprintf(&b, "## Sign send / poll / directory / account\n\n")
+	fmt.Fprintf(&b, "Required headers for `/api/v1/send`, `/api/v1/messages`, `/api/v1/agents`, `DELETE /api/v1/account`, and `/api/v1/account/inbox-policy`:\n\n")
+	fmt.Fprintf(&b, "- `X-Agent-Email` (preferred) or `X-Agent-Username` (full `user@domain` on multi-domain gateways)\n")
 	fmt.Fprintf(&b, "- `X-Agent-Timestamp` (Unix seconds, ±5 minutes)\n")
 	fmt.Fprintf(&b, "- `X-Agent-Signature` (hex Ed25519 signature)\n\n")
-	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n<raw_request_body>`; empty body for GET `/api/v1/messages`.\n\n")
+	fmt.Fprintf(&b, "Sign bytes: `<timestamp>\\n<raw_request_body>`; empty body for GET `/api/v1/messages`, GET `/api/v1/agents`, GET `/api/v1/account/inbox-policy`, and DELETE `/api/v1/account`.\n\n")
 
 	fmt.Fprintf(&b, "## Send\n\n")
 	fmt.Fprintf(&b, "```json\n{\n  \"to\": \"peer@%s\",\n  \"subject\": \"hello\",\n  \"body\": \"message text\"\n}\n```\n\n", meta.Domain)

@@ -41,15 +41,21 @@ const (
 	maxTTLSeconds          = 86400
 	authTimestampTolerance = 5 * time.Minute
 	defaultMaxMessageBytes = 1 << 20
+	maxProfileFieldLen     = 512
+	maxProfileNotesLen     = 2048
+	maxProfileListItems    = 32
+	maxProfileListItemLen  = 128
+	maxInboxPolicyItems    = 64
 )
 
 type Config struct {
-	Domain             string `yaml:"domain"`
-	HTTPAddr           string `yaml:"http_addr"`
-	SMTPAddr           string `yaml:"smtp_addr"`
-	AllowExternalRelay bool   `yaml:"allow_external_relay"`
-	MaxMessageBytes    int64  `yaml:"max_message_bytes"`
-	APIToken           string `yaml:"-"`
+	Domain             string   `yaml:"domain"`
+	AllowedDomains     []string `yaml:"allowed_domains"`
+	HTTPAddr           string   `yaml:"http_addr"`
+	SMTPAddr           string   `yaml:"smtp_addr"`
+	AllowExternalRelay bool     `yaml:"allow_external_relay"`
+	MaxMessageBytes    int64    `yaml:"max_message_bytes"`
+	APIToken           string   `yaml:"-"`
 }
 
 type App struct {
@@ -62,10 +68,29 @@ type App struct {
 	limiters map[string]*rate.Limiter
 }
 
+type AgentProfile struct {
+	DisplayName      string   `json:"display_name,omitempty"`
+	Host             string   `json:"host,omitempty"`
+	Responsibilities string   `json:"responsibilities,omitempty"`
+	Skills           []string `json:"skills,omitempty"`
+	MCPServices      []string `json:"mcp_services,omitempty"`
+	Capabilities     []string `json:"capabilities,omitempty"`
+	Notes            string   `json:"notes,omitempty"`
+}
+
+type InboxPolicy struct {
+	Blocklist []string `json:"blocklist,omitempty"`
+	Allowlist []string `json:"allowlist,omitempty"`
+}
+
 type User struct {
-	Username  string
-	PublicKey ed25519.PublicKey
-	ExpiresAt time.Time
+	Username     string
+	Domain       string
+	PublicKey    ed25519.PublicKey
+	ExpiresAt    time.Time
+	RegisteredAt time.Time
+	Profile      AgentProfile
+	InboxPolicy  InboxPolicy
 }
 
 type Message struct {
@@ -78,15 +103,43 @@ type Message struct {
 }
 
 type registerRequest struct {
-	Username   string `json:"username"`
-	PublicKey  string `json:"public_key"`
-	TTLSeconds int64  `json:"ttl_seconds"`
+	Username    string        `json:"username"`
+	Domain      string        `json:"domain,omitempty"`
+	PublicKey   string        `json:"public_key"`
+	TTLSeconds  int64         `json:"ttl_seconds"`
+	Profile     *AgentProfile `json:"profile,omitempty"`
+	InboxPolicy *InboxPolicy  `json:"inbox_policy,omitempty"`
 }
 
 type registerResponse struct {
-	Email     string    `json:"email"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Status    string    `json:"status"`
+	Email        string       `json:"email"`
+	ExpiresAt    time.Time    `json:"expires_at"`
+	RegisteredAt time.Time    `json:"registered_at"`
+	Profile      AgentProfile `json:"profile,omitempty"`
+	InboxPolicy  InboxPolicy  `json:"inbox_policy"`
+	Status       string       `json:"status"`
+}
+
+type agentEntry struct {
+	Username     string       `json:"username"`
+	Domain       string       `json:"domain"`
+	Email        string       `json:"email"`
+	ExpiresAt    time.Time    `json:"expires_at"`
+	RegisteredAt time.Time    `json:"registered_at"`
+	Profile      AgentProfile `json:"profile,omitempty"`
+}
+
+type agentsResponse struct {
+	Agents []agentEntry `json:"agents"`
+}
+
+type unregisterResponse struct {
+	Email  string `json:"email"`
+	Status string `json:"status"`
+}
+
+type inboxPolicyResponse struct {
+	InboxPolicy InboxPolicy `json:"inbox_policy"`
 }
 
 type sendRequest struct {
@@ -99,6 +152,14 @@ type sendResponse struct {
 	MessageID string `json:"message_id"`
 	Status    string `json:"status"`
 }
+
+type deliverResult int
+
+const (
+	deliverOK deliverResult = iota
+	deliverRecipientMissing
+	deliverRejectedByPolicy
+)
 
 type messagesResponse struct {
 	Messages []Message `json:"messages"`
@@ -130,7 +191,7 @@ func main() {
 
 	errCh := make(chan error, 2)
 	go func() {
-		log.Printf("AgentPost HTTP listening on %s for domain %s", cfg.HTTPAddr, cfg.Domain)
+		log.Printf("AgentPost HTTP listening on %s (default domain %s, allowed domains: %s)", cfg.HTTPAddr, cfg.Domain, strings.Join(cfg.AllowedDomains, ", "))
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -196,8 +257,38 @@ func loadConfig(path string) (Config, error) {
 	if cfg.MaxMessageBytes <= 0 {
 		cfg.MaxMessageBytes = defaultMaxMessageBytes
 	}
+	normalizeConfigDomains(&cfg)
 	applyEnvOverrides(&cfg)
+	normalizeConfigDomains(&cfg)
 	return cfg, nil
+}
+
+func normalizeConfigDomains(cfg *Config) {
+	cfg.Domain = strings.ToLower(strings.TrimSpace(cfg.Domain))
+	if cfg.Domain == "" {
+		cfg.Domain = defaultDomain
+	}
+	if len(cfg.AllowedDomains) == 0 {
+		cfg.AllowedDomains = []string{cfg.Domain}
+		return
+	}
+	seen := make(map[string]struct{}, len(cfg.AllowedDomains))
+	out := make([]string, 0, len(cfg.AllowedDomains))
+	for _, domain := range cfg.AllowedDomains {
+		domain = strings.ToLower(strings.TrimSpace(domain))
+		if domain == "" || !validMailboxDomain(domain) {
+			continue
+		}
+		if _, ok := seen[domain]; ok {
+			continue
+		}
+		seen[domain] = struct{}{}
+		out = append(out, domain)
+	}
+	if len(out) == 0 {
+		out = []string{cfg.Domain}
+	}
+	cfg.AllowedDomains = out
 }
 
 func applyEnvOverrides(cfg *Config) {
@@ -216,10 +307,20 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("AGENTPOST_API_TOKEN"); v != "" {
 		cfg.APIToken = v
 	}
+	if v := os.Getenv("AGENTPOST_ALLOWED_DOMAINS"); v != "" {
+		parts := strings.Split(v, ",")
+		cfg.AllowedDomains = nil
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				cfg.AllowedDomains = append(cfg.AllowedDomains, part)
+			}
+		}
+	}
 }
 
 func NewApp(cfg Config) *App {
-	cfg.Domain = strings.ToLower(strings.TrimSpace(cfg.Domain))
+	normalizeConfigDomains(&cfg)
 	if cfg.MaxMessageBytes <= 0 {
 		cfg.MaxMessageBytes = defaultMaxMessageBytes
 	}
@@ -235,6 +336,9 @@ func NewApp(cfg Config) *App {
 func (a *App) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/register", a.handleRegister)
+	mux.HandleFunc("/api/v1/account", a.handleAccount)
+	mux.HandleFunc("/api/v1/account/inbox-policy", a.handleInboxPolicy)
+	mux.HandleFunc("/api/v1/agents", a.handleAgents)
 	mux.HandleFunc("/api/v1/send", a.handleSend)
 	mux.HandleFunc("/api/v1/messages", a.handleMessages)
 	mux.HandleFunc("/api/v1/skill", a.handleSkill)
@@ -303,6 +407,20 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	domain := strings.ToLower(strings.TrimSpace(req.Domain))
+	if domain == "" {
+		domain = a.cfg.Domain
+	}
+	if !validMailboxDomain(domain) {
+		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "domain must be a valid mailbox suffix"})
+		return
+	}
+	if !a.domainAllowed(domain) {
+		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "domain is not allowed on this gateway"})
+		return
+	}
+	mailbox := mailboxKey(username, domain)
+
 	publicKey, err := hex.DecodeString(strings.TrimSpace(req.PublicKey))
 	if err != nil || len(publicKey) != ed25519.PublicKeySize {
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "public_key must be a hex-encoded Ed25519 public key"})
@@ -317,28 +435,156 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		ttl = maxTTLSeconds
 	}
 
+	profile := AgentProfile{}
+	if req.Profile != nil {
+		normalized, err := normalizeAgentProfile(*req.Profile)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+		profile = normalized
+	}
+
+	inboxPolicy := defaultInboxPolicy()
+	if req.InboxPolicy != nil {
+		normalized, err := a.normalizeInboxPolicy(*req.InboxPolicy)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+		inboxPolicy = normalized
+	}
+
 	now := a.now().UTC()
 	expiresAt := now.Add(time.Duration(ttl) * time.Second)
 
 	a.mu.Lock()
-	if existing, ok := a.users[username]; ok && existing.ExpiresAt.After(now) {
+	if existing, ok := a.users[mailbox]; ok && existing.ExpiresAt.After(now) {
 		a.mu.Unlock()
-		writeJSON(w, http.StatusConflict, errorResponse{Error: "username is already registered"})
+		writeJSON(w, http.StatusConflict, errorResponse{Error: "mailbox is already registered"})
 		return
 	}
-	a.users[username] = &User{
-		Username:  username,
-		PublicKey: append(ed25519.PublicKey(nil), publicKey...),
-		ExpiresAt: expiresAt,
+	a.users[mailbox] = &User{
+		Username:     username,
+		Domain:       domain,
+		PublicKey:    append(ed25519.PublicKey(nil), publicKey...),
+		ExpiresAt:    expiresAt,
+		RegisteredAt: now,
+		Profile:      profile,
+		InboxPolicy:  inboxPolicy,
 	}
-	a.limiters[username] = rate.NewLimiter(rate.Every(time.Minute/2), 2)
+	a.messages[mailbox] = nil
+	a.limiters[mailbox] = rate.NewLimiter(rate.Every(time.Minute/2), 2)
 	a.mu.Unlock()
 
 	writeJSON(w, http.StatusCreated, registerResponse{
-		Email:     a.emailFor(username),
-		ExpiresAt: expiresAt,
-		Status:    "active",
+		Email:        mailbox,
+		ExpiresAt:    expiresAt,
+		RegisteredAt: now,
+		Profile:      profile,
+		InboxPolicy:  inboxPolicy,
+		Status:       "active",
 	})
+}
+
+func (a *App) handleAgents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
+		return
+	}
+
+	if _, status, err := a.authenticate(r, nil); err != nil {
+		writeJSON(w, status, errorResponse{Error: err.Error()})
+		return
+	}
+
+	now := a.now().UTC()
+	a.mu.RLock()
+	entries := make([]agentEntry, 0, len(a.users))
+	for _, user := range a.users {
+		if !user.ExpiresAt.After(now) {
+			continue
+		}
+		entries = append(entries, agentEntry{
+			Username:     user.Username,
+			Domain:       user.Domain,
+			Email:        userMailbox(user),
+			ExpiresAt:    user.ExpiresAt,
+			RegisteredAt: user.RegisteredAt,
+			Profile:      user.Profile,
+		})
+	}
+	a.mu.RUnlock()
+
+	writeJSON(w, http.StatusOK, agentsResponse{Agents: entries})
+}
+
+func (a *App) handleAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
+		return
+	}
+
+	user, status, err := a.authenticate(r, nil)
+	if err != nil {
+		writeJSON(w, status, errorResponse{Error: err.Error()})
+		return
+	}
+
+	email := userMailbox(user)
+	a.mu.Lock()
+	a.deleteUserLocked(email)
+	a.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, unregisterResponse{
+		Email:  email,
+		Status: "unregistered",
+	})
+}
+
+func (a *App) handleInboxPolicy(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		user, status, err := a.authenticate(r, nil)
+		if err != nil {
+			writeJSON(w, status, errorResponse{Error: err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, inboxPolicyResponse{InboxPolicy: user.InboxPolicy})
+	case http.MethodPut:
+		if !hasJSONContentType(r) {
+			writeJSON(w, http.StatusUnsupportedMediaType, errorResponse{Error: "Content-Type must be application/json"})
+			return
+		}
+		body, err := readLimited(r.Body, a.cfg.MaxMessageBytes)
+		if err != nil {
+			writeJSON(w, http.StatusRequestEntityTooLarge, errorResponse{Error: err.Error()})
+			return
+		}
+		user, status, err := a.authenticate(r, body)
+		if err != nil {
+			writeJSON(w, status, errorResponse{Error: err.Error()})
+			return
+		}
+		var req inboxPolicyResponse
+		if err := decodeJSON(bytes.NewReader(body), &req); err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+		policy, err := a.normalizeInboxPolicy(req.InboxPolicy)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+		a.mu.Lock()
+		if stored, ok := a.users[userMailbox(user)]; ok {
+			stored.InboxPolicy = policy
+		}
+		a.mu.Unlock()
+		writeJSON(w, http.StatusOK, inboxPolicyResponse{InboxPolicy: policy})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
+	}
 }
 
 func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
@@ -364,7 +610,7 @@ func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.mu.RLock()
-	limiter := a.limiters[user.Username]
+	limiter := a.limiters[userMailbox(user)]
 	allowed := limiter != nil && limiter.Allow()
 	a.mu.RUnlock()
 	if !allowed {
@@ -390,7 +636,7 @@ func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if domain != a.cfg.Domain {
+	if !a.domainAllowed(domain) {
 		if !a.cfg.AllowExternalRelay {
 			writeJSON(w, http.StatusForbidden, errorResponse{Error: "external relay is disabled"})
 			return
@@ -401,15 +647,19 @@ func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 
 	message := Message{
 		MessageID:  newMessageID(),
-		From:       a.emailFor(user.Username),
+		From:       userMailbox(user),
 		To:         to,
 		Subject:    strings.TrimSpace(req.Subject),
 		BodyText:   strings.TrimSpace(req.Body),
 		ReceivedAt: a.now().UTC(),
 	}
 
-	if !a.deliver(username, message) {
+	switch a.deliver(mailboxKey(username, domain), message) {
+	case deliverRecipientMissing:
 		writeJSON(w, http.StatusNotFound, errorResponse{Error: "recipient is not registered or has expired"})
+		return
+	case deliverRejectedByPolicy:
+		writeJSON(w, http.StatusForbidden, errorResponse{Error: "recipient inbox policy rejected this sender"})
 		return
 	}
 
@@ -432,17 +682,18 @@ func (a *App) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.mu.Lock()
-	messages := append([]Message(nil), a.messages[user.Username]...)
-	a.messages[user.Username] = nil
+	mailbox := userMailbox(user)
+	messages := append([]Message(nil), a.messages[mailbox]...)
+	a.messages[mailbox] = nil
 	a.mu.Unlock()
 
 	writeJSON(w, http.StatusOK, messagesResponse{Messages: messages})
 }
 
 func (a *App) authenticate(r *http.Request, body []byte) (*User, int, error) {
-	username := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Agent-Username")))
-	if !validUsername(username) {
-		return nil, http.StatusUnauthorized, errors.New("missing or invalid X-Agent-Username")
+	mailbox, err := a.parseAgentMailbox(agentIdentityFromRequest(r))
+	if err != nil {
+		return nil, http.StatusUnauthorized, err
 	}
 
 	timestamp := strings.TrimSpace(r.Header.Get("X-Agent-Timestamp"))
@@ -464,7 +715,7 @@ func (a *App) authenticate(r *http.Request, body []byte) (*User, int, error) {
 	}
 
 	a.mu.RLock()
-	user, ok := a.users[username]
+	user, ok := a.users[mailbox]
 	if !ok || !user.ExpiresAt.After(a.now()) {
 		a.mu.RUnlock()
 		return nil, http.StatusUnauthorized, errors.New("account is not registered or has expired")
@@ -487,18 +738,21 @@ func signaturePayload(timestamp string, body []byte) []byte {
 	return payload
 }
 
-func (a *App) deliver(username string, message Message) bool {
-	username = strings.ToLower(strings.TrimSpace(username))
+func (a *App) deliver(mailbox string, message Message) deliverResult {
+	mailbox = strings.ToLower(strings.TrimSpace(mailbox))
 	now := a.now()
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	user, ok := a.users[username]
+	user, ok := a.users[mailbox]
 	if !ok || !user.ExpiresAt.After(now) {
-		return false
+		return deliverRecipientMissing
 	}
-	a.messages[username] = append(a.messages[username], message)
-	return true
+	if !senderAllowedByInboxPolicy(user.InboxPolicy, message.From, user.Domain) {
+		return deliverRejectedByPolicy
+	}
+	a.messages[mailbox] = append(a.messages[mailbox], message)
+	return deliverOK
 }
 
 func (a *App) StartJanitor(ctx context.Context) {
@@ -521,17 +775,253 @@ func (a *App) cleanupExpired() {
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	for username, user := range a.users {
+	for mailbox, user := range a.users {
 		if !user.ExpiresAt.After(now) {
-			delete(a.users, username)
-			delete(a.messages, username)
-			delete(a.limiters, username)
+			a.deleteUserLocked(mailbox)
 		}
 	}
 }
 
-func (a *App) emailFor(username string) string {
-	return username + "@" + a.cfg.Domain
+func (a *App) deleteUserLocked(mailbox string) {
+	delete(a.users, mailbox)
+	delete(a.messages, mailbox)
+	delete(a.limiters, mailbox)
+}
+
+func normalizeAgentProfile(profile AgentProfile) (AgentProfile, error) {
+	profile.DisplayName = trimProfileField(profile.DisplayName, maxProfileFieldLen)
+	profile.Host = trimProfileField(profile.Host, maxProfileFieldLen)
+	profile.Responsibilities = trimProfileField(profile.Responsibilities, maxProfileFieldLen)
+	profile.Notes = trimProfileField(profile.Notes, maxProfileNotesLen)
+
+	skills, err := normalizeProfileList(profile.Skills, "profile.skills")
+	if err != nil {
+		return AgentProfile{}, err
+	}
+	mcpServices, err := normalizeProfileList(profile.MCPServices, "profile.mcp_services")
+	if err != nil {
+		return AgentProfile{}, err
+	}
+	capabilities, err := normalizeProfileList(profile.Capabilities, "profile.capabilities")
+	if err != nil {
+		return AgentProfile{}, err
+	}
+
+	profile.Skills = skills
+	profile.MCPServices = mcpServices
+	profile.Capabilities = capabilities
+	return profile, nil
+}
+
+func trimProfileField(value string, maxLen int) string {
+	value = strings.TrimSpace(value)
+	if len(value) > maxLen {
+		value = value[:maxLen]
+	}
+	return value
+}
+
+func normalizeProfileList(items []string, field string) ([]string, error) {
+	if len(items) > maxProfileListItems {
+		return nil, fmt.Errorf("%s must contain at most %d items", field, maxProfileListItems)
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		item = trimProfileField(item, maxProfileListItemLen)
+		if item == "" {
+			continue
+		}
+		key := strings.ToLower(item)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func defaultInboxPolicy() InboxPolicy {
+	return InboxPolicy{}
+}
+
+func (a *App) normalizeInboxPolicy(policy InboxPolicy) (InboxPolicy, error) {
+	blocklist, err := a.normalizePolicyAddressList(policy.Blocklist, "inbox_policy.blocklist")
+	if err != nil {
+		return InboxPolicy{}, err
+	}
+	allowlist, err := a.normalizePolicyAddressList(policy.Allowlist, "inbox_policy.allowlist")
+	if err != nil {
+		return InboxPolicy{}, err
+	}
+	return InboxPolicy{Blocklist: blocklist, Allowlist: allowlist}, nil
+}
+
+func (a *App) normalizePolicyAddressList(items []string, field string) ([]string, error) {
+	if len(items) > maxInboxPolicyItems {
+		return nil, fmt.Errorf("%s must contain at most %d items", field, maxInboxPolicyItems)
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		normalized, err := a.normalizePolicyAddress(item)
+		if err != nil {
+			return nil, err
+		}
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
+	}
+	return out, nil
+}
+
+func (a *App) normalizePolicyAddress(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	if strings.Contains(value, "@") {
+		email, err := normalizeEmail(value)
+		if err != nil {
+			return "", fmt.Errorf("invalid inbox policy address %q", value)
+		}
+		username, domain, ok := splitEmail(email)
+		if !ok || !validUsername(username) || !validMailboxDomain(domain) {
+			return "", fmt.Errorf("invalid inbox policy address %q", value)
+		}
+		return mailboxKey(username, domain), nil
+	}
+	if !validUsername(value) {
+		return "", fmt.Errorf("invalid inbox policy address %q", value)
+	}
+	return mailboxKey(strings.ToLower(value), a.cfg.Domain), nil
+}
+
+func senderAllowedByInboxPolicy(policy InboxPolicy, from string, recipientDomain string) bool {
+	from = strings.ToLower(strings.TrimSpace(from))
+	if from == "" {
+		return false
+	}
+	if addressListMatches(from, policy.Blocklist, recipientDomain) {
+		return false
+	}
+
+	_, fromDomain, ok := splitEmail(from)
+	if !ok {
+		return false
+	}
+	if fromDomain == recipientDomain {
+		return true
+	}
+	return addressListMatches(from, policy.Allowlist, recipientDomain)
+}
+
+func addressListMatches(from string, addresses []string, recipientDomain string) bool {
+	fromUser, fromDomain, fromOK := splitEmail(from)
+	for _, addr := range addresses {
+		if strings.EqualFold(from, addr) {
+			return true
+		}
+		listUser, listDomain, listOK := splitEmail(addr)
+		if !listOK {
+			continue
+		}
+		if fromOK && fromUser == listUser && fromDomain == listDomain {
+			return true
+		}
+		if fromOK && fromUser == listUser && listDomain == recipientDomain {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *App) domainAllowed(domain string) bool {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	for _, allowed := range a.cfg.AllowedDomains {
+		if domain == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *App) parseAgentMailbox(identity string) (string, error) {
+	identity = strings.ToLower(strings.TrimSpace(identity))
+	if identity == "" {
+		return "", errors.New("missing X-Agent-Email or X-Agent-Username")
+	}
+	if strings.Contains(identity, "@") {
+		email, err := normalizeEmail(identity)
+		if err != nil {
+			return "", errors.New("invalid agent mailbox identity")
+		}
+		username, domain, ok := splitEmail(email)
+		if !ok || !validUsername(username) || !validMailboxDomain(domain) {
+			return "", errors.New("invalid agent mailbox identity")
+		}
+		return mailboxKey(username, domain), nil
+	}
+	if !validUsername(identity) {
+		return "", errors.New("invalid X-Agent-Username; use full email user@domain on multi-domain gateways")
+	}
+	return mailboxKey(identity, a.cfg.Domain), nil
+}
+
+func agentIdentityFromRequest(r *http.Request) string {
+	if v := strings.TrimSpace(r.Header.Get("X-Agent-Email")); v != "" {
+		return v
+	}
+	return strings.TrimSpace(r.Header.Get("X-Agent-Username"))
+}
+
+func mailboxKey(username, domain string) string {
+	return strings.ToLower(username) + "@" + strings.ToLower(domain)
+}
+
+func userMailbox(user *User) string {
+	return mailboxKey(user.Username, user.Domain)
+}
+
+func validMailboxDomain(domain string) bool {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" || len(domain) > 253 || strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") {
+		return false
+	}
+	for _, label := range strings.Split(domain, ".") {
+		if !validDomainLabel(label) {
+			return false
+		}
+	}
+	return true
+}
+
+func validDomainLabel(label string) bool {
+	if len(label) == 0 || len(label) > 63 {
+		return false
+	}
+	if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+		return false
+	}
+	for _, r := range label {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func hasJSONContentType(r *http.Request) bool {
@@ -681,10 +1171,10 @@ func (s *smtpSession) Rcpt(to string, _ *smtp.RcptOptions) error {
 		return &smtp.SMTPError{Code: 553, Message: "invalid recipient address"}
 	}
 	username, domain, ok := splitEmail(normalized)
-	if !ok || domain != s.app.cfg.Domain {
+	if !ok || !s.app.domainAllowed(domain) {
 		return &smtp.SMTPError{Code: 550, Message: "recipient is not local"}
 	}
-	if !s.app.localUserActive(username) {
+	if !s.app.localUserActive(username, domain) {
 		return &smtp.SMTPError{Code: 550, Message: "recipient is not registered"}
 	}
 	s.rcpts = append(s.rcpts, normalized)
@@ -710,7 +1200,7 @@ func (s *smtpSession) Data(r io.Reader) error {
 	}
 
 	for _, rcpt := range s.rcpts {
-		username, _, _ := splitEmail(rcpt)
+		username, domain, _ := splitEmail(rcpt)
 		message := Message{
 			MessageID:  newMessageID(),
 			From:       from,
@@ -719,18 +1209,18 @@ func (s *smtpSession) Data(r io.Reader) error {
 			BodyText:   parsed.BodyText,
 			ReceivedAt: s.app.now().UTC(),
 		}
-		if !s.app.deliver(username, message) {
-			return &smtp.SMTPError{Code: 550, Message: "recipient expired"}
+		if s.app.deliver(mailboxKey(username, domain), message) != deliverOK {
+			return &smtp.SMTPError{Code: 550, Message: "message rejected by recipient inbox policy or recipient expired"}
 		}
 	}
 	return nil
 }
 
-func (a *App) localUserActive(username string) bool {
+func (a *App) localUserActive(username, domain string) bool {
 	now := a.now()
 	a.mu.RLock()
 	defer a.mu.RUnlock()
-	user, ok := a.users[username]
+	user, ok := a.users[mailboxKey(username, domain)]
 	return ok && user.ExpiresAt.After(now)
 }
 

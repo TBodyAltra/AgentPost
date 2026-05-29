@@ -46,7 +46,7 @@ func TestRegisterSendAndPoll(t *testing.T) {
 		Subject: "hello",
 		Body:    "internal delivery works",
 	})
-	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1", privateKey)
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1@agent.test", privateKey)
 	sendReq.Header.Set("Content-Type", "application/json")
 	sendResp := httptest.NewRecorder()
 	handler.ServeHTTP(sendResp, sendReq)
@@ -54,7 +54,7 @@ func TestRegisterSendAndPoll(t *testing.T) {
 		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
 	}
 
-	pollReq := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, "bot_1", privateKey)
+	pollReq := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, "bot_1@agent.test", privateKey)
 	pollResp := httptest.NewRecorder()
 	handler.ServeHTTP(pollResp, pollReq)
 	if pollResp.Code != http.StatusOK {
@@ -70,6 +70,228 @@ func TestRegisterSendAndPoll(t *testing.T) {
 	}
 	if got.Messages[0].Subject != "hello" || got.Messages[0].BodyText != "internal delivery works" {
 		t.Fatalf("unexpected message: %+v", got.Messages[0])
+	}
+}
+
+func TestRegisterProfileDirectoryAndUnregister(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubA, privA, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key A: %v", err)
+	}
+	pubB, privB, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key B: %v", err)
+	}
+
+	registerA := mustJSON(t, registerRequest{
+		Username:   "bot_a",
+		PublicKey:  hex.EncodeToString(pubA),
+		TTLSeconds: 3600,
+		Profile: &AgentProfile{
+			DisplayName:      "Agent Alpha",
+			Host:             "worker-01",
+			Responsibilities: "research",
+			Skills:           []string{"summarize", "search"},
+			MCPServices:      []string{"filesystem"},
+			Capabilities:     []string{"can read PDFs"},
+			Notes:            "primary researcher",
+		},
+	})
+	reqA := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(registerA))
+	reqA.Header.Set("Content-Type", "application/json")
+	respA := httptest.NewRecorder()
+	handler.ServeHTTP(respA, reqA)
+	if respA.Code != http.StatusCreated {
+		t.Fatalf("register A status = %d, body = %s", respA.Code, respA.Body.String())
+	}
+
+	registerB := mustJSON(t, registerRequest{
+		Username:   "bot_b",
+		PublicKey:  hex.EncodeToString(pubB),
+		TTLSeconds: 3600,
+		Profile: &AgentProfile{
+			DisplayName: "Agent Beta",
+			Host:        "worker-02",
+		},
+	})
+	reqB := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(registerB))
+	reqB.Header.Set("Content-Type", "application/json")
+	respB := httptest.NewRecorder()
+	handler.ServeHTTP(respB, reqB)
+	if respB.Code != http.StatusCreated {
+		t.Fatalf("register B status = %d, body = %s", respB.Code, respB.Body.String())
+	}
+
+	listReq := signedRequest(t, http.MethodGet, "/api/v1/agents", nil, "bot_a@agent.test", privA)
+	listResp := httptest.NewRecorder()
+	handler.ServeHTTP(listResp, listReq)
+	if listResp.Code != http.StatusOK {
+		t.Fatalf("agents status = %d, body = %s", listResp.Code, listResp.Body.String())
+	}
+
+	var directory agentsResponse
+	if err := json.NewDecoder(listResp.Body).Decode(&directory); err != nil {
+		t.Fatalf("decode agents response: %v", err)
+	}
+	if len(directory.Agents) != 2 {
+		t.Fatalf("agent count = %d, want 2", len(directory.Agents))
+	}
+
+	var alpha *agentEntry
+	for i := range directory.Agents {
+		if directory.Agents[i].Username == "bot_a" {
+			alpha = &directory.Agents[i]
+			break
+		}
+	}
+	if alpha == nil {
+		t.Fatalf("bot_a not found in directory: %+v", directory.Agents)
+	}
+	if alpha.Profile.DisplayName != "Agent Alpha" || alpha.Profile.Host != "worker-01" {
+		t.Fatalf("unexpected profile: %+v", alpha.Profile)
+	}
+	if len(alpha.Profile.Skills) != 2 || alpha.Profile.MCPServices[0] != "filesystem" {
+		t.Fatalf("unexpected profile lists: %+v", alpha.Profile)
+	}
+
+	sendBody := mustJSON(t, sendRequest{
+		To:      "bot_a@agent.test",
+		Subject: "queued",
+		Body:    "should be deleted on unregister",
+	})
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_b@agent.test", privB)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusOK {
+		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
+	}
+
+	delReq := signedRequest(t, http.MethodDelete, "/api/v1/account", nil, "bot_a@agent.test", privA)
+	delResp := httptest.NewRecorder()
+	handler.ServeHTTP(delResp, delReq)
+	if delResp.Code != http.StatusOK {
+		t.Fatalf("unregister status = %d, body = %s", delResp.Code, delResp.Body.String())
+	}
+
+	listAfter := signedRequest(t, http.MethodGet, "/api/v1/agents", nil, "bot_b@agent.test", privB)
+	listAfterResp := httptest.NewRecorder()
+	handler.ServeHTTP(listAfterResp, listAfter)
+	if listAfterResp.Code != http.StatusOK {
+		t.Fatalf("agents after unregister status = %d", listAfterResp.Code)
+	}
+	if err := json.NewDecoder(listAfterResp.Body).Decode(&directory); err != nil {
+		t.Fatalf("decode agents response: %v", err)
+	}
+	if len(directory.Agents) != 1 || directory.Agents[0].Username != "bot_b" {
+		t.Fatalf("expected only bot_b after unregister, got %+v", directory.Agents)
+	}
+
+	sendAfter := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_b@agent.test", privB)
+	sendAfter.Header.Set("Content-Type", "application/json")
+	sendAfterResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendAfterResp, sendAfter)
+	if sendAfterResp.Code != http.StatusNotFound {
+		t.Fatalf("send to unregistered bot_a status = %d, want 404", sendAfterResp.Code)
+	}
+}
+
+func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "team-a.test",
+		AllowedDomains:  []string{"team-a.test", "team-b.test"},
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubAllowed, privAllowed, _ := ed25519.GenerateKey(crand.Reader)
+	pubBlocked, privBlocked, _ := ed25519.GenerateKey(crand.Reader)
+	pubTarget, privTarget, _ := ed25519.GenerateKey(crand.Reader)
+	pubCross, privCross, _ := ed25519.GenerateKey(crand.Reader)
+
+	registerUser := func(username, domain string, key ed25519.PublicKey, policy InboxPolicy) {
+		t.Helper()
+		body := mustJSON(t, registerRequest{
+			Username:    username,
+			Domain:      domain,
+			PublicKey:   hex.EncodeToString(key),
+			TTLSeconds:  3600,
+			InboxPolicy: &policy,
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("register %s@%s status = %d, body = %s", username, domain, resp.Code, resp.Body.String())
+		}
+	}
+
+	registerUser("allowed", "team-a.test", pubAllowed, InboxPolicy{})
+	registerUser("blocked", "team-a.test", pubBlocked, InboxPolicy{})
+	registerUser("target", "team-a.test", pubTarget, InboxPolicy{})
+	registerUser("partner", "team-b.test", pubCross, InboxPolicy{})
+
+	send := func(fromEmail string, priv ed25519.PrivateKey, to string) int {
+		t.Helper()
+		body := mustJSON(t, sendRequest{To: to, Subject: "test", Body: "hi"})
+		req := signedRequest(t, http.MethodPost, "/api/v1/send", body, fromEmail, priv)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		return resp.Code
+	}
+
+	if code := send("allowed@team-a.test", privAllowed, "target@team-a.test"); code != http.StatusOK {
+		t.Fatalf("same-domain allowed sender status = %d, want 200", code)
+	}
+	if code := send("partner@team-b.test", privCross, "target@team-a.test"); code != http.StatusForbidden {
+		t.Fatalf("cross-domain without allowlist status = %d, want 403", code)
+	}
+
+	policyBody := mustJSON(t, inboxPolicyResponse{
+		InboxPolicy: InboxPolicy{
+			Blocklist: []string{"blocked@team-a.test"},
+			Allowlist: []string{"partner@team-b.test"},
+		},
+	})
+	putReq := signedRequest(t, http.MethodPut, "/api/v1/account/inbox-policy", policyBody, "target@team-a.test", privTarget)
+	putReq.Header.Set("Content-Type", "application/json")
+	putResp := httptest.NewRecorder()
+	handler.ServeHTTP(putResp, putReq)
+	if putResp.Code != http.StatusOK {
+		t.Fatalf("update inbox policy status = %d, body = %s", putResp.Code, putResp.Body.String())
+	}
+
+	if code := send("blocked@team-a.test", privBlocked, "target@team-a.test"); code != http.StatusForbidden {
+		t.Fatalf("blocklisted same-domain sender status = %d, want 403", code)
+	}
+	if code := send("partner@team-b.test", privCross, "target@team-a.test"); code != http.StatusOK {
+		t.Fatalf("allowlisted cross-domain sender status = %d, want 200", code)
+	}
+
+	getReq := signedRequest(t, http.MethodGet, "/api/v1/account/inbox-policy", nil, "target@team-a.test", privTarget)
+	getResp := httptest.NewRecorder()
+	handler.ServeHTTP(getResp, getReq)
+	if getResp.Code != http.StatusOK {
+		t.Fatalf("get inbox policy status = %d", getResp.Code)
+	}
+	var got inboxPolicyResponse
+	if err := json.NewDecoder(getResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode inbox policy: %v", err)
+	}
+	if len(got.InboxPolicy.Blocklist) != 1 || len(got.InboxPolicy.Allowlist) != 1 {
+		t.Fatalf("unexpected inbox policy: %+v", got.InboxPolicy)
 	}
 }
 
@@ -109,6 +331,9 @@ func TestSkillEndpoint(t *testing.T) {
 	}
 	if !strings.Contains(body, "public-domain") {
 		t.Fatalf("skill should include deployment scenario")
+	}
+	if !strings.Contains(body, "/api/v1/agents") {
+		t.Fatalf("skill should document agent directory endpoint")
 	}
 
 	jsonReq := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
@@ -235,7 +460,7 @@ func TestSendRejectsBadSignature(t *testing.T) {
 		Subject: "hello",
 		Body:    "this should not deliver",
 	})
-	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1", wrongPrivateKey)
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1@agent.test", wrongPrivateKey)
 	sendReq.Header.Set("Content-Type", "application/json")
 	sendResp := httptest.NewRecorder()
 	handler.ServeHTTP(sendResp, sendReq)
@@ -270,7 +495,7 @@ func mustJSON(t *testing.T, value any) []byte {
 	return body
 }
 
-func signedRequest(t *testing.T, method, target string, body []byte, username string, privateKey ed25519.PrivateKey) *http.Request {
+func signedRequest(t *testing.T, method, target string, body []byte, identity string, privateKey ed25519.PrivateKey) *http.Request {
 	t.Helper()
 	var reader *bytes.Reader
 	if body == nil {
@@ -281,7 +506,11 @@ func signedRequest(t *testing.T, method, target string, body []byte, username st
 	req := httptest.NewRequest(method, target, reader)
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	signature := ed25519.Sign(privateKey, signaturePayload(timestamp, body))
-	req.Header.Set("X-Agent-Username", username)
+	if strings.Contains(identity, "@") {
+		req.Header.Set("X-Agent-Email", identity)
+	} else {
+		req.Header.Set("X-Agent-Username", identity)
+	}
 	req.Header.Set("X-Agent-Timestamp", timestamp)
 	req.Header.Set("X-Agent-Signature", hex.EncodeToString(signature))
 	return req

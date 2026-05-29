@@ -218,25 +218,34 @@ apply_scenario_defaults() {
       ;;
     lan)
       DOMAIN="${DOMAIN:-agent.local}"
-      LAN_IP="${LAN_IP:-$(detect_lan_ip)}"
-      if [[ -z "$LAN_IP" ]]; then
-        if [[ "$INTERACTIVE" == "1" ]] && is_tty; then
-          LAN_IP="$(prompt "LAN IP address for agents to connect" "")"
-        else
-          die "scenario=lan requires --lan-ip or a detectable LAN address"
+      if [[ -n "$LAN_IP" ]]; then
+        PUBLIC_URL="http://${LAN_IP}:${HTTP_PORT}"
+      elif [[ -z "$PUBLIC_URL" ]]; then
+        LAN_IP="$(detect_lan_ip)"
+        if [[ -z "$LAN_IP" ]]; then
+          if [[ "$INTERACTIVE" == "1" ]] && is_tty; then
+            LAN_IP="$(prompt "LAN IP address for agents to connect" "")"
+          else
+            die "scenario=lan requires --lan-ip or a detectable LAN address"
+          fi
         fi
+        PUBLIC_URL="http://${LAN_IP}:${HTTP_PORT}"
       fi
-      PUBLIC_URL="http://${LAN_IP}:${HTTP_PORT}"
       ENABLE_CADDY=0
       ;;
     public-ip)
-      PUBLIC_IP="${PUBLIC_IP:-$(detect_public_ip)}"
-      if [[ -z "$PUBLIC_IP" ]]; then
-        if [[ "$INTERACTIVE" == "1" ]] && is_tty; then
-          PUBLIC_IP="$(prompt "Public IP address for agents to connect" "")"
-        else
-          die "scenario=public-ip requires --public-ip or network access to detect it"
+      if [[ -n "$PUBLIC_IP" ]]; then
+        PUBLIC_URL="http://${PUBLIC_IP}:${HTTP_PORT}"
+      elif [[ -z "$PUBLIC_URL" ]]; then
+        PUBLIC_IP="$(detect_public_ip)"
+        if [[ -z "$PUBLIC_IP" ]]; then
+          if [[ "$INTERACTIVE" == "1" ]] && is_tty; then
+            PUBLIC_IP="$(prompt "Public IP address for agents to connect" "")"
+          else
+            die "scenario=public-ip requires --public-ip or network access to detect it"
+          fi
         fi
+        PUBLIC_URL="http://${PUBLIC_IP}:${HTTP_PORT}"
       fi
       if [[ -z "$DOMAIN" || "$DOMAIN" == "agent.local" ]]; then
         if [[ "$INTERACTIVE" == "1" ]] && is_tty; then
@@ -245,7 +254,6 @@ apply_scenario_defaults() {
           DOMAIN="${DOMAIN:-agent.local}"
         fi
       fi
-      PUBLIC_URL="http://${PUBLIC_IP}:${HTTP_PORT}"
       ENABLE_CADDY=0
       ;;
     public-domain)
