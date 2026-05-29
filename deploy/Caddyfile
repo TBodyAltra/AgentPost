@@ -1,0 +1,14 @@
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
+example.domain {
+	encode gzip
+	reverse_proxy agentpost:8080
+}
+
+www.example.domain {
+	redir https://example.domain{uri} permanent
+}

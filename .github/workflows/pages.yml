@@ -1,0 +1,135 @@
+name: Deploy GitHub Pages
+
+# First-time repository setup:
+# If GitHub Pages is not enabled yet, this workflow skips deployment instead of
+# failing. Enable Pages manually at Settings -> Pages -> Build and deployment ->
+# Source: GitHub Actions, or add a PAGES_ENABLEMENT_TOKEN secret backed by a
+# PAT/GitHub App token that can create the repository Pages site.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - docs/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+    outputs:
+      pages_enabled: ${{ steps.pages.outputs.enabled }}
+    env:
+      PAGES_ENABLEMENT_TOKEN: ${{ secrets.PAGES_ENABLEMENT_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check GitHub Pages availability
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pages_api="https://api.github.com/repos/${REPO}/pages"
+          api_headers=(
+            -H "Accept: application/vnd.github+json"
+            -H "X-GitHub-Api-Version: 2022-11-28"
+          )
+
+          check_status=$(curl -sS -o "${RUNNER_TEMP}/pages-check.json" -w "%{http_code}" \
+            "${api_headers[@]}" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            "${pages_api}")
+
+          if [ "${check_status}" = "200" ]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+            echo "GitHub Pages is already enabled."
+            exit 0
+          fi
+
+          if [ "${check_status}" != "404" ]; then
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            {
+              echo "### GitHub Pages deployment skipped"
+              echo
+              echo "Could not determine the Pages site status. GitHub API returned HTTP ${check_status}."
+              echo "Open Settings -> Pages and set Build and deployment -> Source to GitHub Actions, then rerun this workflow."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          if [ -z "${PAGES_ENABLEMENT_TOKEN}" ]; then
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            {
+              echo "### GitHub Pages deployment skipped"
+              echo
+              echo "This repository does not have GitHub Pages enabled yet."
+              echo "Set Settings -> Pages -> Build and deployment -> Source to GitHub Actions, then rerun this workflow."
+              echo
+              echo "Alternatively, add a PAGES_ENABLEMENT_TOKEN secret with permission to create the Pages site."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          create_status=$(curl -sS -o "${RUNNER_TEMP}/pages-create.json" -w "%{http_code}" \
+            -X POST \
+            "${api_headers[@]}" \
+            -H "Authorization: Bearer ${PAGES_ENABLEMENT_TOKEN}" \
+            -d '{"build_type":"workflow"}' \
+            "${pages_api}")
+
+          case "${create_status}" in
+            200|201|204)
+              echo "enabled=true" >> "${GITHUB_OUTPUT}"
+              echo "GitHub Pages was enabled for GitHub Actions deployments."
+              ;;
+            *)
+              echo "enabled=false" >> "${GITHUB_OUTPUT}"
+              {
+                echo "### GitHub Pages deployment skipped"
+                echo
+                echo "The workflow tried to enable GitHub Pages with PAGES_ENABLEMENT_TOKEN, but GitHub API returned HTTP ${create_status}."
+                echo "Check that the token has permission to create the repository Pages site, or enable Pages manually in repository settings."
+              } >> "${GITHUB_STEP_SUMMARY}"
+              ;;
+          esac
+
+      - name: Configure Pages
+        if: ${{ steps.pages.outputs.enabled == 'true' }}
+        uses: actions/configure-pages@v6
+
+      - name: Upload static site
+        if: ${{ steps.pages.outputs.enabled == 'true' }}
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    if: ${{ needs.build.outputs.pages_enabled == 'true' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
