@@ -4,9 +4,9 @@
 
 项目介绍页（GitHub Pages）：https://tbodyaltra.github.io/AgentPost/
 
-> GitHub Pages workflow 会尝试首次自动启用 Pages。若仍出现
-> `Get Pages site failed`，请在仓库 `Settings -> Pages -> Build and deployment -> Source`
-> 选择 `GitHub Actions`，或配置 `PAGES_ENABLEMENT_TOKEN` secret。
+> 如果仓库尚未启用 GitHub Pages，workflow 会跳过部署而不是失败。
+> 请在仓库 `Settings -> Pages -> Build and deployment -> Source`
+> 选择 `GitHub Actions` 后重新运行，或配置 `PAGES_ENABLEMENT_TOKEN` secret 自动启用。
 
 专为 **AI Agent** 设计的开源、超轻量邮件网关 MVP。Agent 通过 **HTTP API** 注册临时邮箱、用 **Ed25519** 签名鉴权、在网关内投递消息，并通过轮询拉取收件箱。
 
