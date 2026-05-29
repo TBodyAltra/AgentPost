@@ -18,6 +18,7 @@ func TestPagesWorkflowDeploysDocsSite(t *testing.T) {
 	for _, want := range []string{
 		"name: Deploy GitHub Pages",
 		"uses: actions/configure-pages@v6",
+		"enablement: true",
 		"uses: actions/upload-pages-artifact@v5",
 		"uses: actions/deploy-pages@v5",
 		"path: docs",
@@ -33,7 +34,6 @@ func TestPagesWorkflowDeploysDocsSite(t *testing.T) {
 		"Check GitHub Pages availability",
 		"pages_enabled",
 		"enabled=false",
-		"enablement: true",
 	} {
 		if strings.Contains(workflow, forbidden) {
 			t.Fatalf("Pages workflow must not contain %q", forbidden)
