@@ -2,10 +2,10 @@ name: Deploy GitHub Pages
 
 # First-time repository setup:
 # Settings -> Pages -> Build and deployment -> Source: GitHub Actions.
-# GitHub's default GITHUB_TOKEN can deploy Pages, but it cannot create/enable
-# the Pages site. If you want this workflow to auto-enable Pages, add a
-# PAGES_ENABLEMENT_TOKEN secret backed by a PAT or GitHub App token with the
-# permissions required by actions/configure-pages.
+# GitHub's default GITHUB_TOKEN can deploy Pages after Pages is enabled, but it
+# cannot create/enable the Pages site. If you want this workflow to auto-enable
+# Pages, add a PAGES_ENABLEMENT_TOKEN secret backed by a PAT or GitHub App token
+# with the permissions required by actions/configure-pages.
 
 on:
   push:
@@ -26,33 +26,81 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_ready: ${{ steps.pages-preflight.outputs.pages_ready }}
     permissions:
       contents: read
       pages: write
-    env:
-      PAGES_ENABLEMENT_TOKEN: ${{ secrets.PAGES_ENABLEMENT_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Check GitHub Pages status
+        id: pages-preflight
+        env:
+          ENABLEMENT_TOKEN: ${{ secrets.PAGES_ENABLEMENT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          status="$(curl -sS -o /tmp/pages-response.json -w "%{http_code}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${REPOSITORY}/pages")"
+
+          case "$status" in
+            200)
+              echo "pages_ready=true" >> "$GITHUB_OUTPUT"
+              echo "enable_pages=false" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              if [ -n "$ENABLEMENT_TOKEN" ]; then
+                echo "pages_ready=true" >> "$GITHUB_OUTPUT"
+                echo "enable_pages=true" >> "$GITHUB_OUTPUT"
+              else
+                echo "pages_ready=false" >> "$GITHUB_OUTPUT"
+                echo "enable_pages=false" >> "$GITHUB_OUTPUT"
+                echo "::warning title=GitHub Pages is not enabled::Set Settings -> Pages -> Build and deployment -> Source to GitHub Actions, or add a PAGES_ENABLEMENT_TOKEN secret with Pages enablement permissions."
+                {
+                  echo "### GitHub Pages is not enabled"
+                  echo
+                  echo "This workflow skipped deployment because the repository does not have a Pages site yet."
+                  echo
+                  echo "Fix one of these ways:"
+                  echo
+                  echo "1. Go to \`Settings -> Pages -> Build and deployment -> Source\` and choose \`GitHub Actions\`."
+                  echo "2. Or add a \`PAGES_ENABLEMENT_TOKEN\` secret with the permissions required by \`actions/configure-pages\`."
+                } >> "$GITHUB_STEP_SUMMARY"
+              fi
+              ;;
+            *)
+              echo "::error title=Unable to check GitHub Pages status::GitHub API returned HTTP $status."
+              exit 1
+              ;;
+          esac
+
       - name: Configure Pages
-        if: ${{ env.PAGES_ENABLEMENT_TOKEN == '' }}
+        if: ${{ steps.pages-preflight.outputs.pages_ready == 'true' && steps.pages-preflight.outputs.enable_pages != 'true' }}
         uses: actions/configure-pages@v6
 
       - name: Configure Pages with enablement token
-        if: ${{ env.PAGES_ENABLEMENT_TOKEN != '' }}
+        if: ${{ steps.pages-preflight.outputs.enable_pages == 'true' }}
         uses: actions/configure-pages@v6
         with:
-          token: ${{ env.PAGES_ENABLEMENT_TOKEN }}
+          token: ${{ secrets.PAGES_ENABLEMENT_TOKEN }}
           enablement: true
 
       - name: Upload static site
+        if: ${{ steps.pages-preflight.outputs.pages_ready == 'true' }}
         uses: actions/upload-pages-artifact@v5
         with:
           path: docs
 
   deploy:
     needs: build
+    if: ${{ needs.build.outputs.pages_ready == 'true' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

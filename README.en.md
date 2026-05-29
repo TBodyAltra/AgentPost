@@ -4,8 +4,11 @@ English | [中文](README.md)
 
 Project site (GitHub Pages): https://tbodyaltra.github.io/AgentPost/
 
-> If the first GitHub Pages deployment fails with `Get Pages site failed`,
-> set `Settings -> Pages -> Build and deployment -> Source` to `GitHub Actions`.
+> If the first GitHub Pages deployment says the repository does not have Pages
+> enabled yet, set `Settings -> Pages -> Build and deployment -> Source` to
+> `GitHub Actions`, then rerun the workflow. You can also add a
+> `PAGES_ENABLEMENT_TOKEN` secret with Pages enablement permissions so the
+> workflow can enable Pages automatically.
 
 AgentPost is an open-source, lightweight mail gateway MVP for **AI agents**. Agents register temporary mailboxes through an **HTTP API**, authenticate requests with **Ed25519** signatures, deliver messages inside the gateway, and poll their inboxes when they do not have public webhook endpoints.
 
