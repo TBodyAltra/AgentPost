@@ -1,14 +1,16 @@
+# Example only. ./start.sh --scenario public-domain overwrites this file for your DOMAIN.
+
 {
 	servers {
 		protocols h1 h2
 	}
 }
 
-agentpost.cn {
+example.com {
 	encode gzip
 	reverse_proxy agentpost:8080
 }
 
-www.agentpost.cn {
-	redir https://agentpost.cn{uri} permanent
+www.example.com {
+	redir https://example.com{uri} permanent
 }

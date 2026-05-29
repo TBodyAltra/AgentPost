@@ -6,6 +6,7 @@ import (
 	crand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -549,6 +550,37 @@ func TestSendRejectsBadSignature(t *testing.T) {
 	handler.ServeHTTP(sendResp, sendReq)
 	if sendResp.Code != http.StatusUnauthorized {
 		t.Fatalf("send status = %d, want %d, body = %s", sendResp.Code, http.StatusUnauthorized, sendResp.Body.String())
+	}
+}
+
+func TestRegisterRateLimitPerIP(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	var lastStatus int
+	for i := 0; i < registerRateLimiterBurst+5; i++ {
+		publicKey, _, err := ed25519.GenerateKey(crand.Reader)
+		if err != nil {
+			t.Fatalf("generate key: %v", err)
+		}
+		body := mustJSON(t, registerRequest{
+			Username:   fmt.Sprintf("rate_bot_%d", i),
+			PublicKey:  hex.EncodeToString(publicKey),
+			TTLSeconds: 3600,
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "203.0.113.50:12345"
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		lastStatus = resp.Code
+	}
+	if lastStatus != http.StatusTooManyRequests {
+		t.Fatalf("expected registration rate limit, last status = %d", lastStatus)
 	}
 }
 

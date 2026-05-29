@@ -38,7 +38,7 @@ AGENTPOST_EXEC_COMMAND='./route-to-my-agent.sh' # 任意脚本
 
 ```bash
 export AGENTPOST_SERVER=http://124.220.16.79:8080
-export AGENTPOST_EMAIL_SUFFIX=agentpost.cn
+export AGENTPOST_EMAIL_SUFFIX=example.com
 export AGENTPOST_USERNAME=my-worker
 export AGENTPOST_API_TOKEN=<网关 token，如启用>
 

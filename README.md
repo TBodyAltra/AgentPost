@@ -1,5 +1,9 @@
 # AgentPost（智能体邮局）
 
+> **免责声明**：本软件按「现状」提供，不提供任何明示或暗示的保证。将 AgentPost 暴露在公网时，**部署方**须自行负责安全配置（网关 Token、HTTPS、防火墙）、反滥用与合规（含垃圾邮件相关法规）。作者不对误用、数据丢失或未授权使用承担责任。
+>
+> **安全反馈**：请通过 [SECURITY.md](SECURITY.md) 私下报告漏洞，勿公开 Issue。
+
 专为 **AI Agent** 设计的开源、超轻量邮件网关 MVP。Agent 通过 **HTTP API** 注册临时邮箱、用 **Ed25519** 签名鉴权、在网关内投递消息，并通过轮询拉取收件箱。
 
 > **给 AI Agent 部署本仓库？** 请先读 [`AGENTS.md`](AGENTS.md)（非交互命令、场景表、常见错误）。
@@ -12,6 +16,7 @@
 | 签名发信 | `POST /api/v1/send`，请求体 + 时间戳 Ed25519 签名 |
 | 轮询收件 | `GET /api/v1/messages`，适合无公网 IP 的 Agent |
 | 内部投递 | 同网关下 `@domain` 用户互发 |
+| 限速 | 每邮箱发信每分钟最多 2 封；注册每 IP 每分钟最多 10 次 |
 | Skill API | `GET /api/v1/skill` 返回**本部署**的 URL 与用法 |
 | Dashboard | `/dashboard/` 可视化 domain、邮箱互连与账户详情 |
 | 一键部署 | `./start.sh` 交互式或 `--scenario` 参数化 |
@@ -25,9 +30,9 @@
 | 配置 | 作用 | 示例 |
 |------|------|------|
 | **`AGENTPOST_PUBLIC_URL`**（skill 里的 `server_url`） | Agent **怎么连 HTTP** | `http://203.0.113.10:8080` |
-| **`AGENTPOST_DOMAIN`**（邮箱 `@` 后缀） | 邮箱**长什么样** | `agentpost.cn` |
+| **`AGENTPOST_DOMAIN`**（邮箱 `@` 后缀） | 邮箱**长什么样** | `example.com` |
 
-二者可以完全不同。例如：域名未备案、只能 `IP:8080` 访问，邮箱仍可以是 `bot@agentpost.cn`。
+二者可以完全不同。例如：域名未备案、只能 `IP:8080` 访问，邮箱仍可以是 `bot@example.com`。
 
 ### Skill 与部署参数一致
 
@@ -74,7 +79,7 @@ chmod +x start.sh
 
 # 公网 IP（域名未备案、只能 IP:8080）
 ./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 --domain agentpost.cn
+  --public-ip 203.0.113.10 --domain example.com
 
 # 公网 HTTPS 域名
 ./start.sh --non-interactive --scenario public-domain --domain example.com --smtp
@@ -125,7 +130,7 @@ AGENTPOST_API_TOKEN=<公网场景下由运维分发；skill 不含 Token>
 **域名未备案、无法 HTTPS 访问**时的典型方案：云服务器公网 IP + **8080**。
 
 ```bash
-./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain agentpost.cn
+./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.com
 ```
 
 | 项目 | 说明 |
@@ -147,7 +152,7 @@ Agent 分散在不同网络；需要 HTTPS 与可选外部收信。
 2. 防火墙 **80 / 443**（Caddy 申请证书）；SMTP 需 **25**  
 3. Caddy 将 `https://example.com` 反代到 AgentPost `:8080`
 
-详细 DNS 清单见 [`deploy/agentpost.cn.md`](deploy/agentpost.cn.md)。
+详细 DNS 清单见 [`deploy/public-domain.example.md`](deploy/public-domain.example.md)。
 
 架构：
 
@@ -363,7 +368,7 @@ Ed25519 签名字节：`<unix_timestamp>\n<raw_request_body>`（GET messages 时
 ├── docker-compose.yml   # AgentPost + Caddy（profile: caddy）
 ├── deploy/
 │   ├── Caddyfile        # public-domain 时由 start.sh 生成
-│   └── agentpost.cn.md  # 域名部署 DNS 示例
+│   └── public-domain.example.md  # 公网域名部署示例
 └── README.md
 ```
 
@@ -380,4 +385,6 @@ go run . -config config.yaml
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Third-party Go dependencies are subject to their respective licenses (see `go.mod` / module cache).
+
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -17,6 +17,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
+	"net"
 	"net/http"
 	"net/mail"
 	"os"
@@ -45,7 +46,9 @@ const (
 	maxProfileNotesLen     = 2048
 	maxProfileListItems    = 32
 	maxProfileListItemLen  = 128
-	maxInboxPolicyItems    = 64
+	maxInboxPolicyItems         = 64
+	registerRequestsPerMinute   = 10
+	registerRateLimiterBurst    = 10
 )
 
 type Config struct {
@@ -61,10 +64,11 @@ type App struct {
 	cfg Config
 	now func() time.Time
 
-	mu       sync.RWMutex
-	users    map[string]*User
-	messages map[string][]Message
-	limiters map[string]*rate.Limiter
+	mu               sync.RWMutex
+	users            map[string]*User
+	messages         map[string][]Message
+	limiters         map[string]*rate.Limiter
+	registerLimiters map[string]*rate.Limiter
 }
 
 type AgentProfile struct {
@@ -293,11 +297,12 @@ func NewApp(cfg Config) *App {
 		cfg.MaxMessageBytes = defaultMaxMessageBytes
 	}
 	return &App{
-		cfg:      cfg,
-		now:      time.Now,
-		users:    make(map[string]*User),
-		messages: make(map[string][]Message),
-		limiters: make(map[string]*rate.Limiter),
+		cfg:              cfg,
+		now:              time.Now,
+		users:            make(map[string]*User),
+		messages:         make(map[string][]Message),
+		limiters:         make(map[string]*rate.Limiter),
+		registerLimiters: make(map[string]*rate.Limiter),
 	}
 }
 
@@ -365,6 +370,10 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	if !hasJSONContentType(r) {
 		writeJSON(w, http.StatusUnsupportedMediaType, errorResponse{Error: "Content-Type must be application/json"})
+		return
+	}
+	if !a.allowRegister(clientIP(r)) {
+		writeJSON(w, http.StatusTooManyRequests, errorResponse{Error: "registration rate limit exceeded"})
 		return
 	}
 
@@ -755,6 +764,39 @@ func (a *App) deleteUserLocked(mailbox string) {
 	delete(a.users, mailbox)
 	delete(a.messages, mailbox)
 	delete(a.limiters, mailbox)
+}
+
+func clientIP(r *http.Request) string {
+	if r == nil {
+		return "unknown"
+	}
+	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
+		return strings.TrimSpace(strings.Split(xff, ",")[0])
+	}
+	if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
+		return xri
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func (a *App) allowRegister(clientIP string) bool {
+	clientIP = strings.TrimSpace(clientIP)
+	if clientIP == "" {
+		clientIP = "unknown"
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	lim, ok := a.registerLimiters[clientIP]
+	if !ok {
+		lim = rate.NewLimiter(rate.Every(time.Minute/registerRequestsPerMinute), registerRateLimiterBurst)
+		a.registerLimiters[clientIP] = lim
+	}
+	return lim.Allow()
 }
 
 func normalizeAgentProfile(profile AgentProfile) (AgentProfile, error) {

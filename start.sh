@@ -71,7 +71,7 @@ Examples:
   ./start.sh configure                          # interactive, write .env only
   ./start.sh --scenario local
   ./start.sh --scenario lan --lan-ip 192.168.1.100 --no-token
-  ./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain agentpost.cn
+  ./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.com
   ./start.sh --scenario public-domain --domain example.com --smtp
   AGENTPOST_API_TOKEN=$(openssl rand -hex 32) ./start.sh --scenario public-domain --domain example.com
 EOF
