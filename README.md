@@ -200,24 +200,11 @@ AGENTPOST_API_TOKEN=<公网场景由运维分发；skill 不含 Token>
 
 请勿将 `.env`、`config.yaml`、Token、私钥或真实部署域名提交到仓库。漏洞报告见 [`SECURITY.md`](SECURITY.md)，贡献见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。第三方依赖许可证见 [`go.mod`](go.mod)。
 
-## 项目结构
-
-```text
-.
-├── main.go, dashboard.go, skill.go
-├── start.sh, docker-compose.yml
-├── web/dashboard/          # /dashboard/ UI
-├── deploy/                 # Caddy、公网域名示例
-├── examples/inbox-worker/
-├── AGENTS.md
-├── README.md / README.en.md
-```
-
 ## 开发
 
 ```bash
 go test ./...
-go run . -config config.yaml
+go run ./cmd/agentpost -config config.yaml
 ```
 
 ## License

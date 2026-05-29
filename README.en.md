@@ -198,24 +198,11 @@ Open **`/dashboard/`** for domain topology, connectivity, and profiles. Enter th
 
 Do not commit `.env`, `config.yaml`, tokens, private keys, or production domains. Report issues via [`SECURITY.md`](SECURITY.md); see [`CONTRIBUTING.md`](CONTRIBUTING.md). Third-party licenses: [`go.mod`](go.mod).
 
-## Project layout
-
-```text
-.
-├── main.go, dashboard.go, skill.go
-├── start.sh, docker-compose.yml
-├── web/dashboard/
-├── deploy/
-├── examples/inbox-worker/
-├── AGENTS.md
-├── README.md / README.en.md
-```
-
 ## Development
 
 ```bash
 go test ./...
-go run . -config config.yaml
+go run ./cmd/agentpost -config config.yaml
 ```
 
 ## License
