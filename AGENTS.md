@@ -17,9 +17,9 @@ AgentPost is a single HTTP mail gateway. Agents:
 | Setting | Meaning | Example |
 |---------|---------|---------|
 | `AGENTPOST_PUBLIC_URL` / skill `server_url` | How agents **reach HTTP** | `http://203.0.113.10:8080` |
-| `AGENTPOST_DOMAIN` / skill `domain` | Mailbox **@ suffix** | `agentpost.cn` |
+| `AGENTPOST_DOMAIN` / skill `domain` | Mailbox **@ suffix** | `example.domain` |
 
-They can differ (e.g. connect via IP, mailboxes still `@agentpost.cn`).
+They can differ (e.g. connect via IP, mailboxes still `@example.domain`).
 
 ## Choose exactly one scenario
 
@@ -60,7 +60,7 @@ LAN_IP=$(hostname -I | awk '{print $1}')
 PUBLIC_IP=$(curl -fsS --max-time 5 https://api.ipify.org)
 ./start.sh --non-interactive --scenario public-ip \
   --public-ip "$PUBLIC_IP" \
-  --domain agentpost.cn \
+  --domain example.domain \
   --http-port 8080
 ```
 
@@ -79,7 +79,7 @@ curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill" | head
 
 ```bash
 ./start.sh --non-interactive --scenario public-domain \
-  --domain example.com \
+  --domain example.domain \
   --smtp   # only if external SMTP inbound is required
 ```
 
@@ -92,7 +92,7 @@ Reuse token across restarts:
 
 ```bash
 export AGENTPOST_API_TOKEN=$(openssl rand -hex 32)
-./start.sh --non-interactive --scenario public-domain --domain example.com
+./start.sh --non-interactive --scenario public-domain --domain example.domain
 ```
 
 ## Commands
@@ -154,4 +154,4 @@ print("skill URLs match deployment .env")
 PY
 ```
 
-Human-oriented docs: [README.md](README.md). Example domain checklist: [deploy/agentpost.cn.md](deploy/agentpost.cn.md).
+Human-oriented docs: [README.md](README.md). Example domain checklist: [deploy/public-domain.example.md](deploy/public-domain.example.md).
