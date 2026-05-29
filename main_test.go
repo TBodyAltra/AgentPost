@@ -74,6 +74,9 @@ func TestRegisterSendAndPoll(t *testing.T) {
 }
 
 func TestSkillEndpoint(t *testing.T) {
+	t.Setenv("AGENTPOST_PUBLIC_URL", "https://gateway.example.com")
+	t.Setenv("AGENTPOST_SCENARIO", "public-domain")
+
 	app := NewApp(Config{
 		Domain:          "agent.test",
 		HTTPAddr:        ":0",
@@ -84,8 +87,8 @@ func TestSkillEndpoint(t *testing.T) {
 	handler := app.routes()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
-	req.Host = "gateway.example.com"
-	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Host = "wrong.example.com"
+	req.Header.Set("X-Forwarded-Proto", "http")
 	resp := httptest.NewRecorder()
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
@@ -96,15 +99,20 @@ func TestSkillEndpoint(t *testing.T) {
 		t.Fatalf("skill must not contain the gateway token")
 	}
 	if !strings.Contains(body, "https://gateway.example.com") {
-		t.Fatalf("skill should include resolved server URL, got: %s", body)
+		t.Fatalf("skill should use AGENTPOST_PUBLIC_URL, got: %s", body)
+	}
+	if strings.Contains(body, "wrong.example.com") {
+		t.Fatalf("skill must not fall back to request Host when PUBLIC_URL is set")
 	}
 	if !strings.Contains(body, "agent.test") {
 		t.Fatalf("skill should include domain")
 	}
+	if !strings.Contains(body, "public-domain") {
+		t.Fatalf("skill should include deployment scenario")
+	}
 
 	jsonReq := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
 	jsonReq.Header.Set("Accept", "application/json")
-	jsonReq.Host = "gateway.example.com"
 	jsonResp := httptest.NewRecorder()
 	handler.ServeHTTP(jsonResp, jsonReq)
 	if jsonResp.Code != http.StatusOK {
@@ -116,6 +124,33 @@ func TestSkillEndpoint(t *testing.T) {
 	}
 	if got.Meta.Domain != "agent.test" || !got.Meta.GatewayToken {
 		t.Fatalf("unexpected skill meta: %+v", got.Meta)
+	}
+	if got.Meta.ServerURL != "https://gateway.example.com" || got.Meta.PublicURLSource != "deployment_env" {
+		t.Fatalf("unexpected skill URL meta: %+v", got.Meta)
+	}
+}
+
+func TestSkillEndpointInfersHostWhenPublicURLUnset(t *testing.T) {
+	t.Setenv("AGENTPOST_PUBLIC_URL", "")
+
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":8080",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
+	req.Host = "gateway.example.com"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("skill status = %d", resp.Code)
+	}
+	if !strings.Contains(resp.Body.String(), "https://gateway.example.com") {
+		t.Fatalf("skill should infer URL from request Host when PUBLIC_URL is unset")
 	}
 }
 

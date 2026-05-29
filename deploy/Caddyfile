@@ -1,3 +1,9 @@
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
 agentpost.cn {
 	encode gzip
 	reverse_proxy agentpost:8080
