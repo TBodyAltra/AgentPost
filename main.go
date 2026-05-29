@@ -17,6 +17,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
+	"net"
 	"net/http"
 	"net/mail"
 	"os"
@@ -39,6 +40,8 @@ const (
 	defaultSMTPAddr        = ":2525"
 	defaultTTLSeconds      = 3600
 	maxTTLSeconds          = 86400
+	registerRatePerMinute  = 10
+	registerLimiterTTL     = 10 * time.Minute
 	authTimestampTolerance = 5 * time.Minute
 	defaultMaxMessageBytes = 1 << 20
 	maxProfileFieldLen     = 512
@@ -65,6 +68,13 @@ type App struct {
 	users    map[string]*User
 	messages map[string][]Message
 	limiters map[string]*rate.Limiter
+
+	registerLimiters map[string]*registerLimiterState
+}
+
+type registerLimiterState struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
 }
 
 type AgentProfile struct {
@@ -293,11 +303,12 @@ func NewApp(cfg Config) *App {
 		cfg.MaxMessageBytes = defaultMaxMessageBytes
 	}
 	return &App{
-		cfg:      cfg,
-		now:      time.Now,
-		users:    make(map[string]*User),
-		messages: make(map[string][]Message),
-		limiters: make(map[string]*rate.Limiter),
+		cfg:              cfg,
+		now:              time.Now,
+		users:            make(map[string]*User),
+		messages:         make(map[string][]Message),
+		limiters:         make(map[string]*rate.Limiter),
+		registerLimiters: make(map[string]*registerLimiterState),
 	}
 }
 
@@ -365,6 +376,10 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	if !hasJSONContentType(r) {
 		writeJSON(w, http.StatusUnsupportedMediaType, errorResponse{Error: "Content-Type must be application/json"})
+		return
+	}
+	if !a.allowRegister(r) {
+		writeJSON(w, http.StatusTooManyRequests, errorResponse{Error: "register rate limit exceeded"})
 		return
 	}
 
@@ -749,12 +764,62 @@ func (a *App) cleanupExpired() {
 			a.deleteUserLocked(mailbox)
 		}
 	}
+	for key, limiter := range a.registerLimiters {
+		if now.Sub(limiter.lastSeen) > registerLimiterTTL {
+			delete(a.registerLimiters, key)
+		}
+	}
 }
 
 func (a *App) deleteUserLocked(mailbox string) {
 	delete(a.users, mailbox)
 	delete(a.messages, mailbox)
 	delete(a.limiters, mailbox)
+}
+
+func (a *App) allowRegister(r *http.Request) bool {
+	client := clientIP(r)
+	if client == "" {
+		client = "unknown"
+	}
+	now := a.now()
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	limiter := a.registerLimiters[client]
+	if limiter == nil {
+		limiter = &registerLimiterState{
+			limiter: rate.NewLimiter(rate.Every(time.Minute/registerRatePerMinute), registerRatePerMinute),
+		}
+		a.registerLimiters[client] = limiter
+	}
+	limiter.lastSeen = now
+	return limiter.limiter.Allow()
+}
+
+func clientIP(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	for _, value := range []string{r.Header.Get("X-Forwarded-For"), r.Header.Get("X-Real-IP")} {
+		for _, part := range strings.Split(value, ",") {
+			ip := net.ParseIP(strings.TrimSpace(part))
+			if ip != nil {
+				return ip.String()
+			}
+		}
+	}
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err == nil {
+		if ip := net.ParseIP(host); ip != nil {
+			return ip.String()
+		}
+		return host
+	}
+	if ip := net.ParseIP(strings.TrimSpace(r.RemoteAddr)); ip != nil {
+		return ip.String()
+	}
+	return strings.TrimSpace(r.RemoteAddr)
 }
 
 func normalizeAgentProfile(profile AgentProfile) (AgentProfile, error) {
