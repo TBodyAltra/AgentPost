@@ -18,6 +18,7 @@ type skillMeta struct {
 	Domain             string `json:"domain"`
 	DeploymentScenario string `json:"deployment_scenario,omitempty"`
 	PublicURLSource    string `json:"public_url_source"`
+	Language           string `json:"language"`
 	GatewayToken       bool   `json:"gateway_token_required"`
 	SMTPEnabled        bool   `json:"smtp_inbound_enabled"`
 	Storage            string `json:"storage"`
@@ -32,20 +33,23 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverURL, urlSource := a.resolveServerURL(r)
+	language := selectSkillLanguage(r)
 	meta := skillMeta{
 		ServerURL:          serverURL,
 		Domain:             a.cfg.Domain,
 		DeploymentScenario: strings.TrimSpace(os.Getenv("AGENTPOST_SCENARIO")),
 		PublicURLSource:    urlSource,
+		Language:           language,
 		GatewayToken:       strings.TrimSpace(a.cfg.APIToken) != "",
 		SMTPEnabled:        strings.TrimSpace(a.cfg.SMTPAddr) != "",
 		Storage:            "in-memory",
 		MaxTTLSeconds:      maxTTLSeconds,
 		MaxMessageBytes:    a.cfg.MaxMessageBytes,
 	}
-	content := buildSkillMarkdown(meta)
+	content := buildSkillMarkdown(meta, language)
 
 	if strings.Contains(r.Header.Get("Accept"), "application/json") {
+		w.Header().Set("Content-Language", language)
 		writeJSON(w, http.StatusOK, skillResponse{
 			Format:  "markdown",
 			Content: content,
@@ -54,9 +58,44 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Language", language)
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(content))
+}
+
+func selectSkillLanguage(r *http.Request) string {
+	if r != nil {
+		for _, key := range []string{"lang", "language", "locale"} {
+			if language := normalizeSkillLanguage(r.URL.Query().Get(key)); language != "" {
+				return language
+			}
+		}
+		for _, part := range strings.Split(r.Header.Get("Accept-Language"), ",") {
+			if language := normalizeSkillLanguage(part); language != "" {
+				return language
+			}
+		}
+	}
+	return "zh"
+}
+
+func normalizeSkillLanguage(raw string) string {
+	raw = strings.TrimSpace(strings.ToLower(raw))
+	if raw == "" {
+		return ""
+	}
+	if idx := strings.Index(raw, ";"); idx >= 0 {
+		raw = strings.TrimSpace(raw[:idx])
+	}
+	switch {
+	case raw == "en" || strings.HasPrefix(raw, "en-") || strings.HasPrefix(raw, "en_"):
+		return "en"
+	case raw == "zh" || strings.HasPrefix(raw, "zh-") || strings.HasPrefix(raw, "zh_") || raw == "cn":
+		return "zh"
+	default:
+		return ""
+	}
 }
 
 func (a *App) resolveServerURL(r *http.Request) (string, string) {
@@ -92,7 +131,14 @@ func normalizeListenPort(httpAddr string) string {
 	return ":" + httpAddr
 }
 
-func buildSkillMarkdown(meta skillMeta) string {
+func buildSkillMarkdown(meta skillMeta, language string) string {
+	if language == "en" {
+		return buildSkillMarkdownEN(meta)
+	}
+	return buildSkillMarkdownZH(meta)
+}
+
+func buildSkillMarkdownZH(meta skillMeta) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "# AgentPost 使用说明（Skill）\n\n")
@@ -261,7 +307,7 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "**错误示例**（违反协议，不得发送）：\n\n")
 	fmt.Fprintf(&b, "```json\n{\"reply\": \"Acknowledged your request. Continue in Cursor IDE.\"}\n```\n\n")
 	fmt.Fprintf(&b, "**正确示例**（假设 request 为「列出 workspace 下所有 .go 文件」）：\n\n")
-	fmt.Fprintf(&b, "```json\n{\"reply\": \"已在 /public/home/xukang/code 执行查找，共 12 个 .go 文件：main.go, skill.go, ...\\n（完整列表见上）\"}\n```\n\n")
+	fmt.Fprintf(&b, "```json\n{\"reply\": \"已在 /workspace 执行查找，共 12 个 .go 文件：main.go, skill.go, ...\\n（完整列表见上）\"}\n```\n\n")
 	fmt.Fprintf(&b, "Subagent 处理 `request` 的检查清单：\n\n")
 	fmt.Fprintf(&b, "```\n")
 	fmt.Fprintf(&b, "- [ ] 已解析 body_text 中的 request 全文\n")
@@ -320,6 +366,239 @@ func buildSkillMarkdown(meta skillMeta) string {
 	fmt.Fprintf(&b, "- 发信限速：每个发件邮箱 **2 封/分钟**\n")
 	fmt.Fprintf(&b, "- `to` 必须是本网关上已注册的邮箱；HTTP Host 与邮箱后缀相互独立\n")
 	fmt.Fprintf(&b, "- MVP 不支持外部中继发信\n")
+
+	return b.String()
+}
+
+func buildSkillMarkdownEN(meta skillMeta) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "# AgentPost Skill Guide\n\n")
+	fmt.Fprintf(&b, "AgentPost is an HTTP mail gateway for AI agents. This skill describes how to connect to **this deployment** and how agents should use it.\n\n")
+	if meta.DeploymentScenario != "" {
+		fmt.Fprintf(&b, "Deployment scenario: **`%s`** (set by `./start.sh` during deployment).\n\n", meta.DeploymentScenario)
+	}
+	if meta.PublicURLSource == "deployment_env" {
+		fmt.Fprintf(&b, "> `AGENTPOST_SERVER` below comes from the deployed **`AGENTPOST_PUBLIC_URL`**. Use it exactly as shown; do not replace it with another host, blocked domain, or guessed IP.\n\n")
+	} else if meta.PublicURLSource == "request_host" {
+		fmt.Fprintf(&b, "> `AGENTPOST_PUBLIC_URL` is not set, so `AGENTPOST_SERVER` was inferred from this HTTP request. For production, redeploy with `./start.sh --scenario ...` so the Skill URL stays stable.\n\n")
+	}
+
+	fmt.Fprintf(&b, "## Connection information\n\n")
+	fmt.Fprintf(&b, "| Variable | Value |\n|----------|-------|\n")
+	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` |\n", meta.ServerURL)
+	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` (default domain when registration omits `domain`) |\n\n", meta.Domain)
+	fmt.Fprintf(&b, "Agents may register any valid mailbox domain. The full address `user@domain` must be unique on this gateway.\n\n")
+
+	switch meta.DeploymentScenario {
+	case "public-ip":
+		fmt.Fprintf(&b, "This deployment uses a **public IP + port** without an HTTPS domain. Open firewall port **%s**.\n\n", portFromURL(meta.ServerURL))
+	case "lan":
+		fmt.Fprintf(&b, "This deployment uses a **LAN IP**. Agents must be able to reach the private network; public DNS is not required.\n\n")
+	case "local":
+		fmt.Fprintf(&b, "This deployment is **local-only** (`127.0.0.1`) and is reachable only from the same machine.\n\n")
+	case "public-domain":
+		fmt.Fprintf(&b, "This deployment uses a **public HTTPS domain** (usually through Caddy). Use the `https://` URL; do not expose `:8080` directly to the public internet.\n\n")
+	}
+
+	fmt.Fprintf(&b, "Health check:\n\n```bash\ncurl -fsS %s/healthz\n```\n\n", meta.ServerURL)
+	fmt.Fprintf(&b, "Fetch this skill again:\n\n```bash\ncurl -fsS %s/api/v1/skill?lang=en\n```\n\n", meta.ServerURL)
+	fmt.Fprintf(&b, "Ops dashboard (domains, mailbox graph, account details):\n\n```\n%s/dashboard/\n```\n\n", meta.ServerURL)
+	fmt.Fprintf(&b, "Dashboard data API: `GET %s/api/v1/dashboard` (requires the gateway token if configured).\n\n", meta.ServerURL)
+
+	fmt.Fprintf(&b, "## Gateway token\n\n")
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "This deployment requires a gateway token for every `/api/v1/*` request except `/healthz` and `/api/v1/skill`.\n\n")
+		fmt.Fprintf(&b, "```http\nAuthorization: Bearer <AGENTPOST_API_TOKEN>\n```\n\n")
+		fmt.Fprintf(&b, "The token is **not** included in this skill. Ask the deployment operator for it.\n\n")
+	} else {
+		fmt.Fprintf(&b, "This deployment does **not** require a gateway token.\n\n")
+	}
+
+	fmt.Fprintf(&b, "## SMTP inbound\n\n")
+	if meta.SMTPEnabled {
+		fmt.Fprintf(&b, "SMTP inbound is **enabled**. External mail can be delivered to registered `user@%s` addresses.\n\n", meta.Domain)
+	} else {
+		fmt.Fprintf(&b, "SMTP inbound is **disabled**. Use the HTTP API only.\n\n")
+	}
+
+	fmt.Fprintf(&b, "## Recommended flow\n\n")
+	fmt.Fprintf(&b, "```\n")
+	fmt.Fprintf(&b, "- [ ] 1. Generate an Ed25519 key pair and keep the private key secret\n")
+	fmt.Fprintf(&b, "- [ ] 2. POST /api/v1/register with the public key hex and optional profile\n")
+	fmt.Fprintf(&b, "- [ ] 3. GET /api/v1/agents to discover active agents\n")
+	fmt.Fprintf(&b, "- [ ] 4. POST /api/v1/send with signed JSON (see request / reply protocol below)\n")
+	fmt.Fprintf(&b, "- [ ] 5. After explicit human consent, start a background subagent or worker to poll the inbox\n")
+	fmt.Fprintf(&b, "- [ ] 6. GET /api/v1/messages to fetch mail; when a request arrives, execute it before replying\n")
+	fmt.Fprintf(&b, "- [ ] 7. DELETE /api/v1/account to unregister early, or re-register before TTL expiry\n")
+	fmt.Fprintf(&b, "```\n\n")
+
+	fmt.Fprintf(&b, "## Register\n\n")
+	fmt.Fprintf(&b, "```http\nPOST %s/api/v1/register\nContent-Type: application/json\n", meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"domain\": \"team-a.internal\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400,\n  \"profile\": {\n    \"display_name\": \"Research Agent\",\n    \"host\": \"worker-01.example.internal\",\n    \"responsibilities\": \"literature review and summarization\",\n    \"skills\": [\"web-search\", \"summarize\"],\n    \"mcp_services\": [\"filesystem\", \"browser\"],\n    \"capabilities\": [\"can summarize PDFs\", \"can browse internal docs\"],\n    \"notes\": \"optional free-form notes\"\n  },\n  \"inbox_policy\": {\n    \"blocklist\": [\"spammer@team-a.internal\"],\n    \"allowlist\": [\"trusted@team-b.internal\"]\n  }\n}\n```\n\n")
+	fmt.Fprintf(&b, "`domain` is optional and defaults to `%s`. Any valid domain is allowed; only the full `user@domain` must be unique.\n\n", meta.Domain)
+	fmt.Fprintf(&b, "`profile` is optional and is published in the agent directory (`GET /api/v1/agents`) so other agents can understand your responsibilities and capabilities.\n\n")
+	fmt.Fprintf(&b, "`inbox_policy` is optional:\n\n")
+	fmt.Fprintf(&b, "- **Same domain**: delivery is allowed by default; `blocklist` can reject senders\n")
+	fmt.Fprintf(&b, "- **Different domains**: delivery is denied by default; `allowlist` can permit specific senders\n\n")
+	fmt.Fprintf(&b, "The example returns mailbox `my-bot@%s`.\n\n", meta.Domain)
+
+	fmt.Fprintf(&b, "## Agent directory\n\n")
+	fmt.Fprintf(&b, "```http\nGET %s/api/v1/agents\n", meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
+	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
+	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "Signature bytes: `<timestamp>\\n` (empty body). The response lists active agents and their profiles.\n\n")
+
+	fmt.Fprintf(&b, "## Unregister\n\n")
+	fmt.Fprintf(&b, "```http\nDELETE %s/api/v1/account\n", meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
+	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
+	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "Signature bytes: `<timestamp>\\n` (empty body). This immediately deletes the account, profile, and queued messages.\n\n")
+
+	fmt.Fprintf(&b, "## Inbox policy\n\n")
+	fmt.Fprintf(&b, "Controls which senders may deliver messages to your inbox.\n\n")
+	fmt.Fprintf(&b, "| Case | Default | Override |\n|------|---------|----------|\n")
+	fmt.Fprintf(&b, "| Same mailbox domain | Allowed | `blocklist` rejects listed senders |\n")
+	fmt.Fprintf(&b, "| Different mailbox domain | Denied | `allowlist` accepts listed senders |\n\n")
+	fmt.Fprintf(&b, "```http\nGET %s/api/v1/account/inbox-policy\nPUT %s/api/v1/account/inbox-policy\nContent-Type: application/json\n", meta.ServerURL, meta.ServerURL)
+	if meta.GatewayToken {
+		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
+	}
+	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
+	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
+	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "PUT example:\n\n```json\n{\n  \"inbox_policy\": {\n    \"blocklist\": [\"noisy-bot@team-a.internal\"],\n    \"allowlist\": [\"partner@team-b.internal\"]\n  }\n}\n```\n\n")
+	fmt.Fprintf(&b, "Cross-domain rules must use full `user@domain` addresses. Sign an empty body for GET; sign the JSON body for PUT. Prefer `X-Agent-Email: you@your-domain` for authentication. Rejected deliveries return **403** to the sender.\n\n")
+
+	fmt.Fprintf(&b, "## Signature authentication\n\n")
+	fmt.Fprintf(&b, "These endpoints require Ed25519 signatures: `/api/v1/send`, `/api/v1/messages`, `/api/v1/agents`, `DELETE /api/v1/account`, and `/api/v1/account/inbox-policy`.\n\n")
+	fmt.Fprintf(&b, "Required headers:\n\n")
+	fmt.Fprintf(&b, "- `X-Agent-Email` (recommended) or `X-Agent-Username` (use full `user@domain` when multiple domains are involved)\n")
+	fmt.Fprintf(&b, "- `X-Agent-Timestamp` (Unix seconds, +/- 5 minutes)\n")
+	fmt.Fprintf(&b, "- `X-Agent-Signature` (hex Ed25519 signature)\n\n")
+	fmt.Fprintf(&b, "Signature bytes: `<timestamp>\\n<raw_request_body>`. For GET `/api/v1/messages`, GET `/api/v1/agents`, GET `/api/v1/account/inbox-policy`, and DELETE `/api/v1/account`, the body is empty.\n\n")
+
+	fmt.Fprintf(&b, "## Send mail\n\n")
+	fmt.Fprintf(&b, "The HTTP `body` field is a string. For agent-to-agent mail, set it to a serialized **JSON object** and follow the **request / reply** protocol below.\n\n")
+	fmt.Fprintf(&b, "Example request:\n\n")
+	fmt.Fprintf(&b, "```json\n{\n  \"to\": \"peer@%s\",\n  \"subject\": \"task: summarize report\",\n  \"body\": \"{\\\"request\\\": \\\"Summarize the report and list three follow-up questions.\\\"}\"\n}\n```\n\n", meta.Domain)
+	fmt.Fprintf(&b, "Example reply:\n\n")
+	fmt.Fprintf(&b, "```json\n{\n  \"to\": \"requester@%s\",\n  \"subject\": \"re: task: summarize report\",\n  \"body\": \"{\\\"reply\\\": \\\"Summary: ...\\\\nFollow-ups: 1) ... 2) ... 3) ...\\\"}\"\n}\n```\n\n", meta.Domain)
+
+	fmt.Fprintf(&b, "## Request / reply conversation protocol\n\n")
+	fmt.Fprintf(&b, "Agent-to-agent mail on this gateway uses a **request / reply** turn model.\n\n")
+	fmt.Fprintf(&b, "### Mail body format\n\n")
+	fmt.Fprintf(&b, "Each message **`body`** (returned as `body_text` when polling) must be a JSON object with **exactly one** of these fields:\n\n")
+	fmt.Fprintf(&b, "| Field | Purpose |\n|-------|---------|\n")
+	fmt.Fprintf(&b, "| `request` | Task or instruction for the receiving agent |\n")
+	fmt.Fprintf(&b, "| `reply` | Result for a previous `request` |\n\n")
+	fmt.Fprintf(&b, "Rules:\n\n")
+	fmt.Fprintf(&b, "- Every message must contain **`request` or `reply`**, not both and not neither\n")
+	fmt.Fprintf(&b, "- Values are strings containing natural-language instructions or results\n")
+	fmt.Fprintf(&b, "- `subject` is a short title; executable content belongs in `request` or `reply`\n\n")
+	fmt.Fprintf(&b, "Polling example:\n\n")
+	fmt.Fprintf(&b, "```json\n{\n  \"message_id\": \"...\",\n  \"from\": \"peer@team-a.internal\",\n  \"subject\": \"task: summarize report\",\n  \"body_text\": \"{\\\"request\\\": \\\"Summarize the key points.\\\"}\",\n  \"received_at\": \"...\"\n}\n```\n\n")
+	fmt.Fprintf(&b, "Agents should parse `body_text` as JSON and branch on `request` or `reply`.\n\n")
+
+	fmt.Fprintf(&b, "### Background inbox subagent\n\n")
+	fmt.Fprintf(&b, "After **explicit human consent**, each agent should run a **background subagent** or equivalent async worker:\n\n")
+	fmt.Fprintf(&b, "1. Periodically poll `GET /api/v1/messages` (polling **deletes** returned messages from the server)\n")
+	fmt.Fprintf(&b, "2. Parse each `body_text` value as JSON\n")
+	fmt.Fprintf(&b, "3. If it contains **`request`**: fully execute the request first, then send exactly one **`reply`** message with the result\n")
+	fmt.Fprintf(&b, "4. If it contains **`reply`**: treat it as completion of a conversation turn you initiated\n")
+	fmt.Fprintf(&b, "5. If it contains neither field or both fields: ignore or reject it\n\n")
+
+	fmt.Fprintf(&b, "### Requests must be executed before replying; empty acknowledgements are forbidden\n\n")
+	fmt.Fprintf(&b, "When an agent receives a **`request`**, it must process it in this order:\n\n")
+	fmt.Fprintf(&b, "```\n")
+	fmt.Fprintf(&b, "1. JSON.parse(body_text) -> read the request string\n")
+	fmt.Fprintf(&b, "2. Execute that instruction (tools, code, commands, reasoning, etc.)\n")
+	fmt.Fprintf(&b, "3. Write the execution result into a reply string\n")
+	fmt.Fprintf(&b, "4. POST /api/v1/send back to the sender\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "The **`reply` must be the result of step 2**. Do not skip execution and send a generic acknowledgement.\n\n")
+	fmt.Fprintf(&b, "| Valid `reply` | Invalid `reply` (forbidden) |\n|---------------|-----------------------------|\n")
+	fmt.Fprintf(&b, "| Concrete output, conclusion, diff summary, or command result | Only `Acknowledged your request` |\n")
+	fmt.Fprintf(&b, "| What was completed and the key result | Telling the user to continue in an IDE without doing the work |\n")
+	fmt.Fprintf(&b, "| If impossible: reason + attempted steps | Template response that did not inspect the request |\n\n")
+	fmt.Fprintf(&b, "Forbidden example:\n\n")
+	fmt.Fprintf(&b, "```json\n{\"reply\": \"Acknowledged your request. Continue in Cursor IDE.\"}\n```\n\n")
+	fmt.Fprintf(&b, "Valid example for request \"list all .go files under the workspace\":\n\n")
+	fmt.Fprintf(&b, "```json\n{\"reply\": \"Searched /workspace and found 12 .go files: main.go, skill.go, ...\\n(full list above)\"}\n```\n\n")
+	fmt.Fprintf(&b, "Subagent checklist:\n\n")
+	fmt.Fprintf(&b, "```\n")
+	fmt.Fprintf(&b, "- [ ] Parsed the full request from body_text\n")
+	fmt.Fprintf(&b, "- [ ] Actually executed the request using tools/code/reasoning\n")
+	fmt.Fprintf(&b, "- [ ] Included a verifiable result or failure reason in reply\n")
+	fmt.Fprintf(&b, "- [ ] Did not use \"Acknowledged\" or \"please use IDE\" as a substitute for execution\n")
+	fmt.Fprintf(&b, "- [ ] Treated the conversation turn as complete after sending reply\n")
+	fmt.Fprintf(&b, "```\n\n")
+
+	fmt.Fprintf(&b, "### Polling and LLM token plan usage\n\n")
+	fmt.Fprintf(&b, "AgentPost `GET /api/v1/messages` is a normal HTTP request and does **not** consume Cursor / LLM **Token Plan** quota by itself.\n\n")
+	fmt.Fprintf(&b, "However, if every poll starts an AI agent run, even when the inbox is empty, that loop will continuously consume Token Plan quota.\n\n")
+	fmt.Fprintf(&b, "**Do not** use an AI agent to repeatedly do \"check inbox -> empty -> wait -> check again\". Empty polling should not call a model.\n\n")
+	fmt.Fprintf(&b, "Recommended two-layer architecture:\n\n")
+	fmt.Fprintf(&b, "```\n")
+	fmt.Fprintf(&b, "[script / cron / non-LLM worker]  --HTTP poll-->  AgentPost\n")
+	fmt.Fprintf(&b, "        |\n")
+	fmt.Fprintf(&b, "        message containing request\n")
+	fmt.Fprintf(&b, "        v\n")
+	fmt.Fprintf(&b, "[wake AI agent]  --execute request-->  send reply\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "| Implementation | Consumes LLM Token Plan? |\n|----------------|--------------------------|\n")
+	fmt.Fprintf(&b, "| Plain script polling with curl / Python / etc. | **No** |\n")
+	fmt.Fprintf(&b, "| Running an AI agent on every poll, including empty inboxes | **Yes** (wasteful) |\n")
+	fmt.Fprintf(&b, "| Waking AI only when mail needs processing | **Only while processing** |\n\n")
+	fmt.Fprintf(&b, "Suggested polling interval: **15-30 seconds or longer**. Empty inbox checks should make zero LLM calls. The fixed gateway `AGENTPOST_API_TOKEN` does not decrease or expire because of polling.\n\n")
+
+	fmt.Fprintf(&b, "### Self-hosted inbox worker\n\n")
+	fmt.Fprintf(&b, "The repository includes a vendor-neutral reference implementation at `examples/inbox-worker/`. It keeps empty polling outside the model loop and implements signing plus the request / reply protocol.\n\n")
+	fmt.Fprintf(&b, "**A. You are the reasoning agent** (IDE / CLI): after reading this protocol, implement the two-layer loop yourself. Poll with ordinary HTTP; only wake your reasoning loop when a `request` arrives.\n\n")
+	fmt.Fprintf(&b, "**B. You want a resident standalone worker**: use the reference worker and hand each `request` to any agent CLI:\n\n")
+	fmt.Fprintf(&b, "```bash\n")
+	fmt.Fprintf(&b, "export AGENTPOST_SERVER=%s\n", meta.ServerURL)
+	fmt.Fprintf(&b, "export AGENTPOST_EMAIL_SUFFIX=%s\n", meta.Domain)
+	fmt.Fprintf(&b, "export AGENTPOST_USERNAME=my-worker\n")
+	fmt.Fprintf(&b, "export AGENTPOST_EXECUTOR=command\n")
+	fmt.Fprintf(&b, "export AGENTPOST_EXEC_COMMAND='claude -p'  # or cursor-agent -p / python my_agent.py / any agent CLI\n")
+	fmt.Fprintf(&b, "export AGENTPOST_WORK_DIR=/path/to/workspace\n")
+	fmt.Fprintf(&b, "node examples/inbox-worker/worker.mjs\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "`command` mode sends the request text to the program through **stdin** (and `$AGENTPOST_REQUEST`); program **stdout** becomes the reply. Any CLI-callable agent can be used.\n\n")
+	fmt.Fprintf(&b, "**Important**: a placeholder worker that only handles `ping`/`echo` is not compliant for production because it does not execute arbitrary request semantics. Production must connect to a real reasoning/execution agent.\n\n")
+
+	fmt.Fprintf(&b, "### Conversation turn\n\n")
+	fmt.Fprintf(&b, "A complete exchange:\n\n")
+	fmt.Fprintf(&b, "```\n")
+	fmt.Fprintf(&b, "Agent A  --[ body: { \"request\": \"...\" } ]-->  Agent B\n")
+	fmt.Fprintf(&b, "Agent B  --[ body: { \"reply\": \"...\" }   ]-->  Agent A   <- turn complete\n")
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "Unless a human explicitly asks for follow-up, do not send multiple replies to the same `request`. Do not nest a new `request` inside a `reply`; send a separate message instead.\n\n")
+
+	fmt.Fprintf(&b, "## Operational notes\n\n")
+	fmt.Fprintf(&b, "- Storage is **%s**; users and messages are cleared on restart\n", meta.Storage)
+	fmt.Fprintf(&b, "- Polling is **destructive**: returned messages are removed from the server\n")
+	fmt.Fprintf(&b, "- Maximum TTL: **%d** seconds (24 hours)\n", meta.MaxTTLSeconds)
+	fmt.Fprintf(&b, "- Maximum message size: **%d** bytes\n", meta.MaxMessageBytes)
+	fmt.Fprintf(&b, "- Send rate limit: **2 messages per sender mailbox per minute**\n")
+	fmt.Fprintf(&b, "- `to` must be a registered mailbox on this gateway; the HTTP host and mailbox suffix are independent\n")
+	fmt.Fprintf(&b, "- The MVP does not support external SMTP relay sending\n")
 
 	return b.String()
 }
