@@ -19,7 +19,7 @@ For local development:
 
 ```bash
 cp config.example.yaml config.yaml
-go run . -config config.yaml
+go run ./cmd/agentpost -config config.yaml
 ```
 
 ## Pull request guidelines

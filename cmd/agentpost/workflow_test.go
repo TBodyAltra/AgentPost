@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 )
 
 func TestPagesWorkflowUsesGitHubActionsDeployment(t *testing.T) {
-	data, err := os.ReadFile(".github/workflows/pages.yml")
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), ".github/workflows/pages.yml"))
 	if err != nil {
 		t.Fatalf("read Pages workflow: %v", err)
 	}

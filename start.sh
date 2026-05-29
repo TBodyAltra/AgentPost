@@ -653,7 +653,7 @@ cmd_up_native() {
   print_api_token
   log "Starting with go run on :${HTTP_PORT} (scenario=$(scenario_label "$SCENARIO")) ..."
   log "Press Ctrl+C to stop."
-  go run . -config "$CONFIG_FILE"
+  go run ./cmd/agentpost -config "$CONFIG_FILE"
 }
 
 prepare_deployment() {

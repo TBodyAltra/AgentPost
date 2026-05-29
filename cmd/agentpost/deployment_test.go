@@ -95,7 +95,8 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 			configFile := filepath.Join(dir, "config.yaml")
 			caddyFile := filepath.Join(dir, "deploy", "Caddyfile")
 
-			cmd := exec.Command("bash", append([]string{"./start.sh"}, tt.args...)...)
+			root := repoRoot(t)
+			cmd := exec.Command("bash", append([]string{filepath.Join(root, "start.sh")}, tt.args...)...)
 			cmd.Env = []string{
 				"PATH=" + os.Getenv("PATH"),
 				"HOME=" + dir,
@@ -151,13 +152,14 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 }
 
 func TestDockerArtifactsMatchDeploymentContract(t *testing.T) {
-	dockerfileBytes, err := os.ReadFile("Dockerfile")
+	root := repoRoot(t)
+	dockerfileBytes, err := os.ReadFile(filepath.Join(root, "Dockerfile"))
 	if err != nil {
 		t.Fatalf("read Dockerfile: %v", err)
 	}
 	dockerfile := string(dockerfileBytes)
 	for _, want := range []string{
-		"go build -trimpath -ldflags=\"-s -w\" -o /out/agentpost .",
+		"go build -trimpath -ldflags=\"-s -w\" -o /out/agentpost ./cmd/agentpost",
 		"COPY --from=builder /out/agentpost /app/agentpost",
 		"ENTRYPOINT [\"/app/agentpost\"]",
 		"CMD [\"-config\", \"/app/config.yaml\"]",
@@ -167,7 +169,7 @@ func TestDockerArtifactsMatchDeploymentContract(t *testing.T) {
 		}
 	}
 
-	composeBytes, err := os.ReadFile("docker-compose.yml")
+	composeBytes, err := os.ReadFile(filepath.Join(root, "docker-compose.yml"))
 	if err != nil {
 		t.Fatalf("read docker-compose.yml: %v", err)
 	}
@@ -206,7 +208,7 @@ func TestDockerArtifactsMatchDeploymentContract(t *testing.T) {
 		t.Fatalf("healthcheck must target the in-container HTTP port, got %#v", service.Healthcheck.Test)
 	}
 
-	caddyBytes, err := os.ReadFile("deploy/Caddyfile")
+	caddyBytes, err := os.ReadFile(filepath.Join(root, "deploy/Caddyfile"))
 	if err != nil {
 		t.Fatalf("read deploy/Caddyfile: %v", err)
 	}
