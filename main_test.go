@@ -46,7 +46,7 @@ func TestRegisterSendAndPoll(t *testing.T) {
 		Subject: "hello",
 		Body:    "internal delivery works",
 	})
-	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1", privateKey)
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1@agent.test", privateKey)
 	sendReq.Header.Set("Content-Type", "application/json")
 	sendResp := httptest.NewRecorder()
 	handler.ServeHTTP(sendResp, sendReq)
@@ -54,7 +54,7 @@ func TestRegisterSendAndPoll(t *testing.T) {
 		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
 	}
 
-	pollReq := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, "bot_1", privateKey)
+	pollReq := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, "bot_1@agent.test", privateKey)
 	pollResp := httptest.NewRecorder()
 	handler.ServeHTTP(pollResp, pollReq)
 	if pollResp.Code != http.StatusOK {
@@ -130,7 +130,7 @@ func TestRegisterProfileDirectoryAndUnregister(t *testing.T) {
 		t.Fatalf("register B status = %d, body = %s", respB.Code, respB.Body.String())
 	}
 
-	listReq := signedRequest(t, http.MethodGet, "/api/v1/agents", nil, "bot_a", privA)
+	listReq := signedRequest(t, http.MethodGet, "/api/v1/agents", nil, "bot_a@agent.test", privA)
 	listResp := httptest.NewRecorder()
 	handler.ServeHTTP(listResp, listReq)
 	if listResp.Code != http.StatusOK {
@@ -167,7 +167,7 @@ func TestRegisterProfileDirectoryAndUnregister(t *testing.T) {
 		Subject: "queued",
 		Body:    "should be deleted on unregister",
 	})
-	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_b", privB)
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_b@agent.test", privB)
 	sendReq.Header.Set("Content-Type", "application/json")
 	sendResp := httptest.NewRecorder()
 	handler.ServeHTTP(sendResp, sendReq)
@@ -175,14 +175,14 @@ func TestRegisterProfileDirectoryAndUnregister(t *testing.T) {
 		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
 	}
 
-	delReq := signedRequest(t, http.MethodDelete, "/api/v1/account", nil, "bot_a", privA)
+	delReq := signedRequest(t, http.MethodDelete, "/api/v1/account", nil, "bot_a@agent.test", privA)
 	delResp := httptest.NewRecorder()
 	handler.ServeHTTP(delResp, delReq)
 	if delResp.Code != http.StatusOK {
 		t.Fatalf("unregister status = %d, body = %s", delResp.Code, delResp.Body.String())
 	}
 
-	listAfter := signedRequest(t, http.MethodGet, "/api/v1/agents", nil, "bot_b", privB)
+	listAfter := signedRequest(t, http.MethodGet, "/api/v1/agents", nil, "bot_b@agent.test", privB)
 	listAfterResp := httptest.NewRecorder()
 	handler.ServeHTTP(listAfterResp, listAfter)
 	if listAfterResp.Code != http.StatusOK {
@@ -195,7 +195,7 @@ func TestRegisterProfileDirectoryAndUnregister(t *testing.T) {
 		t.Fatalf("expected only bot_b after unregister, got %+v", directory.Agents)
 	}
 
-	sendAfter := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_b", privB)
+	sendAfter := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_b@agent.test", privB)
 	sendAfter.Header.Set("Content-Type", "application/json")
 	sendAfterResp := httptest.NewRecorder()
 	handler.ServeHTTP(sendAfterResp, sendAfter)
@@ -206,7 +206,8 @@ func TestRegisterProfileDirectoryAndUnregister(t *testing.T) {
 
 func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
 	app := NewApp(Config{
-		Domain:          "agent.test",
+		Domain:          "team-a.test",
+		AllowedDomains:  []string{"team-a.test", "team-b.test"},
 		HTTPAddr:        ":0",
 		SMTPAddr:        "",
 		MaxMessageBytes: defaultMaxMessageBytes,
@@ -216,11 +217,13 @@ func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
 	pubAllowed, privAllowed, _ := ed25519.GenerateKey(crand.Reader)
 	pubBlocked, privBlocked, _ := ed25519.GenerateKey(crand.Reader)
 	pubTarget, privTarget, _ := ed25519.GenerateKey(crand.Reader)
+	pubCross, privCross, _ := ed25519.GenerateKey(crand.Reader)
 
-	registerUser := func(username string, key ed25519.PublicKey, policy InboxPolicy) {
+	registerUser := func(username, domain string, key ed25519.PublicKey, policy InboxPolicy) {
 		t.Helper()
 		body := mustJSON(t, registerRequest{
 			Username:    username,
+			Domain:      domain,
 			PublicKey:   hex.EncodeToString(key),
 			TTLSeconds:  3600,
 			InboxPolicy: &policy,
@@ -230,41 +233,39 @@ func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
 		resp := httptest.NewRecorder()
 		handler.ServeHTTP(resp, req)
 		if resp.Code != http.StatusCreated {
-			t.Fatalf("register %s status = %d, body = %s", username, resp.Code, resp.Body.String())
+			t.Fatalf("register %s@%s status = %d, body = %s", username, domain, resp.Code, resp.Body.String())
 		}
 	}
 
-	registerUser("allowed", pubAllowed, InboxPolicy{Mode: inboxModeAcceptAll})
-	registerUser("blocked", pubBlocked, InboxPolicy{Mode: inboxModeAcceptAll})
-	registerUser("target", pubTarget, InboxPolicy{
-		Mode:      inboxModeAllowlist,
-		Addresses: []string{"allowed@agent.test"},
-	})
+	registerUser("allowed", "team-a.test", pubAllowed, InboxPolicy{})
+	registerUser("blocked", "team-a.test", pubBlocked, InboxPolicy{})
+	registerUser("target", "team-a.test", pubTarget, InboxPolicy{})
+	registerUser("partner", "team-b.test", pubCross, InboxPolicy{})
 
-	send := func(fromUser string, priv ed25519.PrivateKey, to string) int {
+	send := func(fromEmail string, priv ed25519.PrivateKey, to string) int {
 		t.Helper()
 		body := mustJSON(t, sendRequest{To: to, Subject: "test", Body: "hi"})
-		req := signedRequest(t, http.MethodPost, "/api/v1/send", body, fromUser, priv)
+		req := signedRequest(t, http.MethodPost, "/api/v1/send", body, fromEmail, priv)
 		req.Header.Set("Content-Type", "application/json")
 		resp := httptest.NewRecorder()
 		handler.ServeHTTP(resp, req)
 		return resp.Code
 	}
 
-	if code := send("allowed", privAllowed, "target@agent.test"); code != http.StatusOK {
-		t.Fatalf("allowed sender status = %d, want 200", code)
+	if code := send("allowed@team-a.test", privAllowed, "target@team-a.test"); code != http.StatusOK {
+		t.Fatalf("same-domain allowed sender status = %d, want 200", code)
 	}
-	if code := send("blocked", privBlocked, "target@agent.test"); code != http.StatusForbidden {
-		t.Fatalf("blocked sender status = %d, want 403", code)
+	if code := send("partner@team-b.test", privCross, "target@team-a.test"); code != http.StatusForbidden {
+		t.Fatalf("cross-domain without allowlist status = %d, want 403", code)
 	}
 
 	policyBody := mustJSON(t, inboxPolicyResponse{
 		InboxPolicy: InboxPolicy{
-			Mode:      inboxModeBlocklist,
-			Addresses: []string{"blocked"},
+			Blocklist: []string{"blocked@team-a.test"},
+			Allowlist: []string{"partner@team-b.test"},
 		},
 	})
-	putReq := signedRequest(t, http.MethodPut, "/api/v1/account/inbox-policy", policyBody, "target", privTarget)
+	putReq := signedRequest(t, http.MethodPut, "/api/v1/account/inbox-policy", policyBody, "target@team-a.test", privTarget)
 	putReq.Header.Set("Content-Type", "application/json")
 	putResp := httptest.NewRecorder()
 	handler.ServeHTTP(putResp, putReq)
@@ -272,14 +273,14 @@ func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
 		t.Fatalf("update inbox policy status = %d, body = %s", putResp.Code, putResp.Body.String())
 	}
 
-	if code := send("allowed", privAllowed, "target@agent.test"); code != http.StatusOK {
-		t.Fatalf("allowed sender after blocklist update status = %d, want 200", code)
+	if code := send("blocked@team-a.test", privBlocked, "target@team-a.test"); code != http.StatusForbidden {
+		t.Fatalf("blocklisted same-domain sender status = %d, want 403", code)
 	}
-	if code := send("blocked", privBlocked, "target@agent.test"); code != http.StatusForbidden {
-		t.Fatalf("blocklisted sender status = %d, want 403", code)
+	if code := send("partner@team-b.test", privCross, "target@team-a.test"); code != http.StatusOK {
+		t.Fatalf("allowlisted cross-domain sender status = %d, want 200", code)
 	}
 
-	getReq := signedRequest(t, http.MethodGet, "/api/v1/account/inbox-policy", nil, "target", privTarget)
+	getReq := signedRequest(t, http.MethodGet, "/api/v1/account/inbox-policy", nil, "target@team-a.test", privTarget)
 	getResp := httptest.NewRecorder()
 	handler.ServeHTTP(getResp, getReq)
 	if getResp.Code != http.StatusOK {
@@ -289,7 +290,7 @@ func TestInboxPolicyAllowlistAndBlocklist(t *testing.T) {
 	if err := json.NewDecoder(getResp.Body).Decode(&got); err != nil {
 		t.Fatalf("decode inbox policy: %v", err)
 	}
-	if got.InboxPolicy.Mode != inboxModeBlocklist || len(got.InboxPolicy.Addresses) != 1 {
+	if len(got.InboxPolicy.Blocklist) != 1 || len(got.InboxPolicy.Allowlist) != 1 {
 		t.Fatalf("unexpected inbox policy: %+v", got.InboxPolicy)
 	}
 }
@@ -459,7 +460,7 @@ func TestSendRejectsBadSignature(t *testing.T) {
 		Subject: "hello",
 		Body:    "this should not deliver",
 	})
-	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1", wrongPrivateKey)
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "bot_1@agent.test", wrongPrivateKey)
 	sendReq.Header.Set("Content-Type", "application/json")
 	sendResp := httptest.NewRecorder()
 	handler.ServeHTTP(sendResp, sendReq)
@@ -494,7 +495,7 @@ func mustJSON(t *testing.T, value any) []byte {
 	return body
 }
 
-func signedRequest(t *testing.T, method, target string, body []byte, username string, privateKey ed25519.PrivateKey) *http.Request {
+func signedRequest(t *testing.T, method, target string, body []byte, identity string, privateKey ed25519.PrivateKey) *http.Request {
 	t.Helper()
 	var reader *bytes.Reader
 	if body == nil {
@@ -505,7 +506,11 @@ func signedRequest(t *testing.T, method, target string, body []byte, username st
 	req := httptest.NewRequest(method, target, reader)
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	signature := ed25519.Sign(privateKey, signaturePayload(timestamp, body))
-	req.Header.Set("X-Agent-Username", username)
+	if strings.Contains(identity, "@") {
+		req.Header.Set("X-Agent-Email", identity)
+	} else {
+		req.Header.Set("X-Agent-Username", identity)
+	}
 	req.Header.Set("X-Agent-Timestamp", timestamp)
 	req.Header.Set("X-Agent-Signature", hex.EncodeToString(signature))
 	return req

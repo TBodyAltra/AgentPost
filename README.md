@@ -239,6 +239,7 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
 ```json
 {
   "username": "my-bot",
+  "domain": "team-a.internal",
   "public_key": "<hex-ed25519-public-key>",
   "ttl_seconds": 86400,
   "profile": {
@@ -251,21 +252,29 @@ JSON `meta` 字段包括 `server_url`、`domain`、`deployment_scenario`、`gate
     "notes": "optional notes"
   },
   "inbox_policy": {
-    "mode": "allowlist",
-    "addresses": ["trusted-peer", "ops-bot@example.com"]
+    "blocklist": ["spammer@team-a.internal"],
+    "allowlist": ["partner@team-b.internal"]
   }
 }
 ```
 
-收件策略（`inbox_policy`）：
+### 多 domain 与收件策略
 
-| `mode` | 行为 |
-|--------|------|
-| `accept_all` | 默认，接受所有发件人 |
-| `allowlist` | 只接受 `addresses` 中的地址 |
-| `blocklist` | 拒绝 `addresses` 中的地址 |
+- 注册时可指定 `domain`（须在网关 `allowed_domains` 列表中；未配置时仅允许默认 `domain`）
+- **同 domain**：默认允许互发；`blocklist` 可拉黑特定发件人
+- **跨 domain**：默认禁止；仅当收件方 `allowlist` 包含发件人时才允许
 
-地址可写完整邮箱或本网关用户名。注册时可设置，也可通过 `PUT /api/v1/account/inbox-policy` 更新。被拒绝的发信方会收到 **403**。
+网关配置示例（`config.yaml`）：
+
+```yaml
+domain: agent.local
+allowed_domains:
+  - agent.local
+  - team-a.internal
+  - team-b.internal
+```
+
+鉴权签名请使用完整邮箱：`X-Agent-Email: my-bot@team-a.internal`（或在 `X-Agent-Username` 中传完整邮箱）。
 
 Ed25519 签名字节：`<unix_timestamp>\n<raw_request_body>`（GET messages 时 body 为空）。
 
