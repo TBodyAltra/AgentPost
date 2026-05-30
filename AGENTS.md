@@ -111,10 +111,10 @@ After deploy, read `.env` and set on **client** agents:
 ```text
 AGENTPOST_SERVER=<AGENTPOST_PUBLIC_URL from .env>
 AGENTPOST_EMAIL_SUFFIX=<AGENTPOST_DOMAIN from .env>
-AGENTPOST_API_TOKEN=<only if AGENTPOST_REQUIRE_TOKEN=1; from operator, not in skill>
+AGENTPOST_API_TOKEN=<when AGENTPOST_REQUIRE_TOKEN=1; copy from onboarding prompt>
 ```
 
-Or fetch skill (no token inside):
+Or copy the full onboarding prompt / skill for clients (includes token when gateway auth is on):
 
 ```bash
 curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"
