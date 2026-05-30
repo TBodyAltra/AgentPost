@@ -682,6 +682,9 @@
         <a href="#dashboard" data-lang="zh-hans">仪表盘</a>
         <a href="#dashboard" data-lang="zh-hant">儀表盤</a>
         <a href="#dashboard" data-lang="en">Dashboard</a>
+        <a href="#compare" data-lang="zh-hans">对比</a>
+        <a href="#compare" data-lang="zh-hant">對比</a>
+        <a href="#compare" data-lang="en">Compare</a>
         <a href="#features" data-lang="zh-hans">特性</a>
         <a href="#features" data-lang="zh-hant">特性</a>
         <a href="#features" data-lang="en">Features</a>
@@ -712,13 +715,13 @@
         <div class="eyebrow" data-lang="en">A lightweight mail gateway for AI agents</div>
         <h1 id="hero-title">AgentPost</h1>
         <p class="lead" data-lang="zh-hans">
-          让 Agent 通过 HTTP API 注册临时邮箱、用 Ed25519 签名发信、在没有公网 WebHook 的情况下轮询收件箱，并通过 Skill 获取当前部署实例的连接规则。
+          相比 RabbitMQ、Kafka 等消息中间件的复杂安装与多环境依赖，AgentPost 只需 HTTP 连接：注册临时邮箱、Ed25519 签名发信、轮询收件，并通过 Skill 获取本实例规则——无需 Broker、专用 SDK 或公网 WebHook。
         </p>
 <p class="lead" data-lang="zh-hant">
-          讓 Agent 通過 HTTP API 註冊臨時郵箱、用 Ed25519 簽名發信、在沒有公網 WebHook 的情況下輪詢收件箱，並通過 Skill 獲取當前部署實例的連接規則。
+          相比 RabbitMQ、Kafka 等消息中間件的複雜安裝與多環境依賴，AgentPost 只需 HTTP 連接：註冊臨時郵箱、Ed25519 簽名發信、輪詢收件，並通過 Skill 獲取本實例規則——無需 Broker、專用 SDK 或公網 WebHook。
         </p>
         <p class="lead" data-lang="en">
-          Give agents temporary email identities, signed HTTP delivery, inbox polling without public webhooks, and deployment-aware skill instructions from a single small gateway.
+          Skip heavy message middleware—RabbitMQ, Kafka, and similar stacks need brokers, extra runtimes, and client SDKs. AgentPost runs on plain HTTP: temporary mailboxes, signed delivery, inbox polling, and deployment-aware skill docs—no broker, no dedicated SDK, no public webhook.
         </p>
         <div class="hero-actions">
           <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="zh-hans">查看 GitHub</a>
@@ -792,30 +795,100 @@
       </figure>
     </section>
 
+    <section id="compare">
+      <div class="section-head">
+        <h2 data-lang="zh-hans">对比消息中间件</h2>
+        <h2 data-lang="zh-hant">對比消息中間件</h2>
+        <h2 data-lang="en">vs message middleware</h2>
+        <p data-lang="zh-hans">传统 MQ 适合高吞吐与持久化事件流；AgentPost 适合「多 Agent 快速组网」——部署轻、接入简单，Agent 只要有出站 HTTP 就能协作。</p>
+        <p data-lang="zh-hant">傳統 MQ 適合高吞吐與持久化事件流；AgentPost 適合「多 Agent 快速組網」——部署輕、接入簡單，Agent 只要有出站 HTTP 就能協作。</p>
+        <p data-lang="en">Traditional MQ shines at throughput and durable event streams. AgentPost targets fast multi-agent wiring—light deploy, simple onboarding, outbound HTTP is enough.</p>
+      </div>
+      <table class="scenario-table">
+        <thead>
+          <tr>
+            <th data-lang="zh-hans">维度</th>
+            <th data-lang="zh-hant">維度</th>
+            <th data-lang="en">Dimension</th>
+            <th data-lang="zh-hans">RabbitMQ / Kafka / NATS 等</th>
+            <th data-lang="zh-hant">RabbitMQ / Kafka / NATS 等</th>
+            <th data-lang="en">RabbitMQ / Kafka / NATS</th>
+            <th>AgentPost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-lang="zh-hans">部署</td>
+            <td data-lang="zh-hant">部署</td>
+            <td data-lang="en">Deploy</td>
+            <td data-lang="zh-hans">独立 Broker、集群组件、运维成本高</td>
+            <td data-lang="zh-hant">獨立 Broker、叢集組件、運維成本高</td>
+            <td data-lang="en">Separate broker, cluster parts, heavier ops</td>
+            <td data-lang="zh-hans"><code>./start.sh</code> 或 Docker，Go 单二进制</td>
+            <td data-lang="zh-hant"><code>./start.sh</code> 或 Docker，Go 單二進制</td>
+            <td data-lang="en"><code>./start.sh</code> or Docker, single Go binary</td>
+          </tr>
+          <tr>
+            <td data-lang="zh-hans">环境依赖</td>
+            <td data-lang="zh-hant">環境依賴</td>
+            <td data-lang="en">Dependencies</td>
+            <td data-lang="zh-hans">Erlang、JVM、ZooKeeper 等运行时常见</td>
+            <td data-lang="zh-hant">Erlang、JVM、ZooKeeper 等運行時常見</td>
+            <td data-lang="en">Erlang, JVM, ZooKeeper, etc.</td>
+            <td data-lang="zh-hans">标准 HTTP（curl / fetch / 任意 HTTP 客户端）</td>
+            <td data-lang="zh-hant">標準 HTTP（curl / fetch / 任意 HTTP 客戶端）</td>
+            <td data-lang="en">Plain HTTP (curl, fetch, any HTTP client)</td>
+          </tr>
+          <tr>
+            <td data-lang="zh-hans">Agent 接入</td>
+            <td data-lang="zh-hant">Agent 接入</td>
+            <td data-lang="en">Agent client</td>
+            <td data-lang="zh-hans">专用 SDK、长连接 consumer、Topic/Queue 建模</td>
+            <td data-lang="zh-hant">專用 SDK、長連接 consumer、Topic/Queue 建模</td>
+            <td data-lang="en">Dedicated SDK, long-lived consumer, topic/queue model</td>
+            <td data-lang="zh-hans">JSON API + Ed25519 签名，无专用客户端</td>
+            <td data-lang="zh-hant">JSON API + Ed25519 簽名，無專用客戶端</td>
+            <td data-lang="en">JSON APIs + Ed25519 signing, no special client</td>
+          </tr>
+          <tr>
+            <td data-lang="zh-hans">收信</td>
+            <td data-lang="zh-hant">收信</td>
+            <td data-lang="en">Receive</td>
+            <td data-lang="zh-hans">常驻 consumer 或暴露入站端口 / WebHook</td>
+            <td data-lang="zh-hant">常駐 consumer 或暴露入站端口 / WebHook</td>
+            <td data-lang="en">Persistent consumer or inbound port / webhook</td>
+            <td data-lang="zh-hans"><code>GET /api/v1/messages</code> 轮询，NAT 后也能收</td>
+            <td data-lang="zh-hant"><code>GET /api/v1/messages</code> 輪詢，NAT 後也能收</td>
+            <td data-lang="en">Poll <code>GET /api/v1/messages</code>—works behind NAT</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <section id="features">
       <div class="section-head">
         <h2 data-lang="zh-hans">为什么是 AgentPost？</h2>
 <h2 data-lang="zh-hant">爲什麼是 AgentPost？</h2>
         <h2 data-lang="en">Why AgentPost?</h2>
-        <p data-lang="zh-hans">它不是传统邮箱服务器，而是为多 Agent 协作和自动化任务收窄过边界的消息网关。</p>
-<p data-lang="zh-hant">它不是傳統郵箱服務器，而是爲多 Agent 協作和自動化任務收窄過邊界的消息網關。</p>
-        <p data-lang="en">It is not a traditional mail server. It is a focused message gateway shaped for multi-agent workflows and automation.</p>
+        <p data-lang="zh-hans">它不是传统邮箱服务器，也不是重量级消息中间件——而是为多 Agent 协作收窄边界的 HTTP 消息网关：部署轻、连接简单。</p>
+<p data-lang="zh-hant">它不是傳統郵箱服務器，也不是重量級消息中間件——而是爲多 Agent 協作收窄邊界的 HTTP 消息網關：部署輕、連接簡單。</p>
+        <p data-lang="en">Not a traditional mail server or heavyweight message broker—a focused HTTP gateway for multi-agent work: light to deploy, simple to connect.</p>
       </div>
       <div class="grid">
         <article class="card" data-lang="zh-hans">
           <div class="card-icon">API</div>
           <h3>HTTP 原生收发</h3>
-          <p>注册、发信、拉取消息、发现 Agent 都是 JSON API，适合脚本、SDK 和自动化环境。</p>
+          <p>无需 MQ Broker 或专用 SDK：注册、发信、轮询、发现 Agent 都是标准 HTTP JSON API，curl 即可调试。</p>
         </article>
 <article class="card" data-lang="zh-hant">
           <div class="card-icon">API</div>
           <h3>HTTP 原生收發</h3>
-          <p>註冊、發信、拉取消息、發現 Agent 都是 JSON API，適合腳本、SDK 和自動化環境。</p>
+          <p>無需 MQ Broker 或專用 SDK：註冊、發信、輪詢、發現 Agent 都是標準 HTTP JSON API，curl 即可調試。</p>
         </article>
         <article class="card" data-lang="en">
           <div class="card-icon">API</div>
           <h3>HTTP-native messaging</h3>
-          <p>Registration, sending, polling, and agent discovery are JSON APIs for scripts, SDKs, and automation.</p>
+          <p>No MQ broker or dedicated SDK—register, send, poll, and discover agents over plain HTTP JSON; curl is enough to debug.</p>
         </article>
         <article class="card" data-lang="zh-hans">
           <div class="card-icon">SIG</div>
