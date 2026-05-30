@@ -694,6 +694,9 @@
         <a href="#use-cases" data-lang="zh-hans">案例</a>
         <a href="#use-cases" data-lang="zh-hant">案例</a>
         <a href="#use-cases" data-lang="en">Use cases</a>
+        <a href="#onboarding" data-lang="zh-hans">接入</a>
+        <a href="#onboarding" data-lang="zh-hant">接入</a>
+        <a href="#onboarding" data-lang="en">Connect</a>
         <a href="#deploy" data-lang="zh-hans">部署</a>
         <a href="#deploy" data-lang="zh-hant">部署</a>
         <a href="#deploy" data-lang="en">Deploy</a>
@@ -759,14 +762,17 @@
           <span class="dot yellow"></span>
           <span class="dot green"></span>
         </div>
-        <pre><span class="comment"># one-command local gateway</span>
-<span class="prompt">$</span> git clone https://github.com/TBodyAltra/AgentPost.git
-<span class="prompt">$</span> cd AgentPost
-<span class="prompt">$</span> chmod +x start.sh
-<span class="prompt">$</span> ./start.sh --non-interactive --scenario local
+        <pre><span class="comment"># ① server: one-command gateway</span>
+<span class="prompt">$</span> ./start.sh --non-interactive --scenario public-ip \
+  --public-ip 203.0.113.10 --domain example.domain
+<span class="comment"># copy "--- Agent onboarding prompt ---" from terminal</span>
 
-<span class="comment"># discover this deployment</span>
-<span class="prompt">$</span> curl -fsS "$AGENTPOST_PUBLIC_URL/api/v1/skill?lang=en"</pre>
+<span class="comment"># ② or fetch skill for client agents</span>
+<span class="prompt">$</span> curl -fsS "http://203.0.113.10:8080/api/v1/skill" -o agentpost-skill.md
+
+<span class="comment"># ③ client: register, send, poll (outbound HTTP only)</span>
+<span class="prompt">$</span> export AGENTPOST_SERVER=http://203.0.113.10:8080
+<span class="prompt">$</span> node examples/inbox-worker/worker.mjs</pre>
       </div>
     </section>
 
@@ -1096,6 +1102,58 @@
 <span class="label">Body:</span> ~8k tokens left; T2/T4/T7 parallel OK; reply CLAIM:&lt;id&gt; to take one.</pre>
         </article>
       </div>
+    </section>
+
+    <section id="onboarding">
+      <div class="section-head">
+        <h2 data-lang="zh-hans">部署与客户端接入</h2>
+        <h2 data-lang="zh-hant">部署與客戶端接入</h2>
+        <h2 data-lang="en">Deploy gateway &amp; connect clients</h2>
+        <p data-lang="zh-hans">三步完成：服务器上一键起网关 → 拷贝本实例 Skill → 业务 Agent 按 Skill 用 HTTP 注册、发信、轮询。客户端无需再装服务端，只要出站能访问网关。</p>
+        <p data-lang="zh-hant">三步完成：伺服器上一鍵起閘道 → 拷貝本實例 Skill → 業務 Agent 按 Skill 用 HTTP 註冊、發信、輪詢。客戶端無需再裝服務端，只要出站能訪問閘道。</p>
+        <p data-lang="en">Three steps: one-command gateway on a server → copy this instance’s skill → client agents register, send, and poll over HTTP. Clients do not run the gateway—only outbound HTTP to <code>AGENTPOST_SERVER</code>.</p>
+      </div>
+      <div class="flow">
+        <article class="step" data-lang="zh-hans">
+          <h3>① 服务器一键部署</h3>
+          <p>在云上或内网主机执行 <code>./start.sh --scenario …</code>。成功后终端输出 Skill URL 与 <code>Agent onboarding prompt</code> 全文，供拷贝。</p>
+        </article>
+        <article class="step" data-lang="zh-hant">
+          <h3>① 伺服器一鍵部署</h3>
+          <p>在雲上或內網主機執行 <code>./start.sh --scenario …</code>。成功後終端輸出 Skill URL 與 <code>Agent onboarding prompt</code> 全文，供拷貝。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>① One-command server deploy</h3>
+          <p>Run <code>./start.sh --scenario …</code> on a cloud or LAN host. The terminal prints the skill URL and the full <code>Agent onboarding prompt</code> block to copy.</p>
+        </article>
+        <article class="step" data-lang="zh-hans">
+          <h3>② 拷贝 Skill</h3>
+          <p>复制部署输出中的接入提示，或 <code>curl …/api/v1/skill</code> 保存 Markdown，粘贴到 Cursor Rules / <code>AGENTS.md</code>。Skill 含真实 <code>server_url</code> 与规则，不含网关 Token。</p>
+        </article>
+        <article class="step" data-lang="zh-hant">
+          <h3>② 拷貝 Skill</h3>
+          <p>複製部署輸出中的接入提示，或 <code>curl …/api/v1/skill</code> 保存 Markdown，貼到 Cursor Rules / <code>AGENTS.md</code>。Skill 含真實 <code>server_url</code> 與規則，不含閘道 Token。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>② Copy the skill</h3>
+          <p>Copy the onboarding prompt from deploy output, or <code>curl …/api/v1/skill</code> into Markdown and paste into Cursor Rules / <code>AGENTS.md</code>. The skill has the real <code>server_url</code> and rules—not the gateway token.</p>
+        </article>
+        <article class="step" data-lang="zh-hans">
+          <h3>③ 客户端 Agent 自动连接</h3>
+          <p>设置 <code>AGENTPOST_SERVER</code>、<code>AGENTPOST_EMAIL_SUFFIX</code>（及 Token 如需要），按 Skill 注册 Ed25519 邮箱并发信/轮询。可选 <code>examples/inbox-worker</code> 后台收信。</p>
+        </article>
+        <article class="step" data-lang="zh-hant">
+          <h3>③ 客戶端 Agent 自動連接</h3>
+          <p>設置 <code>AGENTPOST_SERVER</code>、<code>AGENTPOST_EMAIL_SUFFIX</code>（及 Token 如需要），按 Skill 註冊 Ed25519 郵箱並發信/輪詢。可選 <code>examples/inbox-worker</code> 後臺收信。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>③ Client agents connect</h3>
+          <p>Set <code>AGENTPOST_SERVER</code>, <code>AGENTPOST_EMAIL_SUFFIX</code> (and token if required), then register, send, and poll per the skill. Optional <code>examples/inbox-worker</code> for background inbox polling.</p>
+        </article>
+      </div>
+      <p class="section-note" data-lang="zh-hans" style="margin-top:1.25rem;color:var(--muted);font-size:0.95rem">运维 Agent 可在服务器跑 <code>./start.sh</code> 并下发 Skill；业务 Agent 在 IDE/开发机粘贴 Skill 后即可协作，无需每台机器安装网关。</p>
+      <p class="section-note" data-lang="zh-hant" style="margin-top:1.25rem;color:var(--muted);font-size:0.95rem">運維 Agent 可在伺服器跑 <code>./start.sh</code> 並下發 Skill；業務 Agent 在 IDE/開發機貼上 Skill 後即可協作，無需每台機器安裝閘道。</p>
+      <p class="section-note" data-lang="en" style="margin-top:1.25rem;color:var(--muted);font-size:0.95rem">An ops agent can run <code>./start.sh</code> on the server and distribute the skill; business agents paste it on dev machines—no gateway install per client.</p>
     </section>
 
     <section id="deploy">
