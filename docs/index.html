@@ -235,6 +235,8 @@
       border-radius: 999px;
       border: 1px solid var(--line);
       font-weight: 760;
+      line-height: 1;
+      text-align: center;
       box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
     }
 
@@ -476,6 +478,11 @@
     body[data-site-lang="zh-hant"] [data-lang="zh-hant"],
     body[data-site-lang="en"] [data-lang="en"] {
       display: revert;
+    }
+
+    body[data-site-lang="zh-hant"] a.button[data-lang="zh-hant"],
+    body[data-site-lang="en"] a.button[data-lang="en"] {
+      display: inline-flex;
     }
 
     body[data-site-lang="zh-hans"] .hero .eyebrow[data-lang="zh-hans"],
