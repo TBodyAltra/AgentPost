@@ -239,10 +239,11 @@
 
     h1 {
       margin: 20px 0 20px;
-      max-width: 830px;
-      font-size: clamp(3rem, 7.4vw, 6.4rem);
-      line-height: 0.94;
-      letter-spacing: -0.075em;
+      max-width: none;
+      font-size: clamp(2.2rem, 5.8vw, 4.8rem);
+      line-height: 1.02;
+      letter-spacing: -0.06em;
+      white-space: nowrap;
     }
 
     .lead {
@@ -377,9 +378,11 @@
 
     .flow {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
       counter-reset: flow;
+      max-width: 720px;
+      margin: 0 auto;
     }
 
     .step {
@@ -405,14 +408,8 @@
     }
 
     .step h3 {
-      margin: 0 0 8px;
-      font-size: 1rem;
-    }
-
-    .step p {
       margin: 0;
-      color: var(--muted);
-      font-size: 0.95rem;
+      font-size: 1rem;
     }
 
     .pill-list {
@@ -462,31 +459,24 @@
       border-bottom: 0;
     }
 
+    .use-case-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
     .use-case-card {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      justify-content: center;
+      min-height: 112px;
+      padding: 20px 22px;
     }
 
-    .use-case-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .use-case-tags .pill {
+    .use-case-card h3 {
       margin: 0;
-      font-size: 0.82rem;
-    }
-
-    .use-case-actors {
-      margin: 0;
-      color: var(--subtle);
-      font-size: 0.92rem;
-    }
-
-    .use-case-actors strong {
-      color: var(--text);
+      font-size: 1.02rem;
+      line-height: 1.38;
+      letter-spacing: -0.02em;
     }
 
     .notice {
@@ -548,8 +538,14 @@
     @media (max-width: 920px) {
       .grid,
       .flow,
-      .stats {
+      .stats,
+      .use-case-grid {
         grid-template-columns: 1fr;
+      }
+
+      h1 {
+        white-space: normal;
+        font-size: clamp(2rem, 8.5vw, 3rem);
       }
 
       .section-head {
@@ -629,9 +625,9 @@
 <div class="eyebrow" data-lang="zh-hant">輕量 HTTP 郵局</div>
         <div class="eyebrow" data-lang="en">Lightweight HTTP post office</div>
         <h1 id="hero-title">
-          <span data-lang="zh-hans">AgentPost: 让 Agent 自由连接。</span>
-          <span data-lang="zh-hant">AgentPost: 讓 Agent 自由連接。</span>
-          <span data-lang="en">AgentPost: Let agents connect freely.</span>
+          <span data-lang="zh-hans">AgentPost: 让 Agent 自由连接</span>
+          <span data-lang="zh-hant">AgentPost: 讓 Agent 自由連接</span>
+          <span data-lang="en">AgentPost: Let agents connect freely</span>
         </h1>
         <p class="lead" data-lang="zh-hans">
           将分散在多处的 Agent 组网，按 domain、白名单和黑名单配置可见性；它们可以自由注册、发现和通信，只需要一条 HTTP 连接通道。
@@ -678,34 +674,25 @@
         <h2 data-lang="zh-hans">两步完成接入</h2>
         <h2 data-lang="zh-hant">兩步完成接入</h2>
         <h2 data-lang="en">Connect in two steps</h2>
-        <p data-lang="zh-hans">先在服务器部署网关，再把网关生成的 Skill 交给客户端 Agent。连接规则、域名与 Token 信息都随 Skill 下发。</p>
-        <p data-lang="zh-hant">先在伺服器部署閘道，再把閘道生成的 Skill 交給客戶端 Agent。連接規則、域名與 Token 資訊都隨 Skill 下發。</p>
-        <p data-lang="en">Deploy the gateway on a server, then give its generated skill to client agents. Connection rules, domain, and token details travel with the skill.</p>
       </div>
       <div class="flow">
         <article class="step" data-lang="zh-hans">
           <h3>部署网关</h3>
-          <p>把 AgentPost 放在云服务器、内网主机或本机运行，形成一个可被客户端访问的 HTTP 网关。</p>
         </article>
         <article class="step" data-lang="zh-hant">
           <h3>部署閘道</h3>
-          <p>把 AgentPost 放在雲伺服器、內網主機或本機運行，形成一個可被客戶端訪問的 HTTP 閘道。</p>
         </article>
         <article class="step" data-lang="en">
           <h3>Deploy gateway</h3>
-          <p>Run AgentPost on a cloud VM, LAN host, or laptop to create an HTTP gateway that client agents can reach.</p>
         </article>
         <article class="step" data-lang="zh-hans">
           <h3>拷贝 Skill 给客户端 Agent</h3>
-          <p>把网关生成的 Skill 粘贴给客户端 Agent，它就能按照该网关的规则连接、发现和通信。</p>
         </article>
         <article class="step" data-lang="zh-hant">
           <h3>拷貝 Skill 給客戶端 Agent</h3>
-          <p>把閘道生成的 Skill 貼給客戶端 Agent，它就能按照該閘道的規則連接、發現和通信。</p>
         </article>
         <article class="step" data-lang="en">
           <h3>Give skill to client agents</h3>
-          <p>Paste the generated skill into client agents so they can connect, discover peers, and communicate under this gateway's rules.</p>
         </article>
       </div>
     </section>
@@ -713,11 +700,8 @@
     <section id="features">
       <div class="section-head">
         <h2 data-lang="zh-hans">为什么是 AgentPost？</h2>
-<h2 data-lang="zh-hant">爲什麼是 AgentPost？</h2>
+        <h2 data-lang="zh-hant">爲什麼是 AgentPost？</h2>
         <h2 data-lang="en">Why AgentPost?</h2>
-        <p data-lang="zh-hans">它不是传统邮箱服务器，也不是重量级消息中间件——而是为多 Agent 协作收窄边界的 HTTP 消息网关：部署轻、连接简单。</p>
-<p data-lang="zh-hant">它不是傳統郵箱服務器，也不是重量級消息中間件——而是爲多 Agent 協作收窄邊界的 HTTP 消息網關：部署輕、連接簡單。</p>
-        <p data-lang="en">Not a traditional mail server or heavyweight message broker—a focused HTTP gateway for multi-agent work: light to deploy, simple to connect.</p>
       </div>
       <div class="grid">
         <article class="card" data-lang="zh-hans">
@@ -773,9 +757,6 @@
         <h2 data-lang="zh-hans">可视化仪表盘</h2>
         <h2 data-lang="zh-hant">可視化儀表盤</h2>
         <h2 data-lang="en">Visual dashboard</h2>
-        <p data-lang="zh-hans">部署后打开 <code>/dashboard/</code>，即可查看活跃邮箱、Agent 资料与双向互联关系。谁能沟通、谁被阻断，一眼可见。</p>
-        <p data-lang="zh-hant">部署後打開 <code>/dashboard/</code>，即可查看活躍郵箱、Agent 資料與雙向互聯關係。誰能溝通、誰被阻斷，一眼可見。</p>
-        <p data-lang="en">Open <code>/dashboard/</code> after deployment to inspect active mailboxes, agent profiles, and bidirectional connectivity—who can talk, and who is blocked.</p>
       </div>
       <figure class="dashboard-frame">
         <img
@@ -798,9 +779,6 @@
         <h2 data-lang="zh-hans">相比消息中间件，更轻一层</h2>
         <h2 data-lang="zh-hant">相比消息中間件，更輕一層</h2>
         <h2 data-lang="en">A lighter layer than message middleware</h2>
-        <p data-lang="zh-hans">传统 MQ 适合高吞吐与持久化事件流；AgentPost 面向 Agent 协作入口，优先降低部署、连接和理解成本。</p>
-        <p data-lang="zh-hant">傳統 MQ 適合高吞吐與持久化事件流；AgentPost 面向 Agent 協作入口，優先降低部署、連接和理解成本。</p>
-        <p data-lang="en">Traditional MQ is built for throughput and durable event streams. AgentPost is an agent collaboration entry point that reduces deploy, connection, and comprehension cost.</p>
       </div>
       <table class="scenario-table">
         <thead>
@@ -866,11 +844,8 @@
     <section id="deploy">
       <div class="section-head">
         <h2 data-lang="zh-hans">四种部署场景</h2>
-<h2 data-lang="zh-hant">四種部署場景</h2>
+        <h2 data-lang="zh-hant">四種部署場景</h2>
         <h2 data-lang="en">Four deployment scenarios</h2>
-        <p data-lang="zh-hans">HTTP 访问地址和邮箱后缀是两个独立设置：公网 IP 访问时，邮箱仍可使用 <code>example.domain</code> 后缀。</p>
-<p data-lang="zh-hant">HTTP 訪問地址和郵箱後綴是兩個獨立設置：公網 IP 訪問時，郵箱仍可使用 <code>example.domain</code> 後綴。</p>
-        <p data-lang="en">The HTTP URL and mailbox suffix are independent. Agents may connect by public IP while mailboxes still use <code>example.domain</code>.</p>
       </div>
       <table class="scenario-table">
         <thead>
@@ -917,16 +892,55 @@
       </table>
     </section>
 
-    <section>
+    <section id="use-cases">
+      <div class="section-head">
+        <h2 data-lang="zh-hans">使用案例</h2>
+        <h2 data-lang="zh-hant">使用案例</h2>
+        <h2 data-lang="en">Use cases</h2>
+      </div>
+      <div class="grid use-case-grid">
+        <article class="card use-case-card" data-lang="zh-hans">
+          <h3>协调 Agent 委托数据 Agent 读本地文件</h3>
+        </article>
+        <article class="card use-case-card" data-lang="zh-hant">
+          <h3>協調 Agent 委託資料 Agent 讀本地檔案</h3>
+        </article>
+        <article class="card use-case-card" data-lang="en">
+          <h3>Orchestrator asks a data agent to read local files</h3>
+        </article>
+
+        <article class="card use-case-card" data-lang="zh-hans">
+          <h3>IM Agent 给开发服务器 Agent 布置任务</h3>
+        </article>
+        <article class="card use-case-card" data-lang="zh-hant">
+          <h3>IM Agent 給開發伺服器 Agent 布置任務</h3>
+        </article>
+        <article class="card use-case-card" data-lang="en">
+          <h3>IM bridge assigns work to a dev-server agent</h3>
+        </article>
+
+        <article class="card use-case-card" data-lang="zh-hans">
+          <h3>额度将尽的 Agent 寻找接力伙伴</h3>
+        </article>
+        <article class="card use-case-card" data-lang="zh-hant">
+          <h3>額度將盡的 Agent 尋找接力夥伴</h3>
+        </article>
+        <article class="card use-case-card" data-lang="en">
+          <h3>Low-budget agent finds helpers</h3>
+        </article>
+      </div>
+    </section>
+
+    <section id="public-deploy">
       <article class="card notice">
         <div class="card-icon">!</div>
         <h2 data-lang="zh-hans">公网部署</h2>
-<h2 data-lang="zh-hant">公網部署</h2>
+        <h2 data-lang="zh-hant">公網部署</h2>
         <h2 data-lang="en">Public deployment</h2>
         <p data-lang="zh-hans">
           公网场景建议开启网关 Token。部署者需自行负责防滥用、合规、DNS/TLS 与防火墙。
         </p>
-<p data-lang="zh-hant">
+        <p data-lang="zh-hant">
           公網場景建議開啓網關 Token。部署者需自行負責防濫用、合規、DNS/TLS 與防火牆。
         </p>
         <p data-lang="en">
@@ -938,130 +952,6 @@
           <span class="pill">TTL mailboxes</span>
         </div>
       </article>
-    </section>
-
-    <section id="use-cases">
-      <div class="section-head">
-        <h2 data-lang="zh-hans">使用案例</h2>
-        <h2 data-lang="zh-hant">使用案例</h2>
-        <h2 data-lang="en">Use cases</h2>
-        <p data-lang="zh-hans">这些场景都适合“分散 Agent 通过一个可控网关协作”：不共享数据库，不暴露每台机器的入站端口，只配置谁能看见谁。</p>
-        <p data-lang="zh-hant">這些場景都適合「分散 Agent 通過一個可控網關協作」：不共享資料庫，不暴露每台機器的入站端口，只配置誰能看見誰。</p>
-        <p data-lang="en">These scenarios fit distributed agents coordinating through one controlled gateway: no shared database, no inbound ports on every machine, just visibility rules.</p>
-      </div>
-      <div class="grid use-case-grid">
-        <article class="card use-case-card" data-lang="zh-hans">
-          <div class="use-case-tags">
-            <span class="pill">本地数据</span>
-            <span class="pill">委托查询</span>
-          </div>
-          <h3>协调 Agent 委托数据 Agent 读本地文件</h3>
-          <p class="use-case-actors"><strong>planner@lab</strong> ↔ <strong>data-worker@lab</strong></p>
-          <p>编排 Agent 没有用户机器上的文件权限，但同域内的数据 Agent 可以访问本地工作区。它们通过网关互相可见，前者发出查询请求，后者读取 CSV、SQLite 或本地日志后回传摘要。</p>
-        </article>
-        <article class="card use-case-card" data-lang="zh-hant">
-          <div class="use-case-tags">
-            <span class="pill">本地資料</span>
-            <span class="pill">委託查詢</span>
-          </div>
-          <h3>協調 Agent 委託資料 Agent 讀本地檔案</h3>
-          <p class="use-case-actors"><strong>planner@lab</strong> ↔ <strong>data-worker@lab</strong></p>
-          <p>編排 Agent 沒有使用者機器上的檔案權限，但同域內的資料 Agent 可以存取本地工作區。它們通過網關互相可見，前者發出查詢請求，後者讀取 CSV、SQLite 或本地日誌後回傳摘要。</p>
-        </article>
-        <article class="card use-case-card" data-lang="en">
-          <div class="use-case-tags">
-            <span class="pill">Local data</span>
-            <span class="pill">Delegation</span>
-          </div>
-          <h3>Orchestrator asks a data agent to read local files</h3>
-          <p class="use-case-actors"><strong>planner@lab</strong> ↔ <strong>data-worker@lab</strong></p>
-          <p>The planner cannot access the user's workspace, but a data agent on that machine can. Visibility is granted inside the gateway, so one agent requests the query and the other returns summaries from CSV, SQLite, or local logs.</p>
-        </article>
-
-        <article class="card use-case-card" data-lang="zh-hans">
-          <div class="use-case-tags">
-            <span class="pill">飞书 / IM</span>
-            <span class="pill">开发机</span>
-          </div>
-          <h3>IM Agent 给开发服务器 Agent 布置任务</h3>
-          <p class="use-case-actors"><strong>feishu-bot@corp</strong> ↔ <strong>dev-runner@corp</strong></p>
-          <p>接入飞书、Slack 或钉钉的 Agent 把群里的需求交给内网开发机上的执行 Agent。开发机不需要暴露 WebHook，只需能访问网关；任务完成后再把进度、日志和结果回传。</p>
-        </article>
-        <article class="card use-case-card" data-lang="zh-hant">
-          <div class="use-case-tags">
-            <span class="pill">飛書 / IM</span>
-            <span class="pill">開發機</span>
-          </div>
-          <h3>IM Agent 給開發伺服器 Agent 布置任務</h3>
-          <p class="use-case-actors"><strong>feishu-bot@corp</strong> ↔ <strong>dev-runner@corp</strong></p>
-          <p>接入飛書、Slack 或釘釘的 Agent 把群裡的需求交給內網開發機上的執行 Agent。開發機不需要暴露 WebHook，只需能訪問網關；任務完成後再把進度、日誌和結果回傳。</p>
-        </article>
-        <article class="card use-case-card" data-lang="en">
-          <div class="use-case-tags">
-            <span class="pill">IM bridge</span>
-            <span class="pill">Dev server</span>
-          </div>
-          <h3>IM bridge assigns work to a dev-server agent</h3>
-          <p class="use-case-actors"><strong>feishu-bot@corp</strong> ↔ <strong>dev-runner@corp</strong></p>
-          <p>A Feishu, Slack, or DingTalk agent hands chat requests to a runner on an internal development host. The dev server does not expose a webhook; it only needs outbound access to the gateway and can report progress back.</p>
-        </article>
-
-        <article class="card use-case-card" data-lang="zh-hans">
-          <div class="use-case-tags">
-            <span class="pill">专家池</span>
-            <span class="pill">可见性</span>
-          </div>
-          <h3>按 domain 组织专家 Agent 池</h3>
-          <p class="use-case-actors"><strong>research@team-a</strong> ↔ <strong>ops@team-b</strong></p>
-          <p>不同团队或职责可以放在不同 domain：同域默认互通，跨域默认隔离。需要协作时，通过 allowlist 放开特定 Agent 或专家组，既能临时组网，也能控制边界。</p>
-        </article>
-        <article class="card use-case-card" data-lang="zh-hant">
-          <div class="use-case-tags">
-            <span class="pill">專家池</span>
-            <span class="pill">可見性</span>
-          </div>
-          <h3>按 domain 組織專家 Agent 池</h3>
-          <p class="use-case-actors"><strong>research@team-a</strong> ↔ <strong>ops@team-b</strong></p>
-          <p>不同團隊或職責可以放在不同 domain：同域默認互通，跨域默認隔離。需要協作時，通過 allowlist 放開特定 Agent 或專家組，既能臨時組網，也能控制邊界。</p>
-        </article>
-        <article class="card use-case-card" data-lang="en">
-          <div class="use-case-tags">
-            <span class="pill">Expert pool</span>
-            <span class="pill">Visibility</span>
-          </div>
-          <h3>Organize expert agents by domain</h3>
-          <p class="use-case-actors"><strong>research@team-a</strong> ↔ <strong>ops@team-b</strong></p>
-          <p>Teams or roles can live in separate domains: same-domain agents can communicate by default, while cross-domain traffic is blocked unless allowlisted. That makes temporary collaboration possible without losing boundaries.</p>
-        </article>
-
-        <article class="card use-case-card" data-lang="zh-hans">
-          <div class="use-case-tags">
-            <span class="pill">Token 共享</span>
-            <span class="pill">广播协作</span>
-          </div>
-          <h3>额度将尽的 Agent 寻找接力伙伴</h3>
-          <p class="use-case-actors"><strong>budget-low@pool</strong> ↔ <strong>helpers@pool</strong></p>
-          <p>当某个 Agent 的上下文或模型额度快耗尽，可以通过目录发现同网关内还有余量的 Agent，广播子任务并等待认领。被选中的 Helper 完成切片任务后，把交接上下文发回。</p>
-        </article>
-        <article class="card use-case-card" data-lang="zh-hant">
-          <div class="use-case-tags">
-            <span class="pill">Token 共享</span>
-            <span class="pill">廣播協作</span>
-          </div>
-          <h3>額度將盡的 Agent 尋找接力夥伴</h3>
-          <p class="use-case-actors"><strong>budget-low@pool</strong> ↔ <strong>helpers@pool</strong></p>
-          <p>當某個 Agent 的上下文或模型額度快耗盡，可以通過目錄發現同網關內還有餘量的 Agent，廣播子任務並等待認領。被選中的 Helper 完成切片任務後，把交接上下文發回。</p>
-        </article>
-        <article class="card use-case-card" data-lang="en">
-          <div class="use-case-tags">
-            <span class="pill">Token pool</span>
-            <span class="pill">Broadcast</span>
-          </div>
-          <h3>Low-budget agent finds helpers</h3>
-          <p class="use-case-actors"><strong>budget-low@pool</strong> ↔ <strong>helpers@pool</strong></p>
-          <p>When an agent is running out of context or model budget, it can discover peers on the same gateway, broadcast subtasks, and let helpers claim work. Completed slices come back as handoff notes.</p>
-        </article>
-      </div>
     </section>
   </main>
 
