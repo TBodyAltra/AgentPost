@@ -1,234 +1,162 @@
 # AgentPost（智能体邮局）
 
-**用一条轻量 HTTP 通道连接所有 Agent——各自注册临时邮箱、签名互发、轮询收信，无需 IMAP 与传统邮件栈。**
+**给每个 AI Agent 一个临时邮箱，用一条轻量 HTTP 通道完成注册、发信、收信与协作。**
 
-[English](README.en.md) | 中文
+中文 | [English](README.en.md)
 
-项目介绍页（GitHub Pages）：https://tbodyaltra.github.io/AgentPost/
+项目介绍页：https://tbodyaltra.github.io/AgentPost/
 
-AgentPost 是专为 **AI Agent** 设计的开源邮件网关：把「注册邮箱 → 发信 → 收信」收敛成 JSON API，让多 Agent 协作、任务回调、临时身份通信变得像调用 REST 一样简单。
+AgentPost 是专为 **AI Agent** 设计的开源邮件网关。它不是传统邮箱服务器，也不是重量级消息中间件；它把多 Agent 协作收敛成简单的 HTTP + JSON API：Agent 自行注册邮箱，用 Ed25519 签名发信，通过轮询收信，无需 IMAP、专用 SDK 或公网 WebHook。
 
-> **给 AI Agent 部署本仓库？** 请先读 [`AGENTS.md`](AGENTS.md)（非交互命令、场景表、常见错误）。
+> **给 AI Agent 部署本仓库？** 请先读 [`AGENTS.md`](AGENTS.md)。
 >
 > **公网部署**：部署者需自行负责防滥用、合规、DNS/TLS 与防火墙；公网场景建议开启网关 Token。
 
-## 为什么选 AgentPost
+## 30 秒理解
 
-多 Agent 协作往往要在消息中间件与 HTTP 之间二选一。RabbitMQ、Kafka、NATS 等通常需要独立 Broker、额外运行时（Erlang/JVM/ZooKeeper 等）、专用端口与客户端 SDK；Agent 还要维护长连接或暴露入站端口。**AgentPost 把协作收敛成标准 HTTP**：网关 `./start.sh` 一条命令起服，Agent 只需能 **出站访问 HTTP**——注册、发信、轮询收件全是 JSON API。
+| 你关心的事 | AgentPost 的做法 |
+|------------|------------------|
+| Agent 怎么找到彼此？ | 注册成 `agent@example.domain`，通过邮箱地址寻址 |
+| Agent 没有公网 IP 怎么收消息？ | 主动 `GET /api/v1/messages` 轮询收件箱 |
+| 客户端需要装什么？ | 只需要出站 HTTP；不需要 RabbitMQ/Kafka 客户端或常驻入站服务 |
+| 部署后怎么告诉其他 Agent？ | `./start.sh` 输出 onboarding prompt / Skill，复制给客户端即可 |
+| 适合什么阶段？ | 多 Agent 实验、内网协作、任务委托、Agent 与工具机之间的轻量通信 |
 
-| 维度 | 传统消息中间件 | AgentPost |
-|------|----------------|-----------|
-| **部署** | Broker 集群、多组件、运维成本高 | Go 单二进制 / Docker，`./start.sh` 即可 |
-| **环境依赖** | Erlang、JVM、ZooKeeper 等常见 | 仅需 HTTP（curl / 任意 HTTP 客户端） |
-| **Agent 接入** | 专用 SDK、长连接 consumer | 标准 HTTP + JSON；Ed25519 签名 |
-| **收信** | 需常驻 consumer 或暴露端口 | `GET /messages` 轮询，NAT 后也能收 |
+## 三步跑起来
 
-| 优势 | 说明 |
-|------|------|
-| **只需 HTTP** | 无需 MQ 客户端与 Broker 运维；Agent 有出站 HTTP 即可连网关 |
-| **超轻量** | Go 单二进制，内存占用低；无 IMAP、无繁重邮件栈，`./start.sh` 或 Docker 即可起服 |
-| **Agent 原生** | HTTP + JSON + Ed25519 签名，机器自管密钥，无需人类式密码 |
-| **临时邮箱** | 注册时设 TTL，到期自动释放，适合一次性任务与沙箱协作 |
-| **无公网也能收** | 轮询 `GET /api/v1/messages`，Agent 不必暴露 WebHook |
-| **双角色同一套 API** | 既可 **部署网关**，也可只作 **客户端** 连已有实例——均可由 Agent 自动化 |
-| **部署可发现** | `GET /api/v1/skill` 返回本实例真实 URL 与规则，避免配错域名或 IP |
-| **人机协作（规划中）** | 路线图将支持对接 Gmail、Outlook 等商业邮箱，把人类邮箱纳入 Agent 协作链路（见 [路线图](#路线图)） |
-
-## 架构一览
-
-### 网关部署 vs 客户端 Agent
-
-```mermaid
-flowchart TB
-  subgraph deploy["服务端：部署 AgentPost"]
-    OP["./start.sh --scenario …"]
-    GW["AgentPost 网关"]
-    OP --> GW
-  end
-
-  subgraph clients["客户端：业务 Agent"]
-    A1["Agent A\nbot-a@example.domain"]
-    A2["Agent B\n发信 / 轮询"]
-  end
-
-  A1 & A2 -->|"Ed25519 + HTTP JSON"| GW
-  GW --> A1 & A2
-```
-
-典型流程：服务器 `./start.sh` 起网关 → 拷贝 Skill → 客户端 `GET /api/v1/skill` → `POST /register` → `POST /send` / `GET /messages`。详见 [部署与客户端接入](#部署与客户端接入)。
-
-### `server_url` 与 `domain` 分离
-
-**怎么连 HTTP**（`AGENTPOST_PUBLIC_URL` / skill 里的 `server_url`）与 **邮箱 @ 后缀**（`AGENTPOST_DOMAIN`）可独立配置，例如仅用 `http://203.0.113.10:8080` 访问，邮箱仍为 `bot@example.domain`。skill 中的 `server_url` **来自部署时写入的 `AGENTPOST_PUBLIC_URL`**，不会随请求 Host 变化。
-
-```mermaid
-flowchart LR
-  AG["Agent"] -->|"HTTP"| URL["server_url"]
-  URL --> GW["AgentPost"]
-  GW --> MAIL["alice@example.domain"]
-```
-
-### 网关隔离与 domain 投递边界
-
-通信边界是 **网关实例**（一次部署），不是 `@domain` 字符串。
-
-| 边界 | 默认行为 |
-|------|----------|
-| **不同网关** | 完全隔离，互不可达 |
-| **同一网关 · 同一 domain** | 默认可互发；`blocklist` 可拉黑 |
-| **同一网关 · 不同 domain** | 默认禁止；收件方 `allowlist` 放行才可投递 |
-
-```mermaid
-flowchart TB
-  subgraph GWA["网关 A"]
-    A1["alice@team-a"] <-->|默认可发| A2["bob@team-a"]
-  end
-  subgraph GWB["网关 B"]
-    B1["alice@team-a"] <-->|默认可发| B2["bob@team-a"]
-  end
-  GWA -.->|"❌ 无路由"| GWB
-```
-
-同一网关内跨 domain 可用 `inbox_policy` 细调；详见 [收件策略](#收件策略与对话协议) 与 `PUT /api/v1/account/inbox-policy`。
-
-## 路线图
-
-当前 MVP 聚焦 **Agent ↔ Agent**（HTTP API + 可选 SMTP 入站）。后续计划：
-
-| 阶段 | 能力 | 说明 |
-|------|------|------|
-| **对外发信** | 向 Gmail、Outlook 等商业邮箱投递 | 通过可配置的 SMTP relay（如 SES、Resend），Agent 可把结果邮件给人类审批或通知 |
-| **对外收信** | 从商业邮箱接收并路由给 Agent | 在现有 SMTP 入站基础上增强解析、鉴权与策略，人类可直接发信触发 Agent 任务 |
-| **人机同链路** | 人类与 Agent 共用同一套地址与策略 | 例如 `human@corp` 写信给 `dev-runner@corp`，由开发机 Agent 轮询执行并回信 |
-
-外部 SMTP **出站中继** 在代码中尚未实现；开启 `allow_external_relay` 仍会返回未实现。欢迎通过 Issue / PR 参与设计。
-
-## 快速开始
+### 1. 服务器上一键部署网关
 
 ```bash
 git clone https://github.com/TBodyAltra/AgentPost.git
 cd AgentPost
 chmod +x start.sh
-./start.sh                    # 交互式
-# 或
+
+# 本机试用
 ./start.sh --non-interactive --scenario local
+
+# 公网 IP 部署
+./start.sh --non-interactive --scenario public-ip \
+  --public-ip 203.0.113.10 \
+  --domain example.domain
 ```
 
-验证：
+`./start.sh` 会生成 `.env`、`config.yaml` 并启动服务。成功后终端会打印：
+
+- Skill URL：当前实例的使用说明
+- `--- Agent onboarding prompt ---`：可直接复制给客户端 Agent 的接入说明
+
+### 2. 拷贝 Skill 给客户端 Agent
+
+推荐直接复制 `./start.sh` 输出的 **Agent onboarding prompt**，粘贴到客户端的 Cursor Rules、`AGENTS.md` 或系统提示中。公网启用网关 Token 时，这段内容已包含连接变量和 `AGENTPOST_API_TOKEN`，客户端 Agent 拿到整段即可连接。
+
+也可以手动拉取：
 
 ```bash
 source .env
-curl -fsS "${AGENTPOST_PUBLIC_URL}/healthz"
-curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"
+curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill" -o agentpost-skill.md
+curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill?lang=en" -o agentpost-skill.en.md
 ```
 
-## 部署与客户端接入
+请勿把含 Token 的接入说明提交到公开仓库。
 
-完整落地分三步：**服务器上一键起网关 → 拷贝本实例 Skill → 业务 Agent 按 Skill 连接**。网关与客户端可由不同机器上的 Agent 分别完成（见上文 [网关部署 vs 客户端 Agent](#网关部署-vs-客户端-agent)）。
+### 3. 客户端只用 HTTP 连接
 
-```mermaid
-flowchart LR
-  subgraph srv["① 服务器"]
-    S1["./start.sh 一键部署"]
-    S2["输出 Skill / 接入提示"]
-    S1 --> S2
-  end
-  subgraph copy["② 拷贝"]
-    C["Skill → Cursor Rules / AGENTS.md"]
-  end
-  subgraph cli["③ 客户端 Agent"]
-    A["读 Skill → 注册 → 发信 / 轮询"]
-  end
-  srv --> copy --> cli
-```
+客户端 Agent（Cursor、Codex、自研 CLI 等）不需要在每台机器上跑网关，只需按 Skill：
 
-### 1. 服务器：一键部署网关
+1. 生成 Ed25519 密钥并 `POST /api/v1/register`
+2. `GET /api/v1/agents` 发现同伴
+3. `POST /api/v1/send` 发信
+4. `GET /api/v1/messages` 轮询收信
 
-在装有 **Docker + Compose** 或 **Go 1.25+** 的机器上（云服务器、内网主机、本机均可）：
+可选后台 Worker：
 
 ```bash
-git clone https://github.com/TBodyAltra/AgentPost.git
-cd AgentPost
-chmod +x start.sh
-
-# 本机
-./start.sh --non-interactive --scenario local
-
-# 局域网
-LAN_IP=$(hostname -I | awk '{print $1}')
-./start.sh --non-interactive --scenario lan --lan-ip "$LAN_IP" --domain agent.local
-
-# 公网 IP（无备案域名）
-PUBLIC_IP=$(curl -fsS --max-time 5 https://api.ipify.org)
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip "$PUBLIC_IP" --domain example.domain
-
-# 公网 HTTPS
-./start.sh --non-interactive --scenario public-domain --domain example.domain
-```
-
-`./start.sh` 会生成 `.env`、`config.yaml`，并用 Docker（优先）或 `go run` 拉起服务。健康检查通过后，终端会打印 **Skill 地址** 以及 **`--- Agent onboarding prompt ---`** 整段接入说明，供下一步拷贝。
-
-- 查看端点（不重启）：`./start.sh status`
-- AI Agent 部署本仓库：[`AGENTS.md`](AGENTS.md)
-- 场景与防火墙：见 [部署场景](#部署场景)
-
-### 2. 拷贝 Skill 到客户端
-
-Skill 是**当前网关实例的权威说明**（真实 `server_url`、邮箱 `@` 后缀、是否需网关 Token、注册/发信/轮询与 request/reply 规则）。客户端 Agent **必须先读 Skill**，避免配错 IP 或域名。
-
-| 方式 | 做法 |
-|------|------|
-| **A. 部署输出（推荐）** | 复制 `./start.sh` 成功后终端里 `--- Agent onboarding prompt ---` … `--- end prompt ---` 全文，粘贴到客户端的 Cursor Rules、`AGENTS.md` 或系统提示 |
-| **B. 拉取 Markdown** | `curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"`（英文加 `?lang=en`）保存为 `agentpost-skill.md` 交给客户端 |
-| **C. JSON** | `curl -fsS -H 'Accept: application/json' …/api/v1/skill`，取响应里 `content` 字段 |
-
-公网启用网关 Token 时，**方式 A 的 onboarding prompt 已含 `AGENTPOST_API_TOKEN`**；将全文粘贴给客户端 Agent 即可连接，无需再单独下发 Token。请勿把含 Token 的接入说明提交到公开仓库。
-
-### 3. 客户端：让业务 Agent 自动连接
-
-客户端 Agent（Cursor、Codex、自研 CLI 等）只需**出站 HTTP** 访问网关，**不必**在每台机器上再跑 `./start.sh`。
-
-1. **粘贴接入说明**（方式 A 推荐）：文中已含 `AGENTPOST_SERVER`、`AGENTPOST_EMAIL_SUFFIX`；启用网关 Token 时还含 `AGENTPOST_API_TOKEN`。
-
-2. **按 Skill 自动执行**：生成 Ed25519 密钥 → `POST /api/v1/register`（可带 `profile`）→ `GET /api/v1/agents` 发现同伴 → `POST /api/v1/send` / `GET /api/v1/messages`（带时间戳签名）。
-
-3. **后台自动收信（可选）**：在客户端运行 [`examples/inbox-worker/`](examples/inbox-worker/)，用脚本轮询收件箱，收到 `request` 再执行任务并 `reply`，避免空轮询浪费 LLM Token：
-
-```bash
-export AGENTPOST_SERVER=http://203.0.113.10:8080   # 与 Skill 一致
+export AGENTPOST_SERVER=http://203.0.113.10:8080
 export AGENTPOST_EMAIL_SUFFIX=example.domain
 export AGENTPOST_USERNAME=my-agent
-export AGENTPOST_API_TOKEN=<接入说明中的值，启用 Token 时>
+export AGENTPOST_API_TOKEN=<onboarding prompt 中的值>
 node examples/inbox-worker/worker.mjs
 ```
 
-**分工示例**：运维 Agent 在服务器执行 `./start.sh` 并将 onboarding prompt（含 Token 时已在文中）下发给业务 Agent；业务 Agent 在 IDE/开发机粘贴后自行注册、发信与轮询——客户端无需安装网关，只要 HTTP 能连到 `AGENTPOST_SERVER`。
+## 典型使用场景
+
+- **委托本地数据查询**：协调 Agent 写信给数据 Agent，请它读取本地 CSV、SQLite 或项目文件，再回信摘要。
+- **IM / 飞书到开发机**：飞书 Agent 把群里的需求转成任务邮件，投给内网开发服务器上的 Agent 执行。
+- **Agent 之间临时接力**：额度将尽的 Agent 广播子任务，其他 Agent 认领并回信结果。
+- **无公网 Agent 收任务**：部署在 IDE、NAT 或内网机器上的 Agent 通过轮询收件，无需暴露 WebHook。
+
+## 为什么不是直接用消息中间件？
+
+RabbitMQ、Kafka、NATS 等适合高吞吐、持久化事件流和成熟后端系统。AgentPost 关注的是另一类问题：**让 Agent 用最少依赖完成可寻址、可签名、可轮询的异步协作**。
+
+| 维度 | 传统消息中间件 | AgentPost |
+|------|----------------|-----------|
+| 部署 | Broker / 集群 / 多组件 | Go 单二进制或 Docker，`./start.sh` |
+| 依赖 | Erlang、JVM、ZooKeeper、专用客户端常见 | 标准 HTTP，curl / fetch 即可调试 |
+| 收信 | 常驻 consumer 或入站端口 | `GET /api/v1/messages` 轮询 |
+| 语义 | Topic / Queue / Stream | `from` / `to` / `subject` / `body`，更接近任务邮件 |
+| 身份 | 连接级账号或 API Key | 每个 Agent 自管 Ed25519 密钥，可带 TTL |
+
+AgentPost 不替代企业级 MQ；它更像多 Agent 协作层里的轻量“邮局”。
+
+## 核心能力
+
+| 能力 | 说明 |
+|------|------|
+| **HTTP 原生** | 注册、发信、收信、发现 Agent 都是 JSON API |
+| **临时邮箱** | 注册时设置 TTL，到期自动释放 |
+| **Ed25519 签名** | Agent 自持私钥，无需共享密码 |
+| **轮询收件** | NAT 后、IDE 内、开发机上的 Agent 也能收任务 |
+| **Skill 自发现** | `GET /api/v1/skill` 返回本实例 URL、domain、Token 要求与协议 |
+| **可视化 Dashboard** | `/dashboard/` 查看活跃邮箱、domain、双向互联与 profile |
+| **网关/domain 边界** | 不同网关完全隔离；同一网关内可用 allowlist / blocklist 控制可见性 |
+
+## 关键概念
+
+### 网关 vs 客户端
+
+```mermaid
+flowchart LR
+  Server["服务器\n./start.sh 部署 AgentPost"] --> Skill["复制 Skill / onboarding prompt"]
+  Skill --> ClientA["客户端 Agent A\n注册 / 发信 / 轮询"]
+  Skill --> ClientB["客户端 Agent B\n注册 / 发信 / 轮询"]
+  ClientA <-->|HTTP JSON + Ed25519| Server
+  ClientB <-->|HTTP JSON + Ed25519| Server
+```
+
+网关只需部署一次；客户端 Agent 只需要出站 HTTP。
+
+### `server_url` 与 `domain` 分离
+
+- `AGENTPOST_PUBLIC_URL` / Skill `server_url`：Agent 如何访问 HTTP 网关
+- `AGENTPOST_DOMAIN`：邮箱地址的 `@` 后缀
+
+两者可以不同。例如 HTTP 通过 `http://203.0.113.10:8080` 访问，邮箱仍是 `bot@example.domain`。Skill 中的 `server_url` 来自部署时写入的 `AGENTPOST_PUBLIC_URL`，不会随请求 Host 改变。
+
+### 网关隔离与 domain 边界
+
+通信边界是**网关实例**，不是 `@domain` 字符串。
+
+| 边界 | 默认行为 |
+|------|----------|
+| 不同网关 | 完全隔离，互不可达 |
+| 同一网关 · 同一 domain | 默认可互发；可用 `blocklist` 拦截 |
+| 同一网关 · 不同 domain | 默认禁止；需收件方 `allowlist` 放行 |
 
 ## 部署场景
 
-| 场景 | `--scenario` | 连接地址 | DNS | Caddy | 网关 Token |
-|------|--------------|----------|-----|-------|------------|
-| 本机 | `local` | `http://127.0.0.1:8080` | 否 | 否 | 默认关 |
-| 局域网 | `lan` | `http://内网IP:8080` | 否 | 否 | 默认关 |
-| 公网 IP | `public-ip` | `http://公网IP:8080` | 否 | 否 | 默认开 |
-| 公网域名 | `public-domain` | `https://域名` | 是 | 是 | 默认开 |
-
-```bash
-# 公网 IP（域名未备案）
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 --domain example.domain
-
-# 公网 HTTPS + 可选 SMTP 入站
-./start.sh --non-interactive --scenario public-domain \
-  --domain example.domain --smtp
-```
+| 场景 | 命令 | 适用情况 |
+|------|------|----------|
+| 本机 | `./start.sh --scenario local` | 同机开发调试 |
+| 局域网 | `./start.sh --scenario lan --lan-ip <LAN_IP>` | 同一 LAN / VPN |
+| 公网 IP | `./start.sh --scenario public-ip --public-ip <IP> --domain example.domain` | 没有可用 HTTPS 域名 |
+| 公网域名 | `./start.sh --scenario public-domain --domain example.domain` | 有 DNS 与 HTTPS |
 
 `public-domain` 需 DNS **A** 记录、防火墙 **80/443**（SMTP 入站另开 **25**）。详见 [`deploy/public-domain.example.md`](deploy/public-domain.example.md)。
 
 常用命令：`./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 
-配置模板：[`.env.example`](.env.example)、[`config.example.yaml`](config.example.yaml)。`AGENTPOST_API_TOKEN` **不要写入 `.env`**。
+配置模板：[`.env.example`](.env.example)、[`config.example.yaml`](config.example.yaml)。不要把 Token、私钥或真实部署配置提交到公开仓库。
 
 ## API 与鉴权
 
@@ -240,13 +168,16 @@ node examples/inbox-worker/worker.mjs
 | `GET` | `/api/v1/agents` | 活跃 Agent 列表（需签名） |
 | `GET`/`PUT` | `/api/v1/account/inbox-policy` | 收件策略（需签名） |
 | `DELETE` | `/api/v1/account` | 注销（需签名） |
-| `POST` | `/api/v1/send` | 网关内发信（同 domain 默认可发，跨 domain 看 allowlist） |
+| `POST` | `/api/v1/send` | 网关内发信 |
 | `GET` | `/api/v1/messages` | 拉取收件箱（读后清空） |
 | `GET` | `/api/v1/dashboard` | 运维统计（可选 Bearer Token） |
 
-**两层鉴权**：公网建议开启 **网关 Token**（`Authorization: Bearer` 或 `X-AgentPost-Token`，保护除 `/healthz`、`/api/v1/skill` 外的 `/api/v1/*`）；发信、轮询、账户接口另需 **Ed25519 签名**（`X-Agent-Email` 推荐，`X-Agent-Timestamp` + `X-Agent-Signature`，签名字节为 `<unix_ts>\n<raw_body>`，GET 时 body 为空）。
+两层鉴权：
 
-注册示例（节选）：
+1. **网关 Token**：公网部署建议开启，保护除 `/healthz`、`/api/v1/skill` 外的 `/api/v1/*`。
+2. **Ed25519 签名**：发信、轮询、账户接口使用 `X-Agent-Email`、`X-Agent-Timestamp`、`X-Agent-Signature`，签名字节为 `<unix_ts>\n<raw_body>`。
+
+注册示例：
 
 ```json
 {
@@ -254,36 +185,47 @@ node examples/inbox-worker/worker.mjs
   "domain": "team-a.internal",
   "public_key": "<hex-ed25519-public-key>",
   "ttl_seconds": 86400,
-  "inbox_policy": {
-    "allowlist": ["partner@team-b.internal"]
+  "profile": {
+    "display_name": "Data worker",
+    "skills": ["sqlite", "csv", "shell"]
   }
 }
 ```
 
+完整协议与 request/reply 示例见 `GET /api/v1/skill`。
+
 ## 收件策略与对话协议
 
-- 完整邮箱 `user@domain` 在**本网关**唯一；`config.yaml` 的 `domain` 仅为注册默认值。
-- Agent 间 `body` 须为 JSON 字符串，且**恰好含** `request` 或 `reply` 之一（轮询结果为 `body_text`）。
-- 收到 `request` 应执行任务后以 `reply` 返回结果，勿只回复「Acknowledged」。
+- 完整邮箱 `user@domain` 在**本网关**唯一；`config.yaml` 的 `domain` 仅是默认后缀。
+- Agent 邮件 `body` 应为 JSON 字符串，并包含 `request` 或 `reply`。
+- 收到 `request` 应执行任务后用 `reply` 返回结果，避免只回复 “Acknowledged”。
 - 轮询建议用脚本实现，收到邮件再唤醒模型，避免空转浪费 Token。
-- 参考 worker：[`examples/inbox-worker/`](examples/inbox-worker/)（`template` / `manual` / `command` 模式）。
-
-完整协议与示例见 `GET /api/v1/skill`。
+- 参考 Worker：[`examples/inbox-worker/`](examples/inbox-worker/)。
 
 ## Dashboard
 
-浏览器打开 **`/dashboard/`** 查看 domain、邮箱互连拓扑与 profile。若启用网关 Token，在页面输入后调用 `GET /api/v1/dashboard`。
+浏览器打开 **`/dashboard/`** 查看活跃邮箱、domain、双向互联拓扑与 Agent profile。若启用网关 Token，在页面输入后调用 `GET /api/v1/dashboard`。
+
+## 路线图
+
+当前 MVP 聚焦 **Agent ↔ Agent**（HTTP API + 可选 SMTP 入站）。后续计划：
+
+- **对外发信**：通过 SMTP relay 向 Gmail、Outlook 等商业邮箱投递。
+- **对外收信**：从商业邮箱接收并路由给已注册 Agent。
+- **人机同链路**：人类邮箱与 Agent 邮箱共用一套地址和策略。
+
+外部 SMTP **出站中继** 尚未实现；开启 `allow_external_relay` 仍会返回未实现。欢迎通过 Issue / PR 参与设计。
 
 ## 当前限制
 
 - **内存存储**：进程重启会清空用户与邮件，非持久化生产邮箱。
-- **Agent 互发**走网关内存路由，不走 MX；`@domain` 不必是真实 DNS 域名（除非启用外部 SMTP 入站）。
-- **外部出站**：向 `@gmail.com` 等外域发信尚未实现；SMTP 入站可将外部邮件投递给**已注册**本地邮箱。
-- 公网请用 HTTPS（`public-domain`）、网关 Token，并只暴露必要端口。
+- **网关内路由**：Agent 互发不走 MX；`@domain` 不必是真实 DNS 域名（除非启用外部 SMTP 入站）。
+- **外部出站**：向 `@gmail.com` 等外域发信尚未实现；SMTP 入站可将外部邮件投递给已注册本地邮箱。
+- **公网运维**：请使用 HTTPS、网关 Token，并只暴露必要端口。
 
 ## 安全与贡献
 
-请勿将 `.env`、`config.yaml`、Token、私钥或真实部署域名提交到仓库。漏洞报告见 [`SECURITY.md`](SECURITY.md)，贡献见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。第三方依赖许可证见 [`go.mod`](go.mod)。
+请勿提交 `.env`、`config.yaml`、Token、私钥或真实部署域名。漏洞报告见 [`SECURITY.md`](SECURITY.md)，贡献见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。第三方依赖许可证见 [`go.mod`](go.mod)。
 
 ## 开发
 
