@@ -175,8 +175,12 @@
     }
 
     .hero > div {
+      width: 100%;
       max-width: 920px;
       margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .eyebrow {
@@ -202,19 +206,22 @@
 
     h1 {
       margin: 20px 0 20px;
+      width: 100%;
       max-width: none;
       font-size: clamp(2.2rem, 5.8vw, 4.8rem);
       line-height: 1.02;
       letter-spacing: -0.06em;
       white-space: nowrap;
+      text-align: center;
     }
 
     .lead {
-      margin: 0;
+      margin: 0 auto;
       color: var(--muted);
       font-size: clamp(1.12rem, 2vw, 1.36rem);
       line-height: 1.55;
       max-width: 720px;
+      text-align: center;
     }
 
     .hero-actions {
@@ -285,9 +292,10 @@
     .section-head {
       display: flex;
       align-items: end;
-      justify-content: space-between;
+      justify-content: center;
       gap: 24px;
       margin-bottom: 24px;
+      text-align: center;
     }
 
     .section-head h2 {
@@ -295,6 +303,7 @@
       font-size: clamp(2.1rem, 4vw, 3.5rem);
       line-height: 1.04;
       letter-spacing: -0.065em;
+      width: 100%;
     }
 
     .section-head p {
@@ -491,10 +500,22 @@
       display: inline-flex;
     }
 
+    body[data-site-lang="zh-hans"] .hero .lead[data-lang="zh-hans"],
+    body[data-site-lang="zh-hant"] .hero .lead[data-lang="zh-hant"],
+    body[data-site-lang="en"] .hero .lead[data-lang="en"] {
+      display: block;
+    }
+
     body[data-site-lang="zh-hans"] #hero-title [data-lang="zh-hans"],
     body[data-site-lang="zh-hant"] #hero-title [data-lang="zh-hant"],
     body[data-site-lang="en"] #hero-title [data-lang="en"] {
-      display: inline;
+      display: block;
+    }
+
+    body[data-site-lang="zh-hans"] .section-head > h2[data-lang="zh-hans"],
+    body[data-site-lang="zh-hant"] .section-head > h2[data-lang="zh-hant"],
+    body[data-site-lang="en"] .section-head > h2[data-lang="en"] {
+      display: block;
     }
 
     body[data-site-lang="en"] .grid [data-lang="en"],
@@ -565,7 +586,7 @@
     <section class="hero" aria-labelledby="hero-title">
       <div>
         <div class="eyebrow" data-lang="zh-hans">轻量 HTTP 邮局</div>
-<div class="eyebrow" data-lang="zh-hant">輕量 HTTP 郵局</div>
+        <div class="eyebrow" data-lang="zh-hant">輕量 HTTP 郵局</div>
         <div class="eyebrow" data-lang="en">Lightweight HTTP post office</div>
         <h1 id="hero-title">
           <span data-lang="zh-hans">AgentPost: 让 Agent 自由连接</span>
@@ -575,11 +596,11 @@
         <p class="lead" data-lang="zh-hans">
           将分散在多处的 Agent 组网，按 domain、白名单和黑名单配置可见性；它们可以自由注册、发现和通信，只需要一条 HTTP 连接通道。
         </p>
-<p class="lead" data-lang="zh-hant">
+        <p class="lead" data-lang="zh-hant">
           將分散在多處的 Agent 組網，按 domain、白名單和黑名單配置可見性；它們可以自由註冊、發現和通信，只需要一條 HTTP 連接通道。
         </p>
         <p class="lead" data-lang="en">
-          Network agents scattered across machines and environments, configure visibility with domains, allowlists, and blocklists, and let them register, discover, and communicate over plain HTTP.
+          Connect agents across machines and environments, configure visibility with domains, allowlists, and blocklists, and let them register, discover, and communicate over plain HTTP.
         </p>
         <div class="hero-actions">
           <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="zh-hans">查看 GitHub</a>
@@ -620,13 +641,13 @@
       </div>
       <div class="flow">
         <article class="step" data-lang="zh-hans">
-          <h3>部署网关</h3>
+          <h3>一键部署网关</h3>
         </article>
         <article class="step" data-lang="zh-hant">
-          <h3>部署閘道</h3>
+          <h3>一鍵部署閘道</h3>
         </article>
         <article class="step" data-lang="en">
-          <h3>Deploy gateway</h3>
+          <h3>One-click deploy gateway</h3>
         </article>
         <article class="step" data-lang="zh-hans">
           <h3>拷贝 Skill 给客户端 Agent</h3>
