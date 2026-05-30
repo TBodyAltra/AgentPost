@@ -220,10 +220,49 @@
     .legend-item { display: flex; align-items: center; gap: 0.4rem; color: var(--text-2); }
     .dot { width: 9px; height: 9px; border-radius: 50%; }
 
-    .graph-wrap { position: relative; min-height: 440px; padding: 0.5rem; }
+    .hidden { display: none !important; }
+    .graph-wrap {
+      position: relative; min-height: 440px; padding: 0.5rem;
+      background: var(--surface-2); border-radius: 14px;
+    }
+    :root[data-theme="dark"] .graph-wrap { background: rgba(44, 44, 46, 0.55); }
     #graph-svg { width: 100%; height: 100%; min-height: 440px; display: block; }
     #graph-svg circle[data-email] { transition: r 0.2s var(--spring); }
-    .graph-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-3); font-size: 0.9rem; flex-direction: column; gap: 0.5rem; }
+    #graph-svg .node-label { font-size: 11px; font-weight: 600; pointer-events: none; }
+    #graph-svg .node-domain { font-size: 9px; fill: var(--text-3); pointer-events: none; }
+    .graph-empty, .graph-hint {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: var(--text-3); font-size: 0.9rem; flex-direction: column; gap: 0.5rem; text-align: center;
+      padding: 1.5rem; line-height: 1.45;
+    }
+    .graph-hint strong { color: var(--text-2); font-weight: 600; }
+    #graph-matrix { display: none; width: 100%; max-height: 480px; overflow: auto; }
+    #graph-matrix.active { display: block; }
+    #graph-svg.hidden { display: none; }
+    .matrix-table { border-collapse: separate; border-spacing: 0; font-size: 0.72rem; width: max-content; min-width: 100%; }
+    .matrix-table th, .matrix-table td {
+      border: 1px solid var(--hairline); padding: 0; text-align: center; vertical-align: middle;
+      background: var(--surface-solid);
+    }
+    .matrix-table thead th {
+      position: sticky; top: 0; z-index: 2; font-weight: 600; color: var(--text-2);
+      padding: 0.35rem 0.25rem; min-width: 2rem; max-width: 4.5rem;
+      font-family: var(--mono); font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .matrix-table tbody th {
+      position: sticky; left: 0; z-index: 1; text-align: left; font-weight: 600;
+      padding: 0.35rem 0.55rem; min-width: 5.5rem; max-width: 9rem;
+      font-family: var(--mono); font-size: 0.68rem; cursor: pointer;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .matrix-table tbody th.selected, .matrix-table thead th.selected-col { background: var(--accent-soft); color: var(--accent); }
+    .matrix-table td { width: 2rem; height: 2rem; cursor: default; }
+    .matrix-table td.cell-allowed { background: rgba(52, 199, 89, 0.22); }
+    :root[data-theme="dark"] .matrix-table td.cell-allowed { background: rgba(48, 209, 88, 0.28); }
+    .matrix-table td.cell-self { background: var(--surface-2); }
+    .matrix-table td.cell-empty { background: transparent; }
+    .matrix-note { font-size: 0.76rem; color: var(--text-3); padding: 0.55rem 0.15rem 0; }
+    .matrix-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
 
     /* Search */
     .search-bar { padding: 1.1rem 0 0; }
@@ -356,6 +395,10 @@
           <span class="panel-title" id="topology-title">投递拓扑</span>
           <span class="spacer"></span>
           <span class="refresh-note" id="refresh-note"><span class="live-dot"></span>实时 · 10s</span>
+          <div class="segmented" id="view-seg" role="tablist" aria-label="Graph view">
+            <button type="button" data-view="focus" class="active" id="view-focus">聚焦</button>
+            <button type="button" data-view="matrix" id="view-matrix">矩阵</button>
+          </div>
           <div class="segmented" id="filter-seg">
             <button data-filter="all" class="active" id="filter-all">全部</button>
             <button data-filter="cross" id="filter-cross">仅跨域</button>
@@ -363,10 +406,20 @@
           </div>
         </div>
         <div class="legend" id="legend">
-          <span class="legend-item"><span class="dot" style="background:var(--ok)"></span><span id="legend-allowed">允许投递</span><span style="color:var(--text-3);margin-left:0.15rem">→</span></span>
-          <span class="legend-item"><span style="display:inline-block;width:22px;height:0;border-top:2px solid var(--ok);vertical-align:middle;margin-right:0.35rem"></span><span id="legend-mutual">双向允许（无箭头）</span></span>
+          <span class="legend-item" id="legend-focus-items">
+            <span class="dot" style="background:var(--ok)"></span><span id="legend-allowed">允许投递</span><span style="color:var(--text-3);margin-left:0.15rem">→</span>
+          </span>
+          <span class="legend-item" id="legend-mutual-item">
+            <span style="display:inline-block;width:22px;height:0;border-top:2px solid var(--ok);vertical-align:middle;margin-right:0.35rem"></span><span id="legend-mutual">双向允许（无箭头）</span>
+          </span>
+          <span class="legend-item hidden" id="legend-matrix-item">
+            <span class="matrix-dot" style="vertical-align:middle;margin-right:0.35rem"></span><span id="legend-matrix">行 → 列：允许投递</span>
+          </span>
         </div>
-        <div class="graph-wrap"><svg id="graph-svg"></svg></div>
+        <div class="graph-wrap" id="graph-wrap">
+          <svg id="graph-svg" aria-label="Delivery topology"></svg>
+          <div id="graph-matrix" aria-label="Delivery matrix"></div>
+        </div>
       </section>
 
       <div class="search-bar">
@@ -413,8 +466,15 @@
         filterAll: "全部",
         filterCross: "仅跨域",
         filterBlocked: "仅禁止",
+        viewFocus: "聚焦",
+        viewMatrix: "矩阵",
         legendAllowed: "允许投递",
         legendMutual: "双向允许（无箭头）",
+        legendMatrix: "行 → 列：允许投递",
+        graphHintTitle: "选择邮箱查看投递关系",
+        graphHintBody: "在下方列表或搜索后点击邮箱，此处显示以该邮箱为中心的投递图（仅相关节点与连线）。",
+        matrixNote: "绿点表示该行邮箱可向列邮箱投递；行首点击可选中邮箱。",
+        matrixTruncated: "邮箱较多，仅显示前 {n} 个；请用搜索缩小范围。",
         detailTitle: "邮箱详情",
         detailEmpty: "点击邮箱或拓扑节点查看详情",
         searchPlaceholder: "搜索邮箱或 domain",
@@ -465,8 +525,15 @@
         filterAll: "全部",
         filterCross: "僅跨域",
         filterBlocked: "僅禁止",
+        viewFocus: "聚焦",
+        viewMatrix: "矩陣",
         legendAllowed: "允許投遞",
         legendMutual: "雙向允許（無箭頭）",
+        legendMatrix: "列 → 欄：允許投遞",
+        graphHintTitle: "選擇郵箱查看投遞關係",
+        graphHintBody: "在下方列表或搜尋後點擊郵箱，此處顯示以該郵箱為中心的投遞圖（僅相關節點與連線）。",
+        matrixNote: "綠點表示該列郵箱可向該欄郵箱投遞；列首點擊可選中郵箱。",
+        matrixTruncated: "郵箱較多，僅顯示前 {n} 個；請用搜尋縮小範圍。",
         detailTitle: "郵箱詳情",
         detailEmpty: "點擊郵箱或拓撲節點查看詳情",
         searchPlaceholder: "搜尋郵箱或 domain",
@@ -517,8 +584,15 @@
         filterAll: "All",
         filterCross: "Cross-domain",
         filterBlocked: "Denied only",
+        viewFocus: "Focus",
+        viewMatrix: "Matrix",
         legendAllowed: "Allowed delivery",
         legendMutual: "Both ways (no arrow)",
+        legendMatrix: "Row → column: allowed",
+        graphHintTitle: "Select a mailbox",
+        graphHintBody: "Click a mailbox in the list below to see its delivery graph—only related nodes and allowed edges.",
+        matrixNote: "Green dot = row can deliver to column. Click a row label to select that mailbox.",
+        matrixTruncated: "Showing first {n} mailboxes only; use search to narrow the list.",
         detailTitle: "Mailbox details",
         detailEmpty: "Select a mailbox or graph node",
         searchPlaceholder: "Search mailboxes or domains",
@@ -558,7 +632,8 @@
     };
 
     let lang = "zh-hans";
-    let state = { data: null, selected: null, token: "", filter: "all", search: "", prevStats: {} };
+    let state = { data: null, selected: null, token: "", filter: "all", search: "", graphView: "focus", prevStats: {} };
+    const MATRIX_CAP = 20;
     let refreshTimer = null;
 
     const $ = (id) => document.getElementById(id);
@@ -617,11 +692,15 @@
       dot.className = "live-dot";
       dot.setAttribute("aria-hidden", "true");
       note.append(dot, document.createTextNode(t("live")));
+      $("view-focus").textContent = t("viewFocus");
+      $("view-matrix").textContent = t("viewMatrix");
       $("filter-all").textContent = t("filterAll");
       $("filter-cross").textContent = t("filterCross");
       $("filter-blocked").textContent = t("filterBlocked");
       $("legend-allowed").textContent = t("legendAllowed");
       $("legend-mutual").textContent = t("legendMutual");
+      $("legend-matrix").textContent = t("legendMatrix");
+      updateLegendForView();
       $("detail-title").textContent = t("detailTitle");
       $("detail-empty-text").textContent = t("detailEmpty");
       $("search-input").placeholder = t("searchPlaceholder");
@@ -844,6 +923,222 @@
       });
     }
 
+    function updateLegendForView() {
+      const matrix = state.graphView === "matrix";
+      $("legend-focus-items").classList.toggle("hidden", matrix);
+      $("legend-mutual-item").classList.toggle("hidden", matrix);
+      $("legend-matrix-item").classList.toggle("hidden", !matrix);
+      $("graph-svg").classList.toggle("hidden", matrix);
+      $("graph-matrix").classList.toggle("active", matrix);
+    }
+
+    function allMailboxes(data) {
+      return data.domains.flatMap((d) => d.mailboxes);
+    }
+
+    function mailboxDomain(data, email) {
+      for (const d of data.domains) {
+        if (d.mailboxes.includes(email)) return d.domain;
+      }
+      return email.split("@")[1] || "";
+    }
+
+    function shortUser(email) {
+      return email.split("@")[0];
+    }
+
+    function mailboxesMatchingSearch(emails) {
+      const q = (state.search || "").trim().toLowerCase();
+      if (!q) return emails;
+      return emails.filter((e) => e.toLowerCase().includes(q) || mailboxDomain(state.data, e).toLowerCase().includes(q));
+    }
+
+    function emailsForMatrix(data) {
+      const links = filteredLinks(data);
+      let emails;
+      if (state.filter === "all") emails = allMailboxes(data);
+      else {
+        emails = [];
+        const seen = new Set();
+        links.forEach((l) => {
+          [l.from, l.to].forEach((e) => { if (!seen.has(e)) { seen.add(e); emails.push(e); } });
+        });
+      }
+      emails = mailboxesMatchingSearch(emails).sort();
+      return emails;
+    }
+
+    function deliveryAllowed(from, to, links) {
+      const link = links.find((l) => l.from === from && l.to === to);
+      return link && deliveryPermits(link.forward_status);
+    }
+
+    function focusPeers(center, data) {
+      const peers = new Set();
+      filteredLinks(data).forEach((l) => {
+        if (l.from !== center && l.to !== center) return;
+        const other = l.from === center ? l.to : l.from;
+        if (state.filter === "blocked") {
+          if (!deliveryPermits(l.forward_status) || !deliveryPermits(l.reverse_status)) peers.add(other);
+          return;
+        }
+        const outOK = l.from === center && deliveryPermits(l.forward_status);
+        const inOK = l.to === center && deliveryPermits(l.reverse_status);
+        if (outOK || inOK) peers.add(other);
+      });
+      return [...peers];
+    }
+
+    function clearGraphOverlays(wrap) {
+      wrap.querySelector(".graph-empty")?.remove();
+      wrap.querySelector(".graph-hint")?.remove();
+    }
+
+    function renderGraph(data) {
+      updateLegendForView();
+      const wrap = $("graph-wrap");
+      clearGraphOverlays(wrap);
+      $("graph-matrix").innerHTML = "";
+      if (!data.domains.length) {
+        $("graph-svg").innerHTML = "";
+        const e = document.createElement("div");
+        e.className = "graph-empty";
+        e.innerHTML = `<div>${esc(t("graphEmpty"))}</div>`;
+        wrap.appendChild(e);
+        return;
+      }
+      if (state.graphView === "matrix") {
+        $("graph-svg").innerHTML = "";
+        renderMatrix(data);
+        return;
+      }
+      $("graph-matrix").classList.remove("active");
+      renderFocusGraph(data);
+    }
+
+    function renderFocusGraph(data) {
+      const svg = $("graph-svg");
+      const wrap = $("graph-wrap");
+      const center = state.selected;
+      if (!center) {
+        svg.innerHTML = "";
+        const hint = document.createElement("div");
+        hint.className = "graph-hint";
+        hint.innerHTML = `<strong>${esc(t("graphHintTitle"))}</strong><div>${esc(t("graphHintBody"))}</div>`;
+        wrap.appendChild(hint);
+        return;
+      }
+
+      const peers = focusPeers(center, data);
+      const nodes = [center, ...peers];
+      const W = Math.max(wrap.clientWidth, 520);
+      const H = Math.max(440, 320);
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+
+      const cx = W / 2, cy = H / 2;
+      const positions = {};
+      positions[center] = { x: cx, y: cy };
+      const ringR = Math.min(W, H) * 0.34;
+      peers.forEach((email, i) => {
+        const angle = peers.length ? (2 * Math.PI * i) / peers.length - Math.PI / 2 : 0;
+        positions[email] = { x: cx + ringR * Math.cos(angle), y: cy + ringR * Math.sin(angle) };
+      });
+
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
+        (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      const accent = isDark ? "#0a84ff" : "#0071e3";
+      const textColor = isDark ? "#f5f5f7" : "#1d1d1f";
+      const labelColor = isDark ? "#aeaeb2" : "#6e6e73";
+      const links = filteredLinks(data);
+      const edgeParts = [];
+      const arrowFill = STATUS_COLORS.allowed;
+
+      let html = `<defs><marker id="arrow-allowed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <path d="M 0 1 L 9 5 L 0 9 z" fill="${arrowFill}"/>
+      </marker></defs>`;
+
+      links.forEach((l) => {
+        if (!nodes.includes(l.from) || !nodes.includes(l.to)) return;
+        const a = positions[l.from], b = positions[l.to];
+        if (!a || !b) return;
+        const fwdOK = deliveryPermits(l.forward_status);
+        const revOK = deliveryPermits(l.reverse_status);
+        if (!fwdOK && !revOK) return;
+
+        if (fwdOK && revOK) {
+          const pad = 26;
+          const seg = shortenSegment(a.x, a.y, b.x, b.y, pad);
+          const color = edgeColor(l.forward_status === "allowlisted" || l.reverse_status === "allowlisted" ? "allowlisted" : "allowed");
+          const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, 0);
+          html += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.4" opacity="0.88" stroke-linecap="round"/>`;
+          return;
+        }
+        if (fwdOK) appendAllowedEdge(edgeParts, a, b, l.forward_status, 1, null, true);
+        if (revOK) appendAllowedEdge(edgeParts, b, a, l.reverse_status, -1, null, true);
+      });
+      html += edgeParts.join("");
+
+      nodes.forEach((email) => {
+        const p = positions[email], on = email === center;
+        const r = on ? 28 : 22;
+        html += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${on ? accent : (isDark ? "#2c2c2e" : "#ffffff")}" stroke="${accent}" stroke-width="${on ? 3 : 2}" data-email="${esc(email)}" style="cursor:pointer"/>`;
+        html += `<text class="node-label" x="${p.x}" y="${p.y + 4}" text-anchor="middle" fill="${on ? "#fff" : textColor}">${esc(shortUser(email).slice(0, 12))}</text>`;
+        html += `<text class="node-domain" x="${p.x}" y="${p.y + r + 14}" text-anchor="middle">${esc(mailboxDomain(data, email))}</text>`;
+      });
+
+      if (!peers.length) {
+        html += `<text x="${cx}" y="${cy + 52}" text-anchor="middle" fill="${labelColor}" font-size="12">${esc(t("none"))}</text>`;
+      }
+
+      svg.innerHTML = html;
+      svg.querySelectorAll("circle[data-email]").forEach((c) => {
+        c.addEventListener("click", () => selectMailbox(c.getAttribute("data-email")));
+      });
+    }
+
+    function renderMatrix(data) {
+      const matrixEl = $("graph-matrix");
+      matrixEl.classList.add("active");
+      let emails = emailsForMatrix(data);
+      let truncated = false;
+      if (emails.length > MATRIX_CAP) {
+        truncated = true;
+        emails = emails.slice(0, MATRIX_CAP);
+      }
+      if (!emails.length) {
+        matrixEl.innerHTML = `<div class="graph-hint" style="position:relative;min-height:200px"><div>${esc(t("graphEmpty"))}</div></div>`;
+        return;
+      }
+
+      const links = filteredLinks(data);
+      const sel = state.selected;
+      let table = '<table class="matrix-table"><thead><tr><th></th>';
+      emails.forEach((col) => {
+        const cls = col === sel ? "selected-col" : "";
+        table += `<th class="${cls}" title="${esc(col)}">${esc(shortUser(col))}</th>`;
+      });
+      table += "</tr></thead><tbody>";
+      emails.forEach((row) => {
+        const rowCls = row === sel ? "selected" : "";
+        table += `<tr><th class="${rowCls}" data-email="${esc(row)}" title="${esc(row)}">${esc(shortUser(row))}</th>`;
+        emails.forEach((col) => {
+          if (row === col) {
+            table += '<td class="cell-self"></td>';
+            continue;
+          }
+          const ok = deliveryAllowed(row, col, links);
+          table += ok ? '<td class="cell-allowed"><span class="matrix-dot" aria-label="allowed"></span></td>' : '<td class="cell-empty"></td>';
+        });
+        table += "</tr>";
+      });
+      table += "</tbody></table>";
+      const note = `<div class="matrix-note">${esc(t("matrixNote"))}${truncated ? " " + esc(t("matrixTruncated").replace("{n}", String(MATRIX_CAP))) : ""}</div>`;
+      matrixEl.innerHTML = table + note;
+      matrixEl.querySelectorAll("tbody th[data-email]").forEach((th) => {
+        th.addEventListener("click", () => selectMailbox(th.getAttribute("data-email")));
+      });
+    }
+
     function shortenSegment(ax, ay, bx, by, pad) {
       const dx = bx - ax, dy = by - ay;
       const len = Math.hypot(dx, dy) || 1;
@@ -874,84 +1169,6 @@
       htmlParts.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round" marker-end="url(#arrow-allowed)"/>`);
     }
 
-    function renderGraph(data) {
-      const svg = $("graph-svg");
-      const wrap = svg.parentElement;
-      wrap.querySelector(".graph-empty")?.remove();
-      if (!data.domains.length) {
-        svg.innerHTML = "";
-        const e = document.createElement("div"); e.className = "graph-empty"; e.innerHTML = `<div>${esc(t("graphEmpty"))}</div>`;
-        wrap.appendChild(e); return;
-      }
-      const W = Math.max(wrap.clientWidth, 600);
-      const domains = data.domains;
-      const colW = Math.max(190, W / Math.max(domains.length, 1));
-      const nodeH = 44, topPad = 56;
-      const positions = {};
-      domains.forEach((d, di) => {
-        const cx = colW * di + colW / 2;
-        d.mailboxes.forEach((email, mi) => { positions[email] = { x: cx, y: topPad + mi * nodeH + 24 }; });
-      });
-      const maxRows = Math.max(...domains.map((d) => d.mailboxes.length), 1);
-      const H = Math.max(440, topPad + maxRows * nodeH + 40);
-      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-
-      const isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
-        (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      const links = filteredLinks(data);
-      const edgeParts = [];
-      const sel = state.selected;
-
-      const arrowFill = STATUS_COLORS.allowed;
-      let html = `<defs><marker id="arrow-allowed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-        <path d="M 0 1 L 9 5 L 0 9 z" fill="${arrowFill}"/>
-      </marker></defs>`;
-
-      links.forEach((l) => {
-        const a = positions[l.from], b = positions[l.to];
-        if (!a || !b) return;
-        const related = !sel || l.from === sel || l.to === sel;
-        const fwdOK = deliveryPermits(l.forward_status);
-        const revOK = deliveryPermits(l.reverse_status);
-        if (!fwdOK && !revOK) return;
-
-        if (fwdOK && revOK) {
-          const pad = 22;
-          const seg = shortenSegment(a.x, a.y, b.x, b.y, pad);
-          const color = edgeColor(l.forward_status === "allowlisted" || l.reverse_status === "allowlisted" ? "allowlisted" : "allowed");
-          const opacity = sel ? (related ? 0.9 : 0.1) : 0.75;
-          const width = related && sel ? 2.6 : 1.9;
-          const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, 0);
-          html += `<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round"/>`;
-          return;
-        }
-
-        if (fwdOK) appendAllowedEdge(edgeParts, a, b, l.forward_status, 1, sel, related);
-        if (revOK) appendAllowedEdge(edgeParts, b, a, l.reverse_status, -1, sel, related);
-      });
-      html += edgeParts.join("");
-
-      const boxFill = isDark ? "rgba(44,44,46,0.5)" : "rgba(255,255,255,0.6)";
-      const boxStroke = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
-      const accent = isDark ? "#0a84ff" : "#0071e3";
-      const labelColor = isDark ? "#aeaeb2" : "#6e6e73";
-      const textColor = isDark ? "#f5f5f7" : "#1d1d1f";
-
-      domains.forEach((d, di) => {
-        const x = colW * di + 14, boxH = d.mailboxes.length * nodeH + 42;
-        html += `<rect x="${x}" y="16" width="${colW - 28}" height="${boxH}" rx="16" fill="${boxFill}" stroke="${d.is_default ? accent : boxStroke}" stroke-width="${d.is_default ? 1.6 : 1}"/>`;
-        html += `<text x="${x + 14}" y="40" fill="${labelColor}" font-size="12" font-weight="600">${esc(d.domain)}</text>`;
-        d.mailboxes.forEach((email) => {
-          const p = positions[email], on = sel === email;
-          html += `<circle cx="${p.x}" cy="${p.y}" r="${on ? 19 : 17}" fill="${on ? accent : (isDark ? "#1c1c1e" : "#ffffff")}" stroke="${accent}" stroke-width="${on ? 3 : 1.75}" data-email="${esc(email)}" style="cursor:pointer"/>`;
-          html += `<text x="${p.x}" y="${p.y + 4}" text-anchor="middle" fill="${on ? "#fff" : textColor}" font-size="10" font-weight="600" pointer-events="none">${esc(email.split("@")[0].slice(0, 9))}</text>`;
-        });
-      });
-
-      svg.innerHTML = html;
-      svg.querySelectorAll("circle[data-email]").forEach((c) => c.addEventListener("click", () => selectMailbox(c.getAttribute("data-email"))));
-    }
-
     function esc(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); }
     function fmtTime(iso) { try { return new Date(iso).toLocaleString(); } catch { return iso; } }
 
@@ -959,6 +1176,12 @@
       try {
         const data = await fetchDashboard();
         state.data = data;
+        if (!state.graphViewTouched && allMailboxes(data).length > 8) {
+          state.graphView = "matrix";
+          $("view-seg").querySelectorAll("button").forEach((x) => {
+            x.classList.toggle("active", x.dataset.view === state.graphView);
+          });
+        }
         renderStats(data); renderDomains(data); renderGraph(data);
         if (state.selected) renderDetail(data, state.selected, false);
         if (manual) showToast(t("refreshed"), "ok");
@@ -1001,6 +1224,13 @@
     });
     $("refresh-btn").addEventListener("click", doRefresh);
 
+    $("view-seg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      state.graphView = b.dataset.view;
+      state.graphViewTouched = true;
+      $("view-seg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+      if (state.data) renderGraph(state.data);
+    }));
+
     $("filter-seg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
       state.filter = b.dataset.filter;
       $("filter-seg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
@@ -1011,13 +1241,13 @@
     searchInput.addEventListener("input", () => {
       state.search = searchInput.value;
       $("search-field").classList.toggle("has-value", !!searchInput.value);
-      if (state.data) renderDomains(state.data);
+      if (state.data) { renderDomains(state.data); renderGraph(state.data); }
     });
     $("search-clear").addEventListener("click", () => {
       searchInput.value = ""; state.search = "";
       $("search-field").classList.remove("has-value");
       searchInput.focus();
-      if (state.data) renderDomains(state.data);
+      if (state.data) { renderDomains(state.data); renderGraph(state.data); }
     });
 
     document.addEventListener("keydown", (e) => {
