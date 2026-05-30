@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AgentPost - AI Agent Mail Gateway</title>
-  <meta name="description" content="AgentPost is a lightweight HTTP-native mail gateway for AI agents with temporary mailboxes, Ed25519 signatures, inbox polling, and deployment-aware skill output.">
+  <meta name="description" content="AgentPost gives AI agents temporary mailboxes over a lightweight HTTP gateway: one-command server deploy, copyable skill onboarding, signed delivery, and inbox polling.">
   <meta property="og:title" content="AgentPost - AI Agent Mail Gateway">
-  <meta property="og:description" content="Temporary mailboxes, signed HTTP APIs, inbox polling, and deployment-aware skill docs for AI agents.">
+  <meta property="og:description" content="Give every AI agent a temporary mailbox over one lightweight HTTP lane.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tbodyaltra.github.io/AgentPost/">
   <link rel="canonical" href="https://tbodyaltra.github.io/AgentPost/">
@@ -14,25 +14,25 @@
   <style>
     :root {
       color-scheme: light dark;
-      --bg: #f8fafc;
-      --bg-soft: #eff6ff;
-      --card: rgba(255, 255, 255, 0.82);
+      --bg: #f5f5f7;
+      --bg-soft: #ffffff;
+      --card: rgba(255, 255, 255, 0.72);
       --card-strong: #ffffff;
-      --text: #0f172a;
-      --muted: #475569;
-      --subtle: #64748b;
-      --line: rgba(15, 23, 42, 0.1);
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-      --primary-soft: rgba(37, 99, 235, 0.12);
+      --text: #1d1d1f;
+      --muted: #515154;
+      --subtle: #6e6e73;
+      --line: rgba(29, 29, 31, 0.1);
+      --primary: #0071e3;
+      --primary-dark: #0066cc;
+      --primary-soft: rgba(0, 113, 227, 0.11);
       --green: #16a34a;
       --amber: #d97706;
       --purple: #7c3aed;
-      --shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
-      --radius-lg: 28px;
-      --radius-md: 20px;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.08);
+      --radius-lg: 32px;
+      --radius-md: 24px;
       --radius-sm: 14px;
-      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
       --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     }
 
@@ -68,11 +68,12 @@
       margin: 0;
       font-family: var(--font);
       background:
-        radial-gradient(circle at 12% 0%, rgba(37, 99, 235, 0.22), transparent 34rem),
-        radial-gradient(circle at 88% 12%, rgba(124, 58, 237, 0.18), transparent 32rem),
-        linear-gradient(180deg, var(--bg-soft), var(--bg) 32rem);
+        radial-gradient(circle at 50% -12rem, rgba(0, 113, 227, 0.14), transparent 36rem),
+        linear-gradient(180deg, var(--bg-soft), var(--bg) 38rem);
       color: var(--text);
       line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
     }
 
     a {
@@ -105,11 +106,11 @@
     .nav-inner {
       width: min(1180px, calc(100% - 32px));
       margin: 0 auto;
-      min-height: 72px;
+      min-height: 64px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 18px;
+      gap: 16px;
     }
 
     .brand {
@@ -117,18 +118,18 @@
       align-items: center;
       gap: 12px;
       font-weight: 780;
-      letter-spacing: -0.04em;
+      letter-spacing: -0.03em;
       font-size: 1.15rem;
     }
 
     .logo {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       display: grid;
       place-items: center;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #2563eb, #7c3aed);
-      box-shadow: 0 16px 34px rgba(37, 99, 235, 0.3);
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0071e3, #7c3aed);
+      box-shadow: 0 14px 30px rgba(0, 113, 227, 0.24);
     }
 
     .logo svg {
@@ -202,11 +203,12 @@
     }
 
     .hero {
-      padding: 92px 0 64px;
+      padding: 104px 0 70px;
       display: grid;
       grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
       gap: 42px;
       align-items: center;
+      min-height: calc(100vh - 64px);
     }
 
     .eyebrow {
@@ -231,17 +233,18 @@
     }
 
     h1 {
-      margin: 22px 0 18px;
+      margin: 20px 0 20px;
       max-width: 830px;
-      font-size: clamp(3.1rem, 8vw, 6.6rem);
-      line-height: 0.92;
-      letter-spacing: -0.08em;
+      font-size: clamp(3rem, 7.4vw, 6.4rem);
+      line-height: 0.94;
+      letter-spacing: -0.075em;
     }
 
     .lead {
       margin: 0;
       color: var(--muted);
-      font-size: clamp(1.08rem, 2vw, 1.28rem);
+      font-size: clamp(1.12rem, 2vw, 1.36rem);
+      line-height: 1.55;
       max-width: 720px;
     }
 
@@ -308,7 +311,7 @@
       color: #e2e8f0;
       box-shadow: var(--shadow);
       overflow: hidden;
-      transform: rotate(1.2deg);
+      transform: none;
     }
 
     .terminal-bar {
@@ -348,7 +351,7 @@
     }
 
     section {
-      padding: 54px 0;
+      padding: 64px 0;
     }
 
     .section-head {
@@ -361,9 +364,9 @@
 
     .section-head h2 {
       margin: 0;
-      font-size: clamp(2rem, 4vw, 3.2rem);
-      line-height: 1;
-      letter-spacing: -0.06em;
+      font-size: clamp(2.1rem, 4vw, 3.5rem);
+      line-height: 1.04;
+      letter-spacing: -0.065em;
     }
 
     .section-head p {
@@ -383,7 +386,8 @@
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
       background: var(--card);
-      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.045);
+      backdrop-filter: blur(20px);
     }
 
     .card-icon {
@@ -411,7 +415,7 @@
 
     .flow {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 14px;
       counter-reset: flow;
     }
@@ -679,12 +683,9 @@
         <span>AgentPost</span>
       </a>
       <div class="nav-links">
-        <a href="#dashboard" data-lang="zh-hans">仪表盘</a>
-        <a href="#dashboard" data-lang="zh-hant">儀表盤</a>
-        <a href="#dashboard" data-lang="en">Dashboard</a>
-        <a href="#compare" data-lang="zh-hans">对比</a>
-        <a href="#compare" data-lang="zh-hant">對比</a>
-        <a href="#compare" data-lang="en">Compare</a>
+        <a href="#onboarding" data-lang="zh-hans">接入</a>
+        <a href="#onboarding" data-lang="zh-hant">接入</a>
+        <a href="#onboarding" data-lang="en">Connect</a>
         <a href="#features" data-lang="zh-hans">特性</a>
         <a href="#features" data-lang="zh-hant">特性</a>
         <a href="#features" data-lang="en">Features</a>
@@ -694,9 +695,12 @@
         <a href="#use-cases" data-lang="zh-hans">案例</a>
         <a href="#use-cases" data-lang="zh-hant">案例</a>
         <a href="#use-cases" data-lang="en">Use cases</a>
-        <a href="#onboarding" data-lang="zh-hans">接入</a>
-        <a href="#onboarding" data-lang="zh-hant">接入</a>
-        <a href="#onboarding" data-lang="en">Connect</a>
+        <a href="#dashboard" data-lang="zh-hans">仪表盘</a>
+        <a href="#dashboard" data-lang="zh-hant">儀表盤</a>
+        <a href="#dashboard" data-lang="en">Dashboard</a>
+        <a href="#compare" data-lang="zh-hans">对比</a>
+        <a href="#compare" data-lang="zh-hant">對比</a>
+        <a href="#compare" data-lang="en">Compare</a>
         <a href="#deploy" data-lang="zh-hans">部署</a>
         <a href="#deploy" data-lang="zh-hant">部署</a>
         <a href="#deploy" data-lang="en">Deploy</a>
@@ -713,18 +717,22 @@
   <main id="top" class="page">
     <section class="hero" aria-labelledby="hero-title">
       <div>
-        <div class="eyebrow" data-lang="zh-hans">面向 AI Agent 的轻量邮件网关</div>
-<div class="eyebrow" data-lang="zh-hant">面向 AI Agent 的輕量郵件網關</div>
-        <div class="eyebrow" data-lang="en">A lightweight mail gateway for AI agents</div>
-        <h1 id="hero-title">AgentPost</h1>
+        <div class="eyebrow" data-lang="zh-hans">一条 HTTP 通道，连接你的 Agent</div>
+<div class="eyebrow" data-lang="zh-hant">一條 HTTP 通道，連接你的 Agent</div>
+        <div class="eyebrow" data-lang="en">One HTTP lane for your agents</div>
+        <h1 id="hero-title">
+          <span data-lang="zh-hans">给 Agent 一个临时邮箱。</span>
+          <span data-lang="zh-hant">給 Agent 一個臨時郵箱。</span>
+          <span data-lang="en">Give every agent a mailbox.</span>
+        </h1>
         <p class="lead" data-lang="zh-hans">
-          相比 RabbitMQ、Kafka 等消息中间件的复杂安装与多环境依赖，AgentPost 只需 HTTP 连接：注册临时邮箱、Ed25519 签名发信、轮询收件，并通过 Skill 获取本实例规则——无需 Broker、专用 SDK 或公网 WebHook。
+          AgentPost 是面向 AI Agent 的轻量邮局：服务器一键部署，客户端只需出站 HTTP。Agent 注册邮箱、签名发信、轮询收件，再通过 Skill 自动学习本实例的连接方式与规则。
         </p>
 <p class="lead" data-lang="zh-hant">
-          相比 RabbitMQ、Kafka 等消息中間件的複雜安裝與多環境依賴，AgentPost 只需 HTTP 連接：註冊臨時郵箱、Ed25519 簽名發信、輪詢收件，並通過 Skill 獲取本實例規則——無需 Broker、專用 SDK 或公網 WebHook。
+          AgentPost 是面向 AI Agent 的輕量郵局：伺服器一鍵部署，客戶端只需出站 HTTP。Agent 註冊郵箱、簽名發信、輪詢收件，再通過 Skill 自動學習本實例的連接方式與規則。
         </p>
         <p class="lead" data-lang="en">
-          Skip heavy message middleware—RabbitMQ, Kafka, and similar stacks need brokers, extra runtimes, and client SDKs. AgentPost runs on plain HTTP: temporary mailboxes, signed delivery, inbox polling, and deployment-aware skill docs—no broker, no dedicated SDK, no public webhook.
+          AgentPost is a lightweight post office for AI agents: one-command server deploy, outbound HTTP for clients, temporary mailboxes, signed delivery, inbox polling, and deployment-aware skill docs.
         </p>
         <div class="hero-actions">
           <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="zh-hans">查看 GitHub</a>
@@ -736,22 +744,22 @@
         </div>
         <div class="stats" aria-label="Project highlights">
           <div class="stat">
+            <strong>Deploy</strong>
+            <span data-lang="zh-hans">一键起服</span>
+<span data-lang="zh-hant">一鍵起服</span>
+            <span data-lang="en">one command</span>
+          </div>
+          <div class="stat">
             <strong>HTTP</strong>
-            <span data-lang="zh-hans">原生 API</span>
-<span data-lang="zh-hant">原生 API</span>
-            <span data-lang="en">native APIs</span>
+            <span data-lang="zh-hans">客户端连接</span>
+<span data-lang="zh-hant">客戶端連接</span>
+            <span data-lang="en">client access</span>
           </div>
           <div class="stat">
-            <strong>Ed25519</strong>
-            <span data-lang="zh-hans">无密码签名</span>
-<span data-lang="zh-hant">無密碼簽名</span>
-            <span data-lang="en">passwordless signatures</span>
-          </div>
-          <div class="stat">
-            <strong>TTL</strong>
-            <span data-lang="zh-hans">临时身份</span>
-<span data-lang="zh-hant">臨時身份</span>
-            <span data-lang="en">temporary identities</span>
+            <strong>Skill</strong>
+            <span data-lang="zh-hans">复制即用</span>
+<span data-lang="zh-hant">複製即用</span>
+            <span data-lang="en">copy to agents</span>
           </div>
         </div>
       </div>
@@ -776,99 +784,53 @@
       </div>
     </section>
 
-    <section id="dashboard" class="dashboard-showcase">
+    <section id="onboarding">
       <div class="section-head">
-        <h2 data-lang="zh-hans">运维互联仪表盘</h2>
-        <h2 data-lang="zh-hant">運維互聯儀表盤</h2>
-        <h2 data-lang="en">Operations dashboard</h2>
-        <p data-lang="zh-hans">部署网关后，用 Token 登录即可查看活跃邮箱、域内互联拓扑与 Agent 资料——与运行中的 <code>/dashboard/</code> 一致。</p>
-        <p data-lang="zh-hant">部署閘道後，用 Token 登入即可查看活躍郵箱、域內互聯拓撲與 Agent 資料——與運行中的 <code>/dashboard/</code> 一致。</p>
-        <p data-lang="en">After deploying the gateway, sign in with your token to inspect active mailboxes, intra-domain topology, and agent profiles—the same UI served at <code>/dashboard/</code>.</p>
+        <h2 data-lang="zh-hans">三步接入</h2>
+        <h2 data-lang="zh-hant">三步接入</h2>
+        <h2 data-lang="en">Connect in three steps</h2>
+        <p data-lang="zh-hans">先在服务器部署一个网关，再把 Skill 复制给客户端 Agent。客户端不用安装服务端，只要能访问 HTTP。</p>
+        <p data-lang="zh-hant">先在伺服器部署一個閘道，再把 Skill 複製給客戶端 Agent。客戶端不用安裝服務端，只要能訪問 HTTP。</p>
+        <p data-lang="en">Deploy one gateway on a server, then copy the skill to client agents. Clients do not install the gateway; outbound HTTP is enough.</p>
       </div>
-      <figure class="dashboard-frame">
-        <img
-          id="dashboard-screenshot"
-          src="images/dashboard.png"
-          width="1536"
-          height="1024"
-          loading="lazy"
-          decoding="async"
-          alt="AgentPost 仪表盘：活跃邮箱统计、互联拓扑图与邮箱详情面板"
-        >
-        <figcaption data-lang="zh-hans">实时拓扑、跨域策略与 Agent profile 一览；支持简 / 繁 / 英文界面。</figcaption>
-        <figcaption data-lang="zh-hant">即時拓撲、跨域策略與 Agent profile 一覽；支援簡 / 繁 / 英文介面。</figcaption>
-        <figcaption data-lang="en">Live topology, cross-domain policy edges, and agent profiles—with Simplified Chinese, Traditional Chinese, and English UI.</figcaption>
-      </figure>
-    </section>
-
-    <section id="compare">
-      <div class="section-head">
-        <h2 data-lang="zh-hans">对比消息中间件</h2>
-        <h2 data-lang="zh-hant">對比消息中間件</h2>
-        <h2 data-lang="en">vs message middleware</h2>
-        <p data-lang="zh-hans">传统 MQ 适合高吞吐与持久化事件流；AgentPost 适合「多 Agent 快速组网」——部署轻、接入简单，Agent 只要有出站 HTTP 就能协作。</p>
-        <p data-lang="zh-hant">傳統 MQ 適合高吞吐與持久化事件流；AgentPost 適合「多 Agent 快速組網」——部署輕、接入簡單，Agent 只要有出站 HTTP 就能協作。</p>
-        <p data-lang="en">Traditional MQ shines at throughput and durable event streams. AgentPost targets fast multi-agent wiring—light deploy, simple onboarding, outbound HTTP is enough.</p>
+      <div class="flow">
+        <article class="step" data-lang="zh-hans">
+          <h3>部署网关</h3>
+          <p>在云服务器、内网主机或本机执行 <code>./start.sh --scenario …</code>。</p>
+        </article>
+        <article class="step" data-lang="zh-hant">
+          <h3>部署閘道</h3>
+          <p>在雲伺服器、內網主機或本機執行 <code>./start.sh --scenario …</code>。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>Deploy gateway</h3>
+          <p>Run <code>./start.sh --scenario …</code> on a cloud VM, LAN host, or laptop.</p>
+        </article>
+        <article class="step" data-lang="zh-hans">
+          <h3>复制 Skill</h3>
+          <p>复制终端输出的 <code>Agent onboarding prompt</code>。启用 Token 时，连接变量与 Token 已在其中。</p>
+        </article>
+        <article class="step" data-lang="zh-hant">
+          <h3>複製 Skill</h3>
+          <p>複製終端輸出的 <code>Agent onboarding prompt</code>。啓用 Token 時，連接變量與 Token 已在其中。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>Copy skill</h3>
+          <p>Copy the terminal's <code>Agent onboarding prompt</code>. When tokens are enabled, connection variables and token are included.</p>
+        </article>
+        <article class="step" data-lang="zh-hans">
+          <h3>客户端连接</h3>
+          <p>业务 Agent 粘贴 Skill 后自行注册、发信、轮询；每台客户端只需要出站 HTTP。</p>
+        </article>
+        <article class="step" data-lang="zh-hant">
+          <h3>客戶端連接</h3>
+          <p>業務 Agent 貼上 Skill 後自行註冊、發信、輪詢；每台客戶端只需要出站 HTTP。</p>
+        </article>
+        <article class="step" data-lang="en">
+          <h3>Clients connect</h3>
+          <p>Business agents paste the skill, then register, send, and poll. Each client only needs outbound HTTP.</p>
+        </article>
       </div>
-      <table class="scenario-table">
-        <thead>
-          <tr>
-            <th data-lang="zh-hans">维度</th>
-            <th data-lang="zh-hant">維度</th>
-            <th data-lang="en">Dimension</th>
-            <th data-lang="zh-hans">RabbitMQ / Kafka / NATS 等</th>
-            <th data-lang="zh-hant">RabbitMQ / Kafka / NATS 等</th>
-            <th data-lang="en">RabbitMQ / Kafka / NATS</th>
-            <th>AgentPost</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td data-lang="zh-hans">部署</td>
-            <td data-lang="zh-hant">部署</td>
-            <td data-lang="en">Deploy</td>
-            <td data-lang="zh-hans">独立 Broker、集群组件、运维成本高</td>
-            <td data-lang="zh-hant">獨立 Broker、叢集組件、運維成本高</td>
-            <td data-lang="en">Separate broker, cluster parts, heavier ops</td>
-            <td data-lang="zh-hans"><code>./start.sh</code> 或 Docker，Go 单二进制</td>
-            <td data-lang="zh-hant"><code>./start.sh</code> 或 Docker，Go 單二進制</td>
-            <td data-lang="en"><code>./start.sh</code> or Docker, single Go binary</td>
-          </tr>
-          <tr>
-            <td data-lang="zh-hans">环境依赖</td>
-            <td data-lang="zh-hant">環境依賴</td>
-            <td data-lang="en">Dependencies</td>
-            <td data-lang="zh-hans">Erlang、JVM、ZooKeeper 等运行时常见</td>
-            <td data-lang="zh-hant">Erlang、JVM、ZooKeeper 等運行時常見</td>
-            <td data-lang="en">Erlang, JVM, ZooKeeper, etc.</td>
-            <td data-lang="zh-hans">标准 HTTP（curl / fetch / 任意 HTTP 客户端）</td>
-            <td data-lang="zh-hant">標準 HTTP（curl / fetch / 任意 HTTP 客戶端）</td>
-            <td data-lang="en">Plain HTTP (curl, fetch, any HTTP client)</td>
-          </tr>
-          <tr>
-            <td data-lang="zh-hans">Agent 接入</td>
-            <td data-lang="zh-hant">Agent 接入</td>
-            <td data-lang="en">Agent client</td>
-            <td data-lang="zh-hans">专用 SDK、长连接 consumer、Topic/Queue 建模</td>
-            <td data-lang="zh-hant">專用 SDK、長連接 consumer、Topic/Queue 建模</td>
-            <td data-lang="en">Dedicated SDK, long-lived consumer, topic/queue model</td>
-            <td data-lang="zh-hans">JSON API + Ed25519 签名，无专用客户端</td>
-            <td data-lang="zh-hant">JSON API + Ed25519 簽名，無專用客戶端</td>
-            <td data-lang="en">JSON APIs + Ed25519 signing, no special client</td>
-          </tr>
-          <tr>
-            <td data-lang="zh-hans">收信</td>
-            <td data-lang="zh-hant">收信</td>
-            <td data-lang="en">Receive</td>
-            <td data-lang="zh-hans">常驻 consumer 或暴露入站端口 / WebHook</td>
-            <td data-lang="zh-hant">常駐 consumer 或暴露入站端口 / WebHook</td>
-            <td data-lang="en">Persistent consumer or inbound port / webhook</td>
-            <td data-lang="zh-hans"><code>GET /api/v1/messages</code> 轮询，NAT 后也能收</td>
-            <td data-lang="zh-hant"><code>GET /api/v1/messages</code> 輪詢，NAT 後也能收</td>
-            <td data-lang="en">Poll <code>GET /api/v1/messages</code>—works behind NAT</td>
-          </tr>
-        </tbody>
-      </table>
     </section>
 
     <section id="features">
@@ -1104,56 +1066,99 @@
       </div>
     </section>
 
-    <section id="onboarding">
+    <section id="dashboard" class="dashboard-showcase">
       <div class="section-head">
-        <h2 data-lang="zh-hans">部署与客户端接入</h2>
-        <h2 data-lang="zh-hant">部署與客戶端接入</h2>
-        <h2 data-lang="en">Deploy gateway &amp; connect clients</h2>
-        <p data-lang="zh-hans">三步完成：服务器上一键起网关 → 拷贝本实例 Skill → 业务 Agent 按 Skill 用 HTTP 注册、发信、轮询。客户端无需再装服务端，只要出站能访问网关。</p>
-        <p data-lang="zh-hant">三步完成：伺服器上一鍵起閘道 → 拷貝本實例 Skill → 業務 Agent 按 Skill 用 HTTP 註冊、發信、輪詢。客戶端無需再裝服務端，只要出站能訪問閘道。</p>
-        <p data-lang="en">Three steps: one-command gateway on a server → copy this instance’s skill → client agents register, send, and poll over HTTP. Clients do not run the gateway—only outbound HTTP to <code>AGENTPOST_SERVER</code>.</p>
+        <h2 data-lang="zh-hans">可视化仪表盘</h2>
+        <h2 data-lang="zh-hant">可視化儀表盤</h2>
+        <h2 data-lang="en">Visual dashboard</h2>
+        <p data-lang="zh-hans">部署后打开 <code>/dashboard/</code>，即可查看活跃邮箱、Agent 资料与双向互联关系。谁能沟通、谁被阻断，一眼可见。</p>
+        <p data-lang="zh-hant">部署後打開 <code>/dashboard/</code>，即可查看活躍郵箱、Agent 資料與雙向互聯關係。誰能溝通、誰被阻斷，一眼可見。</p>
+        <p data-lang="en">Open <code>/dashboard/</code> after deployment to inspect active mailboxes, agent profiles, and bidirectional connectivity—who can talk, and who is blocked.</p>
       </div>
-      <div class="flow">
-        <article class="step" data-lang="zh-hans">
-          <h3>① 服务器一键部署</h3>
-          <p>在云上或内网主机执行 <code>./start.sh --scenario …</code>。成功后终端输出 Skill URL 与 <code>Agent onboarding prompt</code> 全文，供拷贝。</p>
-        </article>
-        <article class="step" data-lang="zh-hant">
-          <h3>① 伺服器一鍵部署</h3>
-          <p>在雲上或內網主機執行 <code>./start.sh --scenario …</code>。成功後終端輸出 Skill URL 與 <code>Agent onboarding prompt</code> 全文，供拷貝。</p>
-        </article>
-        <article class="step" data-lang="en">
-          <h3>① One-command server deploy</h3>
-          <p>Run <code>./start.sh --scenario …</code> on a cloud or LAN host. The terminal prints the skill URL and the full <code>Agent onboarding prompt</code> block to copy.</p>
-        </article>
-        <article class="step" data-lang="zh-hans">
-          <h3>② 拷贝 Skill</h3>
-          <p>复制 <code>./start.sh</code> 成功后终端里的 <code>Agent onboarding prompt</code> 全文（推荐），或 <code>curl …/api/v1/skill</code> 保存 Markdown，粘贴到 Cursor Rules / <code>AGENTS.md</code>。<strong>启用网关 Token 时，onboarding prompt 已含 <code>AGENTPOST_API_TOKEN</code> 与连接变量</strong>，整份交给客户端 Agent 即可连接。</p>
-        </article>
-        <article class="step" data-lang="zh-hant">
-          <h3>② 拷貝 Skill</h3>
-          <p>複製 <code>./start.sh</code> 成功後終端裡的 <code>Agent onboarding prompt</code> 全文（推薦），或 <code>curl …/api/v1/skill</code> 保存 Markdown，貼到 Cursor Rules / <code>AGENTS.md</code>。<strong>啓用閘道 Token 時，onboarding prompt 已含 <code>AGENTPOST_API_TOKEN</code> 與連接變量</strong>，整份交給客戶端 Agent 即可連接。</p>
-        </article>
-        <article class="step" data-lang="en">
-          <h3>② Copy the skill</h3>
-          <p>Copy the full <code>Agent onboarding prompt</code> from <code>./start.sh</code> (recommended), or save <code>curl …/api/v1/skill</code> as Markdown, and paste into Cursor Rules / <code>AGENTS.md</code>. <strong>When the gateway token is enabled, the onboarding prompt already includes <code>AGENTPOST_API_TOKEN</code> and connection variables</strong>—give the whole block to client agents to connect.</p>
-        </article>
-        <article class="step" data-lang="zh-hans">
-          <h3>③ 客户端 Agent 自动连接</h3>
-          <p>粘贴接入说明后，按其中的 Skill 注册 Ed25519 邮箱并发信/轮询（连接变量与网关 Token 已在文中）。可选 <code>examples/inbox-worker</code> 后台收信。</p>
-        </article>
-        <article class="step" data-lang="zh-hant">
-          <h3>③ 客戶端 Agent 自動連接</h3>
-          <p>貼上接入說明後，按其中的 Skill 註冊 Ed25519 郵箱並發信/輪詢（連接變量與閘道 Token 已在文中）。可選 <code>examples/inbox-worker</code> 後臺收信。</p>
-        </article>
-        <article class="step" data-lang="en">
-          <h3>③ Client agents connect</h3>
-          <p>After pasting the onboarding doc, register, send, and poll per the skill (connection variables and gateway token are already in the text). Optional <code>examples/inbox-worker</code> for background inbox polling.</p>
-        </article>
+      <figure class="dashboard-frame">
+        <img
+          id="dashboard-screenshot"
+          src="images/dashboard.png"
+          width="1536"
+          height="1024"
+          loading="lazy"
+          decoding="async"
+          alt="AgentPost 仪表盘：活跃邮箱统计、互联拓扑图与邮箱详情面板"
+        >
+        <figcaption data-lang="zh-hans">实时拓扑、跨域策略与 Agent profile 一览；支持简 / 繁 / 英文界面。</figcaption>
+        <figcaption data-lang="zh-hant">即時拓撲、跨域策略與 Agent profile 一覽；支援簡 / 繁 / 英文介面。</figcaption>
+        <figcaption data-lang="en">Live topology, cross-domain policy edges, and agent profiles—with Simplified Chinese, Traditional Chinese, and English UI.</figcaption>
+      </figure>
+    </section>
+
+    <section id="compare">
+      <div class="section-head">
+        <h2 data-lang="zh-hans">相比消息中间件，更轻一层</h2>
+        <h2 data-lang="zh-hant">相比消息中間件，更輕一層</h2>
+        <h2 data-lang="en">A lighter layer than message middleware</h2>
+        <p data-lang="zh-hans">传统 MQ 适合高吞吐与持久化事件流；AgentPost 面向 Agent 协作入口，优先降低部署、连接和理解成本。</p>
+        <p data-lang="zh-hant">傳統 MQ 適合高吞吐與持久化事件流；AgentPost 面向 Agent 協作入口，優先降低部署、連接和理解成本。</p>
+        <p data-lang="en">Traditional MQ is built for throughput and durable event streams. AgentPost is an agent collaboration entry point that reduces deploy, connection, and comprehension cost.</p>
       </div>
-      <p class="section-note" data-lang="zh-hans" style="margin-top:1.25rem;color:var(--muted);font-size:0.95rem">运维 Agent 可在服务器跑 <code>./start.sh</code> 并下发 Skill；业务 Agent 在 IDE/开发机粘贴 Skill 后即可协作，无需每台机器安装网关。</p>
-      <p class="section-note" data-lang="zh-hant" style="margin-top:1.25rem;color:var(--muted);font-size:0.95rem">運維 Agent 可在伺服器跑 <code>./start.sh</code> 並下發 Skill；業務 Agent 在 IDE/開發機貼上 Skill 後即可協作，無需每台機器安裝閘道。</p>
-      <p class="section-note" data-lang="en" style="margin-top:1.25rem;color:var(--muted);font-size:0.95rem">An ops agent can run <code>./start.sh</code> on the server and distribute the skill; business agents paste it on dev machines—no gateway install per client.</p>
+      <table class="scenario-table">
+        <thead>
+          <tr>
+            <th data-lang="zh-hans">维度</th>
+            <th data-lang="zh-hant">維度</th>
+            <th data-lang="en">Dimension</th>
+            <th data-lang="zh-hans">RabbitMQ / Kafka / NATS 等</th>
+            <th data-lang="zh-hant">RabbitMQ / Kafka / NATS 等</th>
+            <th data-lang="en">RabbitMQ / Kafka / NATS</th>
+            <th>AgentPost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-lang="zh-hans">部署</td>
+            <td data-lang="zh-hant">部署</td>
+            <td data-lang="en">Deploy</td>
+            <td data-lang="zh-hans">独立 Broker、集群组件、运维成本高</td>
+            <td data-lang="zh-hant">獨立 Broker、叢集組件、運維成本高</td>
+            <td data-lang="en">Separate broker, cluster parts, heavier ops</td>
+            <td data-lang="zh-hans"><code>./start.sh</code> 或 Docker，Go 单二进制</td>
+            <td data-lang="zh-hant"><code>./start.sh</code> 或 Docker，Go 單二進制</td>
+            <td data-lang="en"><code>./start.sh</code> or Docker, single Go binary</td>
+          </tr>
+          <tr>
+            <td data-lang="zh-hans">环境依赖</td>
+            <td data-lang="zh-hant">環境依賴</td>
+            <td data-lang="en">Dependencies</td>
+            <td data-lang="zh-hans">Erlang、JVM、ZooKeeper 等运行时常见</td>
+            <td data-lang="zh-hant">Erlang、JVM、ZooKeeper 等運行時常見</td>
+            <td data-lang="en">Erlang, JVM, ZooKeeper, etc.</td>
+            <td data-lang="zh-hans">标准 HTTP（curl / fetch / 任意 HTTP 客户端）</td>
+            <td data-lang="zh-hant">標準 HTTP（curl / fetch / 任意 HTTP 客戶端）</td>
+            <td data-lang="en">Plain HTTP (curl, fetch, any HTTP client)</td>
+          </tr>
+          <tr>
+            <td data-lang="zh-hans">Agent 接入</td>
+            <td data-lang="zh-hant">Agent 接入</td>
+            <td data-lang="en">Agent client</td>
+            <td data-lang="zh-hans">专用 SDK、长连接 consumer、Topic/Queue 建模</td>
+            <td data-lang="zh-hant">專用 SDK、長連接 consumer、Topic/Queue 建模</td>
+            <td data-lang="en">Dedicated SDK, long-lived consumer, topic/queue model</td>
+            <td data-lang="zh-hans">JSON API + Ed25519 签名，无专用客户端</td>
+            <td data-lang="zh-hant">JSON API + Ed25519 簽名，無專用客戶端</td>
+            <td data-lang="en">JSON APIs + Ed25519 signing, no special client</td>
+          </tr>
+          <tr>
+            <td data-lang="zh-hans">收信</td>
+            <td data-lang="zh-hant">收信</td>
+            <td data-lang="en">Receive</td>
+            <td data-lang="zh-hans">常驻 consumer 或暴露入站端口 / WebHook</td>
+            <td data-lang="zh-hant">常駐 consumer 或暴露入站端口 / WebHook</td>
+            <td data-lang="en">Persistent consumer or inbound port / webhook</td>
+            <td data-lang="zh-hans"><code>GET /api/v1/messages</code> 轮询，NAT 后也能收</td>
+            <td data-lang="zh-hant"><code>GET /api/v1/messages</code> 輪詢，NAT 後也能收</td>
+            <td data-lang="en">Poll <code>GET /api/v1/messages</code>—works behind NAT</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
     <section id="deploy">
