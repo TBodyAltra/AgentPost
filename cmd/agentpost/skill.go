@@ -20,6 +20,7 @@ type skillMeta struct {
 	PublicURLSource    string `json:"public_url_source"`
 	Language           string `json:"language"`
 	GatewayToken       bool   `json:"gateway_token_required"`
+	GatewayAPIToken    string `json:"gateway_api_token,omitempty"`
 	SMTPEnabled        bool   `json:"smtp_inbound_enabled"`
 	Storage            string `json:"storage"`
 	MaxTTLSeconds      int64  `json:"max_ttl_seconds"`
@@ -34,13 +35,15 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 
 	serverURL, urlSource := a.resolveServerURL(r)
 	language := selectSkillLanguage(r)
+	apiToken := strings.TrimSpace(a.cfg.APIToken)
 	meta := skillMeta{
 		ServerURL:          serverURL,
 		Domain:             a.cfg.Domain,
 		DeploymentScenario: strings.TrimSpace(os.Getenv("AGENTPOST_SCENARIO")),
 		PublicURLSource:    urlSource,
 		Language:           language,
-		GatewayToken:       strings.TrimSpace(a.cfg.APIToken) != "",
+		GatewayToken:       apiToken != "",
+		GatewayAPIToken:    apiToken,
 		SMTPEnabled:        strings.TrimSpace(a.cfg.SMTPAddr) != "",
 		Storage:            "in-memory",
 		MaxTTLSeconds:      maxTTLSeconds,
@@ -138,6 +141,22 @@ func buildSkillMarkdown(meta skillMeta, language string) string {
 	return buildSkillMarkdownZH(meta)
 }
 
+func skillBearerLine(meta skillMeta) string {
+	if !meta.GatewayToken {
+		return ""
+	}
+	if meta.GatewayAPIToken != "" {
+		return "Authorization: Bearer " + meta.GatewayAPIToken
+	}
+	return "Authorization: Bearer <AGENTPOST_API_TOKEN>"
+}
+
+func writeSkillGatewayAuthHeader(b *strings.Builder, meta skillMeta) {
+	if line := skillBearerLine(meta); line != "" {
+		fmt.Fprintf(b, "%s\n", line)
+	}
+}
+
 func buildSkillMarkdownZH(meta skillMeta) string {
 	var b strings.Builder
 
@@ -155,7 +174,12 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 	fmt.Fprintf(&b, "## 连接信息\n\n")
 	fmt.Fprintf(&b, "| 变量 | 值 |\n|------|----|\n")
 	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` |\n", meta.ServerURL)
-	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s`（注册时省略 `domain` 的默认值） |\n\n", meta.Domain)
+	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s`（注册时省略 `domain` 的默认值） |\n", meta.Domain)
+	if meta.GatewayToken && meta.GatewayAPIToken != "" {
+		fmt.Fprintf(&b, "| `AGENTPOST_API_TOKEN` | `%s` |\n\n", meta.GatewayAPIToken)
+	} else {
+		fmt.Fprintf(&b, "\n")
+	}
 	fmt.Fprintf(&b, "注册时可选择**任意合法 mailbox domain**；完整地址 `user@domain` 在本网关上必须唯一。\n\n")
 
 	switch meta.DeploymentScenario {
@@ -177,8 +201,13 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 	if meta.GatewayToken {
 		fmt.Fprintf(&b, "## 网关 Token\n\n")
 		fmt.Fprintf(&b, "本部署要求除 `/healthz`、`/api/v1/skill` 外，所有 `/api/v1/*` 请求携带网关 Token。\n\n")
-		fmt.Fprintf(&b, "```http\nAuthorization: Bearer <AGENTPOST_API_TOKEN>\n```\n\n")
-		fmt.Fprintf(&b, "Token **不会**写入本文档，请向部署运维人员索取。\n\n")
+		if meta.GatewayAPIToken != "" {
+			fmt.Fprintf(&b, "```http\nAuthorization: Bearer %s\n```\n\n", meta.GatewayAPIToken)
+			fmt.Fprintf(&b, "上文 `AGENTPOST_API_TOKEN` 已写入本 Skill。**将整份 Skill 交给客户端 Agent 即可连接**；请勿提交到公开仓库或聊天频道。\n\n")
+		} else {
+			fmt.Fprintf(&b, "```http\nAuthorization: Bearer <AGENTPOST_API_TOKEN>\n```\n\n")
+			fmt.Fprintf(&b, "Token 由部署时生成，请从 `./start.sh` 终端输出或运维渠道获取。\n\n")
+		}
 	} else {
 		fmt.Fprintf(&b, "## 网关 Token\n\n")
 		fmt.Fprintf(&b, "本部署**不需要**网关 Token。\n\n")
@@ -205,9 +234,7 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "## 注册\n\n")
 	fmt.Fprintf(&b, "```http\nPOST %s/api/v1/register\nContent-Type: application/json\n", meta.ServerURL)
-	if meta.GatewayToken {
-		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
-	}
+	writeSkillGatewayAuthHeader(&b, meta)
 	fmt.Fprintf(&b, "```\n\n")
 	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"domain\": \"team-a.internal\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400,\n  \"profile\": {\n    \"display_name\": \"Research Agent\",\n    \"host\": \"worker-01.example.internal\",\n    \"responsibilities\": \"literature review and summarization\",\n    \"skills\": [\"web-search\", \"summarize\"],\n    \"mcp_services\": [\"filesystem\", \"browser\"],\n    \"capabilities\": [\"can summarize PDFs\", \"can browse internal docs\"],\n    \"notes\": \"optional free-form notes\"\n  },\n  \"inbox_policy\": {\n    \"blocklist\": [\"spammer@team-a.internal\"],\n    \"allowlist\": [\"trusted@team-b.internal\"]\n  }\n}\n```\n\n")
 	fmt.Fprintf(&b, "`domain` 可选，默认 `%s`。任意合法 domain 均可；仅 `user@domain` 不可重复。\n\n", meta.Domain)
@@ -219,9 +246,7 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "## Agent 目录\n\n")
 	fmt.Fprintf(&b, "```http\nGET %s/api/v1/agents\n", meta.ServerURL)
-	if meta.GatewayToken {
-		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
-	}
+	writeSkillGatewayAuthHeader(&b, meta)
 	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
 	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
 	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
@@ -230,9 +255,7 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "## 注销\n\n")
 	fmt.Fprintf(&b, "```http\nDELETE %s/api/v1/account\n", meta.ServerURL)
-	if meta.GatewayToken {
-		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
-	}
+	writeSkillGatewayAuthHeader(&b, meta)
 	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
 	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
 	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
@@ -245,9 +268,7 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 	fmt.Fprintf(&b, "| 同 mailbox domain | 允许 | `blocklist` 拒绝列表中的发件人 |\n")
 	fmt.Fprintf(&b, "| 不同 mailbox domain | 禁止 | `allowlist` 接受列表中的发件人 |\n\n")
 	fmt.Fprintf(&b, "```http\nGET %s/api/v1/account/inbox-policy\nPUT %s/api/v1/account/inbox-policy\nContent-Type: application/json\n", meta.ServerURL, meta.ServerURL)
-	if meta.GatewayToken {
-		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
-	}
+	writeSkillGatewayAuthHeader(&b, meta)
 	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
 	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
 	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
@@ -341,6 +362,9 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 	fmt.Fprintf(&b, "```bash\n")
 	fmt.Fprintf(&b, "export AGENTPOST_SERVER=%s\n", meta.ServerURL)
 	fmt.Fprintf(&b, "export AGENTPOST_EMAIL_SUFFIX=%s\n", meta.Domain)
+	if meta.GatewayAPIToken != "" {
+		fmt.Fprintf(&b, "export AGENTPOST_API_TOKEN=%s\n", meta.GatewayAPIToken)
+	}
 	fmt.Fprintf(&b, "export AGENTPOST_USERNAME=my-worker\n")
 	fmt.Fprintf(&b, "export AGENTPOST_EXECUTOR=command          # 真执行模式\n")
 	fmt.Fprintf(&b, "export AGENTPOST_EXEC_COMMAND='claude -p'  # 或 cursor-agent -p / python my_agent.py / 任意 agent CLI\n")
@@ -388,7 +412,12 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 	fmt.Fprintf(&b, "## Connection information\n\n")
 	fmt.Fprintf(&b, "| Variable | Value |\n|----------|-------|\n")
 	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` |\n", meta.ServerURL)
-	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` (default domain when registration omits `domain`) |\n\n", meta.Domain)
+	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` (default domain when registration omits `domain`) |\n", meta.Domain)
+	if meta.GatewayToken && meta.GatewayAPIToken != "" {
+		fmt.Fprintf(&b, "| `AGENTPOST_API_TOKEN` | `%s` |\n\n", meta.GatewayAPIToken)
+	} else {
+		fmt.Fprintf(&b, "\n")
+	}
 	fmt.Fprintf(&b, "Agents may register any valid mailbox domain. The full address `user@domain` must be unique on this gateway.\n\n")
 
 	switch meta.DeploymentScenario {
@@ -410,8 +439,13 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 	fmt.Fprintf(&b, "## Gateway token\n\n")
 	if meta.GatewayToken {
 		fmt.Fprintf(&b, "This deployment requires a gateway token for every `/api/v1/*` request except `/healthz` and `/api/v1/skill`.\n\n")
-		fmt.Fprintf(&b, "```http\nAuthorization: Bearer <AGENTPOST_API_TOKEN>\n```\n\n")
-		fmt.Fprintf(&b, "The token is **not** included in this skill. Ask the deployment operator for it.\n\n")
+		if meta.GatewayAPIToken != "" {
+			fmt.Fprintf(&b, "```http\nAuthorization: Bearer %s\n```\n\n", meta.GatewayAPIToken)
+			fmt.Fprintf(&b, "`AGENTPOST_API_TOKEN` is embedded in this skill. **Give the full skill document to client agents to connect**; do not commit it to public repos or chat channels.\n\n")
+		} else {
+			fmt.Fprintf(&b, "```http\nAuthorization: Bearer <AGENTPOST_API_TOKEN>\n```\n\n")
+			fmt.Fprintf(&b, "The token is generated at deploy time; copy it from `./start.sh` output or your operator.\n\n")
+		}
 	} else {
 		fmt.Fprintf(&b, "This deployment does **not** require a gateway token.\n\n")
 	}
@@ -436,9 +470,7 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "## Register\n\n")
 	fmt.Fprintf(&b, "```http\nPOST %s/api/v1/register\nContent-Type: application/json\n", meta.ServerURL)
-	if meta.GatewayToken {
-		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
-	}
+	writeSkillGatewayAuthHeader(&b, meta)
 	fmt.Fprintf(&b, "```\n\n")
 	fmt.Fprintf(&b, "```json\n{\n  \"username\": \"my-bot\",\n  \"domain\": \"team-a.internal\",\n  \"public_key\": \"<hex-ed25519-public-key>\",\n  \"ttl_seconds\": 86400,\n  \"profile\": {\n    \"display_name\": \"Research Agent\",\n    \"host\": \"worker-01.example.internal\",\n    \"responsibilities\": \"literature review and summarization\",\n    \"skills\": [\"web-search\", \"summarize\"],\n    \"mcp_services\": [\"filesystem\", \"browser\"],\n    \"capabilities\": [\"can summarize PDFs\", \"can browse internal docs\"],\n    \"notes\": \"optional free-form notes\"\n  },\n  \"inbox_policy\": {\n    \"blocklist\": [\"spammer@team-a.internal\"],\n    \"allowlist\": [\"trusted@team-b.internal\"]\n  }\n}\n```\n\n")
 	fmt.Fprintf(&b, "`domain` is optional and defaults to `%s`. Any valid domain is allowed; only the full `user@domain` must be unique.\n\n", meta.Domain)
@@ -450,9 +482,7 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "## Agent directory\n\n")
 	fmt.Fprintf(&b, "```http\nGET %s/api/v1/agents\n", meta.ServerURL)
-	if meta.GatewayToken {
-		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
-	}
+	writeSkillGatewayAuthHeader(&b, meta)
 	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
 	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
 	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
@@ -461,9 +491,7 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "## Unregister\n\n")
 	fmt.Fprintf(&b, "```http\nDELETE %s/api/v1/account\n", meta.ServerURL)
-	if meta.GatewayToken {
-		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
-	}
+	writeSkillGatewayAuthHeader(&b, meta)
 	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
 	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
 	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
@@ -476,9 +504,7 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 	fmt.Fprintf(&b, "| Same mailbox domain | Allowed | `blocklist` rejects listed senders |\n")
 	fmt.Fprintf(&b, "| Different mailbox domain | Denied | `allowlist` accepts listed senders |\n\n")
 	fmt.Fprintf(&b, "```http\nGET %s/api/v1/account/inbox-policy\nPUT %s/api/v1/account/inbox-policy\nContent-Type: application/json\n", meta.ServerURL, meta.ServerURL)
-	if meta.GatewayToken {
-		fmt.Fprintf(&b, "Authorization: Bearer <AGENTPOST_API_TOKEN>\n")
-	}
+	writeSkillGatewayAuthHeader(&b, meta)
 	fmt.Fprintf(&b, "X-Agent-Username: my-bot\n")
 	fmt.Fprintf(&b, "X-Agent-Timestamp: <unix-seconds>\n")
 	fmt.Fprintf(&b, "X-Agent-Signature: <hex>\n")
@@ -575,6 +601,9 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 	fmt.Fprintf(&b, "```bash\n")
 	fmt.Fprintf(&b, "export AGENTPOST_SERVER=%s\n", meta.ServerURL)
 	fmt.Fprintf(&b, "export AGENTPOST_EMAIL_SUFFIX=%s\n", meta.Domain)
+	if meta.GatewayAPIToken != "" {
+		fmt.Fprintf(&b, "export AGENTPOST_API_TOKEN=%s\n", meta.GatewayAPIToken)
+	}
 	fmt.Fprintf(&b, "export AGENTPOST_USERNAME=my-worker\n")
 	fmt.Fprintf(&b, "export AGENTPOST_EXECUTOR=command\n")
 	fmt.Fprintf(&b, "export AGENTPOST_EXEC_COMMAND='claude -p'  # or cursor-agent -p / python my_agent.py / any agent CLI\n")

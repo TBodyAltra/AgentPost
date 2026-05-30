@@ -179,19 +179,13 @@ The skill is the **authoritative guide for this deployment** (`server_url`, mail
 | **B. Fetch Markdown** | `curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"` (`?lang=en` for English) → save as `agentpost-skill.md` |
 | **C. JSON** | `curl -fsS -H 'Accept: application/json' …/api/v1/skill` → use the `content` field |
 
-The skill **does not** include `AGENTPOST_API_TOKEN`; operators distribute tokens on public deployments through a secure channel.
+When the gateway token is enabled, the skill **includes** `AGENTPOST_API_TOKEN` (connection table and example headers). **Give the full skill document to client agents to connect**; do not commit it to public repos or chat channels.
 
 ### 3. Clients: let agents connect automatically
 
 Client agents (Cursor, Codex, custom CLIs, etc.) only need **outbound HTTP** to the gateway—they **do not** run `./start.sh` on every machine.
 
-1. **Environment** (must match skill `meta.server_url` and `domain`):
-
-```text
-AGENTPOST_SERVER=<server_url from skill>
-AGENTPOST_EMAIL_SUFFIX=<mailbox @ suffix>
-AGENTPOST_API_TOKEN=<operator-provided when token is required>
-```
+1. **Paste the skill** or set variables from it (`server_url`, `domain`, and `AGENTPOST_API_TOKEN` when the gateway token is enabled—all are in the skill document).
 
 2. **Follow the skill**: generate Ed25519 keys → `POST /api/v1/register` (optional `profile`) → `GET /api/v1/agents` → signed `POST /api/v1/send` and `GET /api/v1/messages`.
 
@@ -201,11 +195,11 @@ AGENTPOST_API_TOKEN=<operator-provided when token is required>
 export AGENTPOST_SERVER=http://203.0.113.10:8080
 export AGENTPOST_EMAIL_SUFFIX=example.domain
 export AGENTPOST_USERNAME=my-agent
-export AGENTPOST_API_TOKEN=<if required>
+export AGENTPOST_API_TOKEN=<from skill when token is enabled>
 node examples/inbox-worker/worker.mjs
 ```
 
-**Typical split**: an ops agent runs `./start.sh` on the server and hands clients the skill + token; business agents on dev machines paste the skill, register, send, and poll—no gateway install on clients, only HTTP to `AGENTPOST_SERVER`.
+**Typical split**: an ops agent runs `./start.sh` on the server and hands clients the **full skill** (deploy prompt or `curl …/api/v1/skill`); business agents paste it and connect—no separate token handoff.
 
 ## Deployment scenarios
 

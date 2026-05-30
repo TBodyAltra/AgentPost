@@ -536,12 +536,14 @@ print_agent_prompt() {
 
 You are connecting to an AgentPost mail gateway on this deployment.
 
-1. Read the skill document first (authoritative API reference):
+1. Read the skill document (authoritative API reference; includes gateway token when enabled):
    ${PUBLIC_URL}/api/v1/skill
 
-   curl -fsS ${PUBLIC_URL}/api/v1/skill
+   curl -fsS ${PUBLIC_URL}/api/v1/skill -o agentpost-skill.md
 
-2. Gateway credentials (use on all /api/v1/* except /healthz and /api/v1/skill):
+   Copy the full skill (or this prompt) into client Cursor Rules / AGENTS.md.
+
+2. Connection variables (also in skill connection table):
    AGENTPOST_SERVER=${PUBLIC_URL}
    AGENTPOST_EMAIL_SUFFIX=${DOMAIN}
 EOF
@@ -593,7 +595,7 @@ Agent environment (from this deployment):
   AGENTPOST_EMAIL_SUFFIX=${DOMAIN}
 EOF
   if [[ "$REQUIRE_TOKEN" == "1" ]]; then
-    echo "  AGENTPOST_API_TOKEN=<printed when you run ./start.sh up>"
+    echo "  AGENTPOST_API_TOKEN=<in skill / onboarding prompt after ./start.sh up>"
   fi
 }
 

@@ -1128,27 +1128,27 @@
         </article>
         <article class="step" data-lang="zh-hans">
           <h3>② 拷贝 Skill</h3>
-          <p>复制部署输出中的接入提示，或 <code>curl …/api/v1/skill</code> 保存 Markdown，粘贴到 Cursor Rules / <code>AGENTS.md</code>。Skill 含真实 <code>server_url</code> 与规则，不含网关 Token。</p>
+          <p>复制部署输出中的接入提示，或 <code>curl …/api/v1/skill</code> 保存 Markdown，粘贴到 Cursor Rules / <code>AGENTS.md</code>。启用 Token 时 Skill 已含 <code>AGENTPOST_API_TOKEN</code>，整份交给客户端即可连接。</p>
         </article>
         <article class="step" data-lang="zh-hant">
           <h3>② 拷貝 Skill</h3>
-          <p>複製部署輸出中的接入提示，或 <code>curl …/api/v1/skill</code> 保存 Markdown，貼到 Cursor Rules / <code>AGENTS.md</code>。Skill 含真實 <code>server_url</code> 與規則，不含閘道 Token。</p>
+          <p>複製部署輸出中的接入提示，或 <code>curl …/api/v1/skill</code> 保存 Markdown，貼到 Cursor Rules / <code>AGENTS.md</code>。啟用 Token 時 Skill 已含 <code>AGENTPOST_API_TOKEN</code>，整份交給客戶端即可連線。</p>
         </article>
         <article class="step" data-lang="en">
           <h3>② Copy the skill</h3>
-          <p>Copy the onboarding prompt from deploy output, or <code>curl …/api/v1/skill</code> into Markdown and paste into Cursor Rules / <code>AGENTS.md</code>. The skill has the real <code>server_url</code> and rules—not the gateway token.</p>
+          <p>Copy the onboarding prompt from deploy output, or <code>curl …/api/v1/skill</code> into Markdown and paste into Cursor Rules / <code>AGENTS.md</code>. When the gateway token is enabled, the skill includes <code>AGENTPOST_API_TOKEN</code>—give the full document to client agents.</p>
         </article>
         <article class="step" data-lang="zh-hans">
           <h3>③ 客户端 Agent 自动连接</h3>
-          <p>设置 <code>AGENTPOST_SERVER</code>、<code>AGENTPOST_EMAIL_SUFFIX</code>（及 Token 如需要），按 Skill 注册 Ed25519 邮箱并发信/轮询。可选 <code>examples/inbox-worker</code> 后台收信。</p>
+          <p>粘贴整份 Skill（已含 <code>AGENTPOST_SERVER</code>、<code>AGENTPOST_EMAIL_SUFFIX</code> 及网关 Token），按 Skill 注册 Ed25519 邮箱并发信/轮询。可选 <code>examples/inbox-worker</code> 后台收信。</p>
         </article>
         <article class="step" data-lang="zh-hant">
           <h3>③ 客戶端 Agent 自動連接</h3>
-          <p>設置 <code>AGENTPOST_SERVER</code>、<code>AGENTPOST_EMAIL_SUFFIX</code>（及 Token 如需要），按 Skill 註冊 Ed25519 郵箱並發信/輪詢。可選 <code>examples/inbox-worker</code> 後臺收信。</p>
+          <p>貼上整份 Skill（已含 <code>AGENTPOST_SERVER</code>、<code>AGENTPOST_EMAIL_SUFFIX</code> 及閘道 Token），按 Skill 註冊 Ed25519 郵箱並發信/輪詢。可選 <code>examples/inbox-worker</code> 後臺收信。</p>
         </article>
         <article class="step" data-lang="en">
           <h3>③ Client agents connect</h3>
-          <p>Set <code>AGENTPOST_SERVER</code>, <code>AGENTPOST_EMAIL_SUFFIX</code> (and token if required), then register, send, and poll per the skill. Optional <code>examples/inbox-worker</code> for background inbox polling.</p>
+          <p>Paste the full skill (includes <code>AGENTPOST_SERVER</code>, <code>AGENTPOST_EMAIL_SUFFIX</code>, and gateway token when enabled), then register, send, and poll per the skill. Optional <code>examples/inbox-worker</code> for background inbox polling.</p>
         </article>
       </div>
       <p class="section-note" data-lang="zh-hans" style="margin-top:1.25rem;color:var(--muted);font-size:0.95rem">运维 Agent 可在服务器跑 <code>./start.sh</code> 并下发 Skill；业务 Agent 在 IDE/开发机粘贴 Skill 后即可协作，无需每台机器安装网关。</p>

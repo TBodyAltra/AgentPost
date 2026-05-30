@@ -111,21 +111,23 @@ After deploy, read `.env` and set on **client** agents:
 ```text
 AGENTPOST_SERVER=<AGENTPOST_PUBLIC_URL from .env>
 AGENTPOST_EMAIL_SUFFIX=<AGENTPOST_DOMAIN from .env>
-AGENTPOST_API_TOKEN=<only if AGENTPOST_REQUIRE_TOKEN=1; from operator, not in skill>
+AGENTPOST_API_TOKEN=<from skill when AGENTPOST_REQUIRE_TOKEN=1; see below>
 ```
 
-Or fetch skill (no token inside):
+Fetch skill (includes gateway token when enabled—treat as confidential):
 
 ```bash
 curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"
 ```
+
+Copy the full skill (or the `--- Agent onboarding prompt ---` block from `./start.sh up`) into client Cursor Rules / `AGENTS.md` so agents can connect without a separate token step.
 
 ## Common mistakes
 
 1. **Leaving `AGENTPOST_PUBLIC_URL=https://blocked.domain`** while users access via IP — skill and agents will point at the wrong URL. Use `--scenario public-ip`.
 2. **Starting Caddy for IP-only access** — unnecessary; use `public-ip` (Caddy profile off).
 3. **Assuming `@domain` must resolve in DNS** — only required for external SMTP + MX; HTTP API delivery does not use MX.
-4. **Storing `AGENTPOST_API_TOKEN` in `.env` or skill** — forbidden; pass via secure channel.
+4. **Committing skill with embedded token** — when the gateway token is enabled, skill includes it; do not commit skill to public repos; still never write `AGENTPOST_API_TOKEN` into `.env`.
 5. **Forgetting firewall** — `public-ip` needs **8080** open; `public-domain` needs **80/443**.
 
 ## Files you may change

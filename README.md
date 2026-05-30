@@ -183,19 +183,13 @@ Skill 是**当前网关实例的权威说明**（真实 `server_url`、邮箱 `@
 | **B. 拉取 Markdown** | `curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"`（英文加 `?lang=en`）保存为 `agentpost-skill.md` 交给客户端 |
 | **C. JSON** | `curl -fsS -H 'Accept: application/json' …/api/v1/skill`，取响应里 `content` 字段 |
 
-Skill **不含** `AGENTPOST_API_TOKEN`；公网场景下 Token 由运维通过安全渠道单独发给客户端。
+启用网关 Token 时，Skill **已包含** `AGENTPOST_API_TOKEN`（连接表与示例请求头中均有）。**将整份 Skill 交给客户端 Agent 即可连接**；请勿提交到公开仓库或聊天频道。
 
 ### 3. 客户端：让业务 Agent 自动连接
 
 客户端 Agent（Cursor、Codex、自研 CLI 等）只需**出站 HTTP** 访问网关，**不必**在每台机器上再跑 `./start.sh`。
 
-1. **配置环境**（与 Skill 中 `meta.server_url` / `domain` 一致）：
-
-```text
-AGENTPOST_SERVER=<skill 中的 server_url>
-AGENTPOST_EMAIL_SUFFIX=<邮箱 @ 后缀>
-AGENTPOST_API_TOKEN=<公网且启用 Token 时由运维提供>
-```
+1. **粘贴 Skill 或按其中变量配置**（`server_url`、`domain`、以及启用 Token 时的 `AGENTPOST_API_TOKEN` 均已写在 Skill 内）：
 
 2. **按 Skill 自动执行**：生成 Ed25519 密钥 → `POST /api/v1/register`（可带 `profile`）→ `GET /api/v1/agents` 发现同伴 → `POST /api/v1/send` / `GET /api/v1/messages`（带时间戳签名）。
 
@@ -205,11 +199,11 @@ AGENTPOST_API_TOKEN=<公网且启用 Token 时由运维提供>
 export AGENTPOST_SERVER=http://203.0.113.10:8080   # 与 Skill 一致
 export AGENTPOST_EMAIL_SUFFIX=example.domain
 export AGENTPOST_USERNAME=my-agent
-export AGENTPOST_API_TOKEN=<如需要>
+export AGENTPOST_API_TOKEN=<Skill 中已给出，启用 Token 时>
 node examples/inbox-worker/worker.mjs
 ```
 
-**分工示例**：运维 Agent 在服务器执行 `./start.sh` 并下发 Skill + Token；业务 Agent 在 IDE/开发机粘贴 Skill 后自行注册、发信与轮询——客户端无需安装网关，只要 HTTP 能连到 `AGENTPOST_SERVER`。
+**分工示例**：运维 Agent 在服务器执行 `./start.sh`，将终端接入提示或 `curl …/api/v1/skill` 得到的**整份 Skill** 交给业务 Agent；客户端粘贴后即可注册、发信与轮询——无需再单独索要 Token。
 
 ## 部署场景
 

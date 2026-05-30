@@ -944,8 +944,11 @@ func TestSkillEndpoint(t *testing.T) {
 		t.Fatalf("skill status = %d, body = %s", resp.Code, resp.Body.String())
 	}
 	body := resp.Body.String()
-	if strings.Contains(body, "secret-gateway-token") {
-		t.Fatalf("skill must not contain the gateway token")
+	if !strings.Contains(body, "secret-gateway-token") {
+		t.Fatalf("skill should include gateway token when configured")
+	}
+	if !strings.Contains(body, "AGENTPOST_API_TOKEN") {
+		t.Fatalf("skill should document AGENTPOST_API_TOKEN")
 	}
 	if !strings.Contains(body, "https://gateway.example.com") {
 		t.Fatalf("skill should use AGENTPOST_PUBLIC_URL, got: %s", body)
@@ -992,6 +995,9 @@ func TestSkillEndpoint(t *testing.T) {
 	if got.Meta.Domain != "agent.test" || !got.Meta.GatewayToken {
 		t.Fatalf("unexpected skill meta: %+v", got.Meta)
 	}
+	if got.Meta.GatewayAPIToken != "secret-gateway-token" {
+		t.Fatalf("unexpected gateway_api_token meta: %+v", got.Meta)
+	}
 	if got.Meta.ServerURL != "https://gateway.example.com" || got.Meta.PublicURLSource != "deployment_env" {
 		t.Fatalf("unexpected skill URL meta: %+v", got.Meta)
 	}
@@ -1020,8 +1026,8 @@ func TestSkillEndpointEnglish(t *testing.T) {
 	if resp.Header().Get("Content-Language") != "en" {
 		t.Fatalf("Content-Language = %q, want en", resp.Header().Get("Content-Language"))
 	}
-	if strings.Contains(body, "secret-gateway-token") {
-		t.Fatalf("skill must not contain the gateway token")
+	if !strings.Contains(body, "secret-gateway-token") {
+		t.Fatalf("English skill should include gateway token when configured")
 	}
 	for _, want := range []string{
 		"AgentPost Skill Guide",
