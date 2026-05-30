@@ -171,7 +171,7 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "健康检查：\n\n```bash\ncurl -fsS %s/healthz\n```\n\n", meta.ServerURL)
 	fmt.Fprintf(&b, "重新获取本 Skill：\n\n```bash\ncurl -fsS %s/api/v1/skill\n```\n\n", meta.ServerURL)
-	fmt.Fprintf(&b, "运维 Dashboard（domain、邮箱互连、账户详情）：\n\n```\n%s/dashboard/\n```\n\n", meta.ServerURL)
+	fmt.Fprintf(&b, "运维 Dashboard（domain、投递拓扑、账户详情）：\n\n```\n%s/dashboard/\n```\n\n", meta.ServerURL)
 	fmt.Fprintf(&b, "Dashboard 数据接口：`GET %s/api/v1/dashboard`（若配置了网关 Token 则需提供）。\n\n", meta.ServerURL)
 
 	if meta.GatewayToken {

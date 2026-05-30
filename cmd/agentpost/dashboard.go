@@ -49,12 +49,13 @@ type dashboardMailbox struct {
 }
 
 type dashboardLink struct {
-	From       string `json:"from"`
-	To         string `json:"to"`
-	FromDomain string `json:"from_domain"`
-	ToDomain   string `json:"to_domain"`
-	Status     string `json:"status"`
-	SameDomain bool   `json:"same_domain"`
+	From          string `json:"from"`
+	To            string `json:"to"`
+	FromDomain    string `json:"from_domain"`
+	ToDomain      string `json:"to_domain"`
+	ForwardStatus string `json:"forward_status"` // From -> To delivery
+	ReverseStatus string `json:"reverse_status"` // To -> From delivery
+	SameDomain    bool   `json:"same_domain"`
 }
 
 func (a *App) handleDashboardAPI(w http.ResponseWriter, r *http.Request) {
@@ -141,13 +142,24 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 			if !aOK || !bOK {
 				continue
 			}
+			recipientB := userByEmail[b]
+			recipientA := userByEmail[a]
+			forward := "unknown"
+			reverse := "unknown"
+			if recipientB != nil {
+				forward = dashboardDirectedStatus(a, b, recipientB.InboxPolicy)
+			}
+			if recipientA != nil {
+				reverse = dashboardDirectedStatus(b, a, recipientA.InboxPolicy)
+			}
 			links = append(links, dashboardLink{
-				From:       a,
-				To:         b,
-				FromDomain: aDomain,
-				ToDomain:   bDomain,
-				Status:     dashboardPairStatus(a, b, userByEmail),
-				SameDomain: aDomain == bDomain,
+				From:          a,
+				To:            b,
+				FromDomain:    aDomain,
+				ToDomain:      bDomain,
+				ForwardStatus: forward,
+				ReverseStatus: reverse,
+				SameDomain:    aDomain == bDomain,
 			})
 		}
 	}
@@ -186,28 +198,6 @@ func dashboardLinkStatus(from, recipientDomain string, policy InboxPolicy) strin
 	return "cross_domain_blocked"
 }
 
-// dashboardPairStatus reports whether two mailboxes can exchange mail in both
-// directions. Delivery is symmetric in the product model: either both can send
-// and receive, or the pair is treated as disconnected.
-func dashboardPairStatus(a, b string, users map[string]*User) string {
-	recipientB := users[b]
-	recipientA := users[a]
-	if recipientB == nil || recipientA == nil {
-		return "unknown"
-	}
-	statusAToB := dashboardDirectedStatus(a, b, recipientB.InboxPolicy)
-	statusBToA := dashboardDirectedStatus(b, a, recipientA.InboxPolicy)
-	if deliveryStatusPermits(statusAToB) && deliveryStatusPermits(statusBToA) {
-		_, aDomain, _ := splitEmail(a)
-		_, bDomain, _ := splitEmail(b)
-		if aDomain != bDomain {
-			return "allowlisted"
-		}
-		return "allowed"
-	}
-	return dashboardWorstBlockingStatus(statusAToB, statusBToA)
-}
-
 func dashboardDirectedStatus(from, recipientEmail string, policy InboxPolicy) string {
 	_, recipientDomain, ok := splitEmail(recipientEmail)
 	if !ok {
@@ -223,20 +213,6 @@ func dashboardDirectedStatus(from, recipientEmail string, policy InboxPolicy) st
 
 func deliveryStatusPermits(status string) bool {
 	return status == "allowed" || status == "allowlisted"
-}
-
-func dashboardWorstBlockingStatus(a, b string) string {
-	rank := map[string]int{
-		"blocked":              4,
-		"cross_domain_blocked": 3,
-		"unknown":              2,
-		"allowlisted":          1,
-		"allowed":              0,
-	}
-	if rank[a] >= rank[b] {
-		return a
-	}
-	return b
 }
 
 func (a *App) dashboardHandler() http.Handler {
