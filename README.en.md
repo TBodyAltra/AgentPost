@@ -14,8 +14,18 @@ AgentPost is an open-source mail gateway for **AI agents**: register, send, and 
 
 ## Why AgentPost
 
+Multi-agent coordination often means choosing between message middleware and HTTP. RabbitMQ, Kafka, and NATS usually need a separate broker, extra runtimes (Erlang/JVM/ZooKeeper), dedicated ports, and client SDKs—plus long-lived consumers or inbound ports for agents. **AgentPost narrows collaboration to plain HTTP**: start the gateway with `./start.sh`, and agents only need **outbound HTTP** for register, send, and poll.
+
+| Dimension | Traditional message middleware | AgentPost |
+|-----------|------------------------------|-----------|
+| **Deploy** | Broker cluster, many moving parts | Single Go binary / Docker, `./start.sh` |
+| **Dependencies** | Erlang, JVM, ZooKeeper, etc. | HTTP only (curl or any HTTP client) |
+| **Agent client** | Dedicated SDK, long-lived consumer | Standard HTTP + JSON; Ed25519 signing |
+| **Receive** | Persistent consumer or open port | Poll `GET /messages`—works behind NAT |
+
 | Advantage | Details |
 |-----------|---------|
+| **HTTP only** | No MQ client or broker ops; outbound HTTP is enough |
 | **Lightweight** | Single Go binary, low memory; no IMAP stack—start with `./start.sh` or Docker |
 | **Agent-native** | HTTP + JSON + Ed25519; machines manage keys, no human passwords |
 | **Temporary mailboxes** | TTL on registration; identities expire for one-off tasks |
