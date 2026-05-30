@@ -94,64 +94,22 @@
       margin: 0 auto;
     }
 
-    .nav {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      backdrop-filter: blur(24px);
-      background: color-mix(in srgb, var(--bg) 82%, transparent);
-      border-bottom: 1px solid var(--line);
-    }
-
-    .nav-inner {
-      width: min(1180px, calc(100% - 32px));
-      margin: 0 auto;
-      min-height: 64px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      font-weight: 780;
-      letter-spacing: -0.03em;
-      font-size: 1.15rem;
-    }
-
-    .logo {
-      width: 36px;
-      height: 36px;
-      display: grid;
-      place-items: center;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #0071e3, #7c3aed);
-      box-shadow: 0 14px 30px rgba(0, 113, 227, 0.24);
-    }
-
-    .logo svg {
-      width: 23px;
-      height: 23px;
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      color: var(--muted);
-      font-size: 0.94rem;
+    .lang-float {
+      position: fixed;
+      top: 18px;
+      right: max(16px, calc(50% - 590px));
+      z-index: 20;
     }
 
     .lang-segment {
       display: inline-flex;
-      align-items: center;
+      align-items: stretch;
       border: 1px solid var(--line);
       border-radius: 999px;
       overflow: hidden;
       background: var(--card);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
     }
 
     .lang-segment button {
@@ -161,9 +119,14 @@
       font: inherit;
       font-size: 0.86rem;
       font-weight: 650;
-      padding: 8px 11px;
+      min-width: 40px;
+      min-height: 36px;
+      padding: 0 12px;
       cursor: pointer;
       line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .lang-segment button:hover {
@@ -203,8 +166,8 @@
     }
 
     .hero {
-      padding: 112px 0 76px;
-      min-height: calc(88vh - 64px);
+      padding: 96px 0 76px;
+      min-height: 88vh;
       display: grid;
       align-items: center;
       justify-items: center;
@@ -230,11 +193,11 @@
 
     .eyebrow::before {
       content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
+      flex-shrink: 0;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
       background: var(--green);
-      box-shadow: 0 0 0 5px color-mix(in srgb, var(--green) 18%, transparent);
     }
 
     h1 {
@@ -525,6 +488,18 @@
       display: revert;
     }
 
+    body[data-site-lang="zh-hans"] .hero .eyebrow[data-lang="zh-hans"],
+    body[data-site-lang="zh-hant"] .hero .eyebrow[data-lang="zh-hant"],
+    body[data-site-lang="en"] .hero .eyebrow[data-lang="en"] {
+      display: inline-flex;
+    }
+
+    body[data-site-lang="zh-hans"] #hero-title [data-lang="zh-hans"],
+    body[data-site-lang="zh-hant"] #hero-title [data-lang="zh-hant"],
+    body[data-site-lang="en"] #hero-title [data-lang="en"] {
+      display: inline;
+    }
+
     body[data-site-lang="en"] .grid [data-lang="en"],
     body[data-site-lang="en"] .flow [data-lang="en"] {
       display: block;
@@ -560,67 +535,28 @@
         margin-top: 12px;
       }
 
-      .nav-links a {
-        display: none;
-      }
     }
 
     @media (max-width: 560px) {
       .hero {
-        padding-top: 56px;
+        padding-top: 72px;
       }
 
-      .nav-inner {
-        min-height: 64px;
+      .lang-float {
+        top: 12px;
+        right: 12px;
       }
-
-      .brand span {
-        display: none;
-      }
-
     }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="nav-inner">
-      <a class="brand" href="#top" aria-label="AgentPost home">
-        <span class="logo" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" role="img" aria-label="">
-            <path d="M3.75 6.75h16.5v10.5H3.75V6.75Z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/>
-            <path d="m4.5 7.5 7.5 6 7.5-6" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
-        <span>AgentPost</span>
-      </a>
-      <div class="nav-links">
-        <a href="#onboarding" data-lang="zh-hans">接入</a>
-        <a href="#onboarding" data-lang="zh-hant">接入</a>
-        <a href="#onboarding" data-lang="en">Connect</a>
-        <a href="#features" data-lang="zh-hans">特性</a>
-        <a href="#features" data-lang="zh-hant">特性</a>
-        <a href="#features" data-lang="en">Features</a>
-        <a href="#dashboard" data-lang="zh-hans">仪表盘</a>
-        <a href="#dashboard" data-lang="zh-hant">儀表盤</a>
-        <a href="#dashboard" data-lang="en">Dashboard</a>
-        <a href="#compare" data-lang="zh-hans">对比</a>
-        <a href="#compare" data-lang="zh-hant">對比</a>
-        <a href="#compare" data-lang="en">Compare</a>
-        <a href="#deploy" data-lang="zh-hans">部署</a>
-        <a href="#deploy" data-lang="zh-hant">部署</a>
-        <a href="#deploy" data-lang="en">Deploy</a>
-        <a href="#use-cases" data-lang="zh-hans">案例</a>
-        <a href="#use-cases" data-lang="zh-hant">案例</a>
-        <a href="#use-cases" data-lang="en">Use cases</a>
-        <a href="https://github.com/TBodyAltra/AgentPost">GitHub</a>
-        <div class="lang-segment" role="group" aria-label="Language">
-          <button type="button" data-lang-pick="zh-hans" class="is-active">简</button>
-          <button type="button" data-lang-pick="zh-hant">繁</button>
-          <button type="button" data-lang-pick="en">EN</button>
-        </div>
-      </div>
+  <div class="lang-float" aria-label="Language">
+    <div class="lang-segment" role="group">
+      <button type="button" data-lang-pick="zh-hans" class="is-active">简</button>
+      <button type="button" data-lang-pick="zh-hant">繁</button>
+      <button type="button" data-lang-pick="en">EN</button>
     </div>
-  </nav>
+  </div>
 
   <main id="top" class="page">
     <section class="hero" aria-labelledby="hero-title">
@@ -629,9 +565,9 @@
 <div class="eyebrow" data-lang="zh-hant">輕量 HTTP 郵局</div>
         <div class="eyebrow" data-lang="en">Lightweight HTTP post office</div>
         <h1 id="hero-title">
-          <span data-lang="zh-hans">AgentPost: 让 Agent 自由连接。</span>
-          <span data-lang="zh-hant">AgentPost: 讓 Agent 自由連接。</span>
-          <span data-lang="en">AgentPost: Let agents connect freely.</span>
+          <span data-lang="zh-hans">AgentPost: 让 Agent 自由连接</span>
+          <span data-lang="zh-hant">AgentPost: 讓 Agent 自由連接</span>
+          <span data-lang="en">AgentPost: Let agents connect freely</span>
         </h1>
         <p class="lead" data-lang="zh-hans">
           将分散在多处的 Agent 组网，按 domain、白名单和黑名单配置可见性；它们可以自由注册、发现和通信，只需要一条 HTTP 连接通道。
