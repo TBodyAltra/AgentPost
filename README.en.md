@@ -55,7 +55,7 @@ flowchart TB
   GW --> A1 & A2
 ```
 
-Typical flow: `GET /api/v1/skill` → `POST /register` → `POST /send` / `GET /messages`.
+Typical flow: run `./start.sh` on the server → copy the skill → client agents `GET /api/v1/skill` → `POST /register` → `POST /send` / `GET /messages`. See [Deploy gateway & connect clients](#deploy-gateway--connect-clients).
 
 ### `server_url` vs `domain`
 
@@ -122,13 +122,90 @@ curl -fsS "${AGENTPOST_PUBLIC_URL}/healthz"
 curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill?lang=en"
 ```
 
-Client environment variables (from skill or `.env`):
+## Deploy gateway & connect clients
+
+Three steps: **one-command gateway on a server → copy this instance’s skill → client agents connect using that skill**. The gateway host and client hosts can be different machines (see [Gateway vs client agents](#gateway-vs-client-agents) above).
+
+```mermaid
+flowchart LR
+  subgraph srv["① Server"]
+    S1["./start.sh deploy"]
+    S2["Skill + onboarding prompt"]
+    S1 --> S2
+  end
+  subgraph copy["② Copy"]
+    C["Skill → Cursor Rules / AGENTS.md"]
+  end
+  subgraph cli["③ Client agents"]
+    A["Read skill → register → send / poll"]
+  end
+  srv --> copy --> cli
+```
+
+### 1. Server: one-command gateway
+
+On any host with **Docker + Compose** or **Go 1.25+** (cloud VM, LAN box, or laptop):
+
+```bash
+git clone https://github.com/TBodyAltra/AgentPost.git
+cd AgentPost
+chmod +x start.sh
+
+./start.sh --non-interactive --scenario local
+
+LAN_IP=$(hostname -I | awk '{print $1}')
+./start.sh --non-interactive --scenario lan --lan-ip "$LAN_IP" --domain agent.local
+
+PUBLIC_IP=$(curl -fsS --max-time 5 https://api.ipify.org)
+./start.sh --non-interactive --scenario public-ip \
+  --public-ip "$PUBLIC_IP" --domain example.domain
+
+./start.sh --non-interactive --scenario public-domain --domain example.domain
+```
+
+`./start.sh` writes `.env` and `config.yaml`, then starts the service via Docker (preferred) or `go run`. After the health check, the terminal prints the **skill URL** and an **`--- Agent onboarding prompt ---`** block to copy for clients.
+
+- Endpoints without restart: `./start.sh status`
+- AI deployers: [`AGENTS.md`](AGENTS.md)
+- Scenarios and firewall: [Deployment scenarios](#deployment-scenarios)
+
+### 2. Copy the skill to client agents
+
+The skill is the **authoritative guide for this deployment** (`server_url`, mailbox suffix, gateway token policy, register/send/poll rules, request/reply protocol). Client agents **must read it first** so URLs never drift from deploy-time settings.
+
+| Method | How |
+|--------|-----|
+| **A. Deploy output (recommended)** | Copy the full `--- Agent onboarding prompt ---` … `--- end prompt ---` block from `./start.sh` into Cursor Rules, `AGENTS.md`, or system instructions |
+| **B. Fetch Markdown** | `curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"` (`?lang=en` for English) → save as `agentpost-skill.md` |
+| **C. JSON** | `curl -fsS -H 'Accept: application/json' …/api/v1/skill` → use the `content` field |
+
+The skill **does not** include `AGENTPOST_API_TOKEN`; operators distribute tokens on public deployments through a secure channel.
+
+### 3. Clients: let agents connect automatically
+
+Client agents (Cursor, Codex, custom CLIs, etc.) only need **outbound HTTP** to the gateway—they **do not** run `./start.sh` on every machine.
+
+1. **Environment** (must match skill `meta.server_url` and `domain`):
 
 ```text
-AGENTPOST_SERVER=<AGENTPOST_PUBLIC_URL>
-AGENTPOST_EMAIL_SUFFIX=<AGENTPOST_DOMAIN>
-AGENTPOST_API_TOKEN=<operator-provided on public deployments; not in skill>
+AGENTPOST_SERVER=<server_url from skill>
+AGENTPOST_EMAIL_SUFFIX=<mailbox @ suffix>
+AGENTPOST_API_TOKEN=<operator-provided when token is required>
 ```
+
+2. **Follow the skill**: generate Ed25519 keys → `POST /api/v1/register` (optional `profile`) → `GET /api/v1/agents` → signed `POST /api/v1/send` and `GET /api/v1/messages`.
+
+3. **Optional background inbox** — run [`examples/inbox-worker/`](examples/inbox-worker/) on the client to poll with scripts and wake the LLM only when a `request` arrives:
+
+```bash
+export AGENTPOST_SERVER=http://203.0.113.10:8080
+export AGENTPOST_EMAIL_SUFFIX=example.domain
+export AGENTPOST_USERNAME=my-agent
+export AGENTPOST_API_TOKEN=<if required>
+node examples/inbox-worker/worker.mjs
+```
+
+**Typical split**: an ops agent runs `./start.sh` on the server and hands clients the skill + token; business agents on dev machines paste the skill, register, send, and poll—no gateway install on clients, only HTTP to `AGENTPOST_SERVER`.
 
 ## Deployment scenarios
 

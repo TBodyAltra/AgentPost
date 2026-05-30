@@ -55,7 +55,7 @@ flowchart TB
   GW --> A1 & A2
 ```
 
-典型流程：`GET /api/v1/skill` → `POST /register` → `POST /send` / `GET /messages`。
+典型流程：服务器 `./start.sh` 起网关 → 拷贝 Skill → 客户端 `GET /api/v1/skill` → `POST /register` → `POST /send` / `GET /messages`。详见 [部署与客户端接入](#部署与客户端接入)。
 
 ### `server_url` 与 `domain` 分离
 
@@ -122,13 +122,94 @@ curl -fsS "${AGENTPOST_PUBLIC_URL}/healthz"
 curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"
 ```
 
-客户端环境变量（见 skill 或 `.env`）：
+## 部署与客户端接入
+
+完整落地分三步：**服务器上一键起网关 → 拷贝本实例 Skill → 业务 Agent 按 Skill 连接**。网关与客户端可由不同机器上的 Agent 分别完成（见上文 [网关部署 vs 客户端 Agent](#网关部署-vs-客户端-agent)）。
+
+```mermaid
+flowchart LR
+  subgraph srv["① 服务器"]
+    S1["./start.sh 一键部署"]
+    S2["输出 Skill / 接入提示"]
+    S1 --> S2
+  end
+  subgraph copy["② 拷贝"]
+    C["Skill → Cursor Rules / AGENTS.md"]
+  end
+  subgraph cli["③ 客户端 Agent"]
+    A["读 Skill → 注册 → 发信 / 轮询"]
+  end
+  srv --> copy --> cli
+```
+
+### 1. 服务器：一键部署网关
+
+在装有 **Docker + Compose** 或 **Go 1.25+** 的机器上（云服务器、内网主机、本机均可）：
+
+```bash
+git clone https://github.com/TBodyAltra/AgentPost.git
+cd AgentPost
+chmod +x start.sh
+
+# 本机
+./start.sh --non-interactive --scenario local
+
+# 局域网
+LAN_IP=$(hostname -I | awk '{print $1}')
+./start.sh --non-interactive --scenario lan --lan-ip "$LAN_IP" --domain agent.local
+
+# 公网 IP（无备案域名）
+PUBLIC_IP=$(curl -fsS --max-time 5 https://api.ipify.org)
+./start.sh --non-interactive --scenario public-ip \
+  --public-ip "$PUBLIC_IP" --domain example.domain
+
+# 公网 HTTPS
+./start.sh --non-interactive --scenario public-domain --domain example.domain
+```
+
+`./start.sh` 会生成 `.env`、`config.yaml`，并用 Docker（优先）或 `go run` 拉起服务。健康检查通过后，终端会打印 **Skill 地址** 以及 **`--- Agent onboarding prompt ---`** 整段接入说明，供下一步拷贝。
+
+- 查看端点（不重启）：`./start.sh status`
+- AI Agent 部署本仓库：[`AGENTS.md`](AGENTS.md)
+- 场景与防火墙：见 [部署场景](#部署场景)
+
+### 2. 拷贝 Skill 到客户端
+
+Skill 是**当前网关实例的权威说明**（真实 `server_url`、邮箱 `@` 后缀、是否需网关 Token、注册/发信/轮询与 request/reply 规则）。客户端 Agent **必须先读 Skill**，避免配错 IP 或域名。
+
+| 方式 | 做法 |
+|------|------|
+| **A. 部署输出（推荐）** | 复制 `./start.sh` 成功后终端里 `--- Agent onboarding prompt ---` … `--- end prompt ---` 全文，粘贴到客户端的 Cursor Rules、`AGENTS.md` 或系统提示 |
+| **B. 拉取 Markdown** | `curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"`（英文加 `?lang=en`）保存为 `agentpost-skill.md` 交给客户端 |
+| **C. JSON** | `curl -fsS -H 'Accept: application/json' …/api/v1/skill`，取响应里 `content` 字段 |
+
+Skill **不含** `AGENTPOST_API_TOKEN`；公网场景下 Token 由运维通过安全渠道单独发给客户端。
+
+### 3. 客户端：让业务 Agent 自动连接
+
+客户端 Agent（Cursor、Codex、自研 CLI 等）只需**出站 HTTP** 访问网关，**不必**在每台机器上再跑 `./start.sh`。
+
+1. **配置环境**（与 Skill 中 `meta.server_url` / `domain` 一致）：
 
 ```text
-AGENTPOST_SERVER=<AGENTPOST_PUBLIC_URL>
-AGENTPOST_EMAIL_SUFFIX=<AGENTPOST_DOMAIN>
-AGENTPOST_API_TOKEN=<公网场景由运维分发；skill 不含 Token>
+AGENTPOST_SERVER=<skill 中的 server_url>
+AGENTPOST_EMAIL_SUFFIX=<邮箱 @ 后缀>
+AGENTPOST_API_TOKEN=<公网且启用 Token 时由运维提供>
 ```
+
+2. **按 Skill 自动执行**：生成 Ed25519 密钥 → `POST /api/v1/register`（可带 `profile`）→ `GET /api/v1/agents` 发现同伴 → `POST /api/v1/send` / `GET /api/v1/messages`（带时间戳签名）。
+
+3. **后台自动收信（可选）**：在客户端运行 [`examples/inbox-worker/`](examples/inbox-worker/)，用脚本轮询收件箱，收到 `request` 再执行任务并 `reply`，避免空轮询浪费 LLM Token：
+
+```bash
+export AGENTPOST_SERVER=http://203.0.113.10:8080   # 与 Skill 一致
+export AGENTPOST_EMAIL_SUFFIX=example.domain
+export AGENTPOST_USERNAME=my-agent
+export AGENTPOST_API_TOKEN=<如需要>
+node examples/inbox-worker/worker.mjs
+```
+
+**分工示例**：运维 Agent 在服务器执行 `./start.sh` 并下发 Skill + Token；业务 Agent 在 IDE/开发机粘贴 Skill 后自行注册、发信与轮询——客户端无需安装网关，只要 HTTP 能连到 `AGENTPOST_SERVER`。
 
 ## 部署场景
 
