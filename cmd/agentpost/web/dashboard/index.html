@@ -220,7 +220,14 @@
     .legend-item { display: flex; align-items: center; gap: 0.4rem; color: var(--text-2); }
     .dot { width: 9px; height: 9px; border-radius: 50%; }
 
-    .graph-wrap { position: relative; min-height: 440px; padding: 0.5rem; }
+    .graph-wrap {
+      position: relative; min-height: 440px; padding: 0.5rem;
+      background: var(--surface-2); border-radius: 12px; margin: 0 0.5rem 0.5rem;
+    }
+    :root[data-theme="dark"] .graph-wrap { background: rgba(44, 44, 46, 0.72); }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .graph-wrap { background: rgba(44, 44, 46, 0.72); }
+    }
     #graph-svg { width: 100%; height: 100%; min-height: 440px; display: block; }
     #graph-svg circle[data-email] { transition: r 0.2s var(--spring); }
     .graph-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-3); font-size: 0.9rem; flex-direction: column; gap: 0.5rem; }
@@ -396,7 +403,7 @@
     const TOKEN_KEY = "agentpost_dashboard_token";
     const THEME_KEY = "agentpost_dashboard_theme";
     const LANG_KEY = "agentpost_dashboard_lang";
-    const STATUS_COLORS = { allowed: "#34c759", allowlisted: "#af52de", cross_domain_blocked: "#ff9f0a", blocked: "#ff3b30" };
+    const STATUS_COLORS_FALLBACK = { allowed: "#34c759", allowlisted: "#af52de", cross_domain_blocked: "#ff9f0a", blocked: "#ff3b30" };
 
     const I18N = {
       "zh-hans": {
@@ -590,8 +597,33 @@
       }, 0);
     }
 
-    function edgeColor(status) {
-      return status === "allowlisted" ? STATUS_COLORS.allowlisted : STATUS_COLORS.allowed;
+    function isDarkTheme() {
+      const theme = document.documentElement.getAttribute("data-theme");
+      if (theme === "dark") return true;
+      if (theme === "light") return false;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+
+    function themeEdgeColors() {
+      const cs = getComputedStyle(document.documentElement);
+      const allowed = cs.getPropertyValue("--ok").trim();
+      const allowlisted = cs.getPropertyValue("--cross").trim();
+      return {
+        allowed: allowed || STATUS_COLORS_FALLBACK.allowed,
+        allowlisted: allowlisted || STATUS_COLORS_FALLBACK.allowlisted,
+      };
+    }
+
+    function edgeColor(status, palette) {
+      const colors = palette || themeEdgeColors();
+      return status === "allowlisted" ? colors.allowlisted : colors.allowed;
+    }
+
+    function edgeStroke(related, selected, isDark) {
+      if (selected) {
+        return { width: related ? 3.4 : 1.5, opacity: related ? 1 : 0.08 };
+      }
+      return { width: isDark ? 3 : 2.4, opacity: isDark ? 1 : 0.9 };
     }
 
     function detectLang() {
@@ -864,14 +896,22 @@
       return `M ${x1} ${y1} Q ${mx + nx} ${my + ny} ${x2} ${y2}`;
     }
 
-    function appendAllowedEdge(htmlParts, from, to, status, offset, sel, related) {
+    function pushEdgePath(parts, path, color, width, opacity, opts = {}) {
+      const { arrow = false, halo = false } = opts;
+      if (halo) {
+        parts.push(`<path d="${path}" fill="none" stroke="rgba(255,255,255,0.32)" stroke-width="${width + 3}" opacity="${Math.min(opacity, 0.85)}" stroke-linecap="round"/>`);
+      }
+      const marker = arrow ? ' marker-end="url(#arrow-allowed)"' : "";
+      parts.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round"${marker}/>`);
+    }
+
+    function appendAllowedEdge(htmlParts, from, to, status, offset, sel, related, palette, isDark) {
       const pad = 22;
       const seg = shortenSegment(from.x, from.y, to.x, to.y, pad);
-      const color = edgeColor(status);
-      const opacity = sel ? (related ? 0.92 : 0.1) : 0.78;
-      const width = related && sel ? 2.5 : 1.85;
+      const color = edgeColor(status, palette);
+      const stroke = edgeStroke(related, !!sel, isDark);
       const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, offset);
-      htmlParts.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round" marker-end="url(#arrow-allowed)"/>`);
+      pushEdgePath(htmlParts, path, color, stroke.width, stroke.opacity, { arrow: true, halo: isDark });
     }
 
     function renderGraph(data) {
@@ -896,15 +936,15 @@
       const H = Math.max(440, topPad + maxRows * nodeH + 40);
       svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 
-      const isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
-        (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      const isDark = isDarkTheme();
+      const palette = themeEdgeColors();
       const links = filteredLinks(data);
       const edgeParts = [];
       const sel = state.selected;
+      const arrowSize = isDark ? 11 : 9;
 
-      const arrowFill = STATUS_COLORS.allowed;
-      let html = `<defs><marker id="arrow-allowed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-        <path d="M 0 1 L 9 5 L 0 9 z" fill="${arrowFill}"/>
+      let html = `<defs><marker id="arrow-allowed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="${arrowSize}" markerHeight="${arrowSize}" orient="auto">
+        <path d="M 0 0.5 L 10 5 L 0 9.5 z" fill="${palette.allowed}" stroke="${isDark ? "rgba(255,255,255,0.35)" : "none"}" stroke-width="0.6"/>
       </marker></defs>`;
 
       links.forEach((l) => {
@@ -918,16 +958,15 @@
         if (fwdOK && revOK) {
           const pad = 22;
           const seg = shortenSegment(a.x, a.y, b.x, b.y, pad);
-          const color = edgeColor(l.forward_status === "allowlisted" || l.reverse_status === "allowlisted" ? "allowlisted" : "allowed");
-          const opacity = sel ? (related ? 0.9 : 0.1) : 0.75;
-          const width = related && sel ? 2.6 : 1.9;
+          const color = edgeColor(l.forward_status === "allowlisted" || l.reverse_status === "allowlisted" ? "allowlisted" : "allowed", palette);
+          const stroke = edgeStroke(related, !!sel, isDark);
           const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, 0);
-          html += `<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round"/>`;
+          pushEdgePath(edgeParts, path, color, stroke.width, stroke.opacity, { halo: isDark });
           return;
         }
 
-        if (fwdOK) appendAllowedEdge(edgeParts, a, b, l.forward_status, 1, sel, related);
-        if (revOK) appendAllowedEdge(edgeParts, b, a, l.reverse_status, -1, sel, related);
+        if (fwdOK) appendAllowedEdge(edgeParts, a, b, l.forward_status, 1, sel, related, palette, isDark);
+        if (revOK) appendAllowedEdge(edgeParts, b, a, l.reverse_status, -1, sel, related, palette, isDark);
       });
       html += edgeParts.join("");
 
