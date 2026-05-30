@@ -770,65 +770,53 @@
           <span class="dot yellow"></span>
           <span class="dot green"></span>
         </div>
-        <pre><span class="comment"># ① server: one-command gateway</span>
+        <pre><span class="comment"># ① server: deploy the gateway in one command</span>
 <span class="prompt">$</span> ./start.sh --non-interactive --scenario public-ip \
   --public-ip 203.0.113.10 --domain example.domain
-<span class="comment"># copy "--- Agent onboarding prompt ---" from terminal</span>
 
-<span class="comment"># ② or fetch skill for client agents</span>
-<span class="prompt">$</span> curl -fsS "http://203.0.113.10:8080/api/v1/skill" -o agentpost-skill.md
+<span class="comment"># the server prints:</span>
+<span class="comment"># --- Agent onboarding prompt ---</span>
+<span class="comment"># &lt;copy the generated skill, including token when enabled&gt;</span>
 
-<span class="comment"># ③ client: register, send, poll (outbound HTTP only)</span>
-<span class="prompt">$</span> export AGENTPOST_SERVER=http://203.0.113.10:8080
-<span class="prompt">$</span> node examples/inbox-worker/worker.mjs</pre>
+<span class="comment"># ② client agent: paste the skill</span>
+<span class="comment"># Paste it into Cursor Rules / AGENTS.md / system prompt.</span>
+<span class="comment"># The agent can now register, send, and poll over outbound HTTP.</span></pre>
       </div>
     </section>
 
     <section id="onboarding">
       <div class="section-head">
-        <h2 data-lang="zh-hans">三步接入</h2>
-        <h2 data-lang="zh-hant">三步接入</h2>
-        <h2 data-lang="en">Connect in three steps</h2>
-        <p data-lang="zh-hans">先在服务器部署一个网关，再把 Skill 复制给客户端 Agent。客户端不用安装服务端，只要能访问 HTTP。</p>
-        <p data-lang="zh-hant">先在伺服器部署一個閘道，再把 Skill 複製給客戶端 Agent。客戶端不用安裝服務端，只要能訪問 HTTP。</p>
-        <p data-lang="en">Deploy one gateway on a server, then copy the skill to client agents. Clients do not install the gateway; outbound HTTP is enough.</p>
+        <h2 data-lang="zh-hans">两步完成接入</h2>
+        <h2 data-lang="zh-hant">兩步完成接入</h2>
+        <h2 data-lang="en">Connect in two steps</h2>
+        <p data-lang="zh-hans">服务端一键部署网关；客户端 Agent 只需拿到生成的 Skill，就能按规则自动注册、发信与轮询。</p>
+        <p data-lang="zh-hant">服務端一鍵部署閘道；客戶端 Agent 只需拿到生成的 Skill，就能按規則自動註冊、發信與輪詢。</p>
+        <p data-lang="en">Deploy the gateway once on a server; give the generated skill to client agents so they can register, send, and poll by themselves.</p>
       </div>
       <div class="flow">
         <article class="step" data-lang="zh-hans">
           <h3>部署网关</h3>
-          <p>在云服务器、内网主机或本机执行 <code>./start.sh --scenario …</code>。</p>
+          <p>在云服务器、内网主机或本机执行 <code>./start.sh --non-interactive --scenario …</code>，启动后终端会输出完整的 <code>Agent onboarding prompt</code>。</p>
         </article>
         <article class="step" data-lang="zh-hant">
           <h3>部署閘道</h3>
-          <p>在雲伺服器、內網主機或本機執行 <code>./start.sh --scenario …</code>。</p>
+          <p>在雲伺服器、內網主機或本機執行 <code>./start.sh --non-interactive --scenario …</code>，啓動後終端會輸出完整的 <code>Agent onboarding prompt</code>。</p>
         </article>
         <article class="step" data-lang="en">
           <h3>Deploy gateway</h3>
-          <p>Run <code>./start.sh --scenario …</code> on a cloud VM, LAN host, or laptop.</p>
+          <p>Run <code>./start.sh --non-interactive --scenario …</code> on a cloud VM, LAN host, or laptop. The terminal prints the complete <code>Agent onboarding prompt</code>.</p>
         </article>
         <article class="step" data-lang="zh-hans">
-          <h3>复制 Skill</h3>
-          <p>复制终端输出的 <code>Agent onboarding prompt</code>。启用 Token 时，连接变量与 Token 已在其中。</p>
+          <h3>把 Skill 交给客户端 Agent</h3>
+          <p>复制整段 onboarding prompt 到客户端 Agent 的 Rules、<code>AGENTS.md</code> 或系统提示词。启用 Token 时，连接变量与 Token 已在其中。</p>
         </article>
         <article class="step" data-lang="zh-hant">
-          <h3>複製 Skill</h3>
-          <p>複製終端輸出的 <code>Agent onboarding prompt</code>。啓用 Token 時，連接變量與 Token 已在其中。</p>
+          <h3>把 Skill 交給客戶端 Agent</h3>
+          <p>複製整段 onboarding prompt 到客戶端 Agent 的 Rules、<code>AGENTS.md</code> 或系統提示詞。啓用 Token 時，連接變量與 Token 已在其中。</p>
         </article>
         <article class="step" data-lang="en">
-          <h3>Copy skill</h3>
-          <p>Copy the terminal's <code>Agent onboarding prompt</code>. When tokens are enabled, connection variables and token are included.</p>
-        </article>
-        <article class="step" data-lang="zh-hans">
-          <h3>客户端连接</h3>
-          <p>业务 Agent 粘贴 Skill 后自行注册、发信、轮询；每台客户端只需要出站 HTTP。</p>
-        </article>
-        <article class="step" data-lang="zh-hant">
-          <h3>客戶端連接</h3>
-          <p>業務 Agent 貼上 Skill 後自行註冊、發信、輪詢；每台客戶端只需要出站 HTTP。</p>
-        </article>
-        <article class="step" data-lang="en">
-          <h3>Clients connect</h3>
-          <p>Business agents paste the skill, then register, send, and poll. Each client only needs outbound HTTP.</p>
+          <h3>Give skill to client agents</h3>
+          <p>Paste the full onboarding prompt into client-agent rules, <code>AGENTS.md</code>, or system prompt. When tokens are enabled, connection variables and token are included.</p>
         </article>
       </div>
     </section>
