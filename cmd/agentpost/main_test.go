@@ -619,6 +619,30 @@ max_message_bytes: 0
 	}
 }
 
+func TestLoadConfigClearsAPITokenWhenRequireTokenDisabled(t *testing.T) {
+	t.Setenv("AGENTPOST_API_TOKEN", "stale-token")
+	t.Setenv("AGENTPOST_REQUIRE_TOKEN", "0")
+
+	configPath := t.TempDir() + "/config.yaml"
+	if err := os.WriteFile(configPath, []byte(`
+domain: agent.local
+http_addr: ":8080"
+smtp_addr: ""
+allow_external_relay: false
+max_message_bytes: 1048576
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.APIToken != "" {
+		t.Fatalf("api token = %q, want empty when AGENTPOST_REQUIRE_TOKEN=0", cfg.APIToken)
+	}
+}
+
 func TestRegisterNormalizesProfileAndInboxPolicy(t *testing.T) {
 	app := NewApp(Config{
 		Domain:          "agent.test",

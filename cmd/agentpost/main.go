@@ -279,6 +279,14 @@ func normalizeConfigDomains(cfg *Config) {
 	}
 }
 
+func envBoolSet(key string) (value, ok bool) {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return false, false
+	}
+	return strings.EqualFold(v, "true") || v == "1", true
+}
+
 func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("AGENTPOST_DOMAIN"); v != "" {
 		cfg.Domain = v
@@ -294,6 +302,10 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("AGENTPOST_API_TOKEN"); v != "" {
 		cfg.APIToken = v
+	}
+	// Honor explicit AGENTPOST_REQUIRE_TOKEN=0 even when a stale API token remains in the shell.
+	if requireToken, set := envBoolSet("AGENTPOST_REQUIRE_TOKEN"); set && !requireToken {
+		cfg.APIToken = ""
 	}
 }
 
@@ -358,9 +370,8 @@ func (a *App) withGatewayAuth(next http.Handler) http.Handler {
 
 func extractGatewayToken(r *http.Request) string {
 	if auth := strings.TrimSpace(r.Header.Get("Authorization")); auth != "" {
-		const prefix = "Bearer "
-		if strings.HasPrefix(auth, prefix) {
-			return strings.TrimSpace(auth[len(prefix):])
+		if parts := strings.SplitN(auth, " ", 2); len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+			return strings.TrimSpace(parts[1])
 		}
 	}
 	if v := strings.TrimSpace(r.Header.Get("X-AgentPost-Token")); v != "" {
