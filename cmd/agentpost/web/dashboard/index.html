@@ -312,7 +312,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 6 9-6"/></svg>
       </div>
       <h1>AgentPost</h1>
-      <p id="login-desc">输入网关 API Token 查看注册域、邮箱互连状态与账户详情。</p>
+      <p id="login-desc">输入网关 API Token 查看注册域、邮箱投递策略与账户详情。</p>
       <input type="password" id="token-input" placeholder="AGENTPOST_API_TOKEN" autocomplete="off">
       <button type="button" id="login-btn" class="btn btn-full">连接</button>
       <div id="login-error" class="login-error"></div>
@@ -353,7 +353,7 @@
     <div>
       <section class="card">
         <div class="panel-head">
-          <span class="panel-title" id="topology-title">互连拓扑</span>
+          <span class="panel-title" id="topology-title">投递拓扑</span>
           <span class="spacer"></span>
           <span class="refresh-note" id="refresh-note"><span class="live-dot"></span>实时 · 10s</span>
           <div class="segmented" id="filter-seg">
@@ -363,10 +363,11 @@
           </div>
         </div>
         <div class="legend" id="legend">
-          <span class="legend-item"><span class="dot" style="background:var(--ok)"></span><span id="legend-allowed">同域可互连</span></span>
-          <span class="legend-item"><span class="dot" style="background:var(--cross)"></span><span id="legend-allowlisted">跨域白名单互连</span></span>
-          <span class="legend-item"><span class="dot" style="background:var(--warn)"></span><span id="legend-cross">跨域默认阻隔</span></span>
-          <span class="legend-item"><span class="dot" style="background:var(--bad)"></span><span id="legend-blocked">黑名单阻隔</span></span>
+          <span class="legend-item"><span class="dot" style="background:var(--ok)"></span><span id="legend-allowed">同域允许投递</span></span>
+          <span class="legend-item"><span class="dot" style="background:var(--cross)"></span><span id="legend-allowlisted">跨域白名单允许</span></span>
+          <span class="legend-item"><span class="dot" style="background:var(--warn)"></span><span id="legend-cross">跨域默认禁止</span></span>
+          <span class="legend-item"><span class="dot" style="background:var(--bad)"></span><span id="legend-blocked">黑名单禁止</span></span>
+          <span class="legend-item"><span style="font-size:0.85rem;color:var(--text-3)">→</span><span id="legend-arrow">单向允许（箭头）</span></span>
         </div>
         <div class="graph-wrap"><svg id="graph-svg"></svg></div>
       </section>
@@ -402,7 +403,7 @@
 
     const I18N = {
       "zh-hans": {
-        loginDesc: "输入网关 API Token 查看注册域、邮箱互连状态与账户详情。",
+        loginDesc: "输入网关 API Token 查看注册域、邮箱投递策略与账户详情。",
         loginBtn: "连接",
         logout: "退出",
         refresh: "刷新",
@@ -410,21 +411,22 @@
         themeAutoBtn: "自动",
         themeLight: "浅色",
         themeDark: "深色",
-        topology: "互连拓扑",
+        topology: "投递拓扑",
         live: "实时 · 10s",
         filterAll: "全部",
         filterCross: "仅跨域",
-        filterBlocked: "仅阻断",
-        legendAllowed: "同域可互连",
-        legendAllowlisted: "跨域白名单互连",
-        legendCross: "跨域默认阻隔",
-        legendBlocked: "黑名单阻隔",
+        filterBlocked: "仅禁止",
+        legendAllowed: "同域允许投递",
+        legendAllowlisted: "跨域白名单允许",
+        legendCross: "跨域默认禁止",
+        legendBlocked: "黑名单禁止",
+        legendArrow: "单向允许（箭头）",
         detailTitle: "邮箱详情",
         detailEmpty: "点击邮箱或拓扑节点查看详情",
         searchPlaceholder: "搜索邮箱或 domain",
         statMailboxes: "活跃邮箱",
         statDomains: "Domain 数",
-        statPairs: "互联对",
+        statPairs: "投递方向",
         statUpdated: "更新时间",
         defaultDomain: "默认域",
         tokenRequired: "需 Token",
@@ -443,20 +445,22 @@
         name: "名称",
         responsibilities: "职责",
         capabilities: "能力",
-        defaultPolicy: "默认策略（同域可互连，跨域默认阻隔）",
-        peers: "互联",
+        defaultPolicy: "默认策略（同域允许投递，跨域默认禁止）",
+        peers: "投递关系",
         none: "无",
         tokenInvalid: "Token 无效或未配置",
         requestFailed: "请求失败",
         refreshed: "已刷新",
         connectFailed: "连接失败",
-        statusAllowed: "可互连",
-        statusAllowlisted: "白名单互连",
-        statusCross: "跨域阻隔",
-        statusBlocked: "黑名单",
+        statusAllowed: "允许投递",
+        statusAllowlisted: "白名单允许",
+        statusCross: "跨域禁止",
+        statusBlocked: "黑名单禁止",
+        deliveryOut: "发出",
+        deliveryIn: "接收",
       },
       "zh-hant": {
-        loginDesc: "輸入閘道 API Token 查看註冊域、郵箱互連狀態與帳戶詳情。",
+        loginDesc: "輸入閘道 API Token 查看註冊域、郵箱投遞策略與帳戶詳情。",
         loginBtn: "連接",
         logout: "登出",
         refresh: "重新整理",
@@ -464,21 +468,22 @@
         themeAutoBtn: "自動",
         themeLight: "淺色",
         themeDark: "深色",
-        topology: "互連拓撲",
+        topology: "投遞拓撲",
         live: "即時 · 10s",
         filterAll: "全部",
         filterCross: "僅跨域",
-        filterBlocked: "僅阻斷",
-        legendAllowed: "同域可互連",
-        legendAllowlisted: "跨域白名單互連",
-        legendCross: "跨域預設阻隔",
-        legendBlocked: "黑名單阻隔",
+        filterBlocked: "僅禁止",
+        legendAllowed: "同域允許投遞",
+        legendAllowlisted: "跨域白名單允許",
+        legendCross: "跨域預設禁止",
+        legendBlocked: "黑名單禁止",
+        legendArrow: "單向允許（箭頭）",
         detailTitle: "郵箱詳情",
         detailEmpty: "點擊郵箱或拓撲節點查看詳情",
         searchPlaceholder: "搜尋郵箱或 domain",
         statMailboxes: "活躍郵箱",
         statDomains: "網域數",
-        statPairs: "互聯對",
+        statPairs: "投遞方向",
         statUpdated: "更新時間",
         defaultDomain: "預設域",
         tokenRequired: "需 Token",
@@ -497,20 +502,22 @@
         name: "名稱",
         responsibilities: "職責",
         capabilities: "能力",
-        defaultPolicy: "預設策略（同域可互連，跨域預設阻隔）",
-        peers: "互聯",
+        defaultPolicy: "預設策略（同域允許投遞，跨域預設禁止）",
+        peers: "投遞關係",
         none: "無",
         tokenInvalid: "Token 無效或未設定",
         requestFailed: "請求失敗",
         refreshed: "已重新整理",
         connectFailed: "連線失敗",
-        statusAllowed: "可互連",
-        statusAllowlisted: "白名單互連",
-        statusCross: "跨域阻隔",
-        statusBlocked: "黑名單",
+        statusAllowed: "允許投遞",
+        statusAllowlisted: "白名單允許",
+        statusCross: "跨域禁止",
+        statusBlocked: "黑名單禁止",
+        deliveryOut: "發出",
+        deliveryIn: "接收",
       },
       en: {
-        loginDesc: "Enter the gateway API token to inspect domains, mailbox connectivity, and account details.",
+        loginDesc: "Enter the gateway API token to inspect domains, delivery policy, and account details.",
         loginBtn: "Connect",
         logout: "Log out",
         refresh: "Refresh",
@@ -518,21 +525,22 @@
         themeAutoBtn: "Auto",
         themeLight: "Light",
         themeDark: "Dark",
-        topology: "Connectivity",
+        topology: "Delivery topology",
         live: "Live · 10s",
         filterAll: "All",
         filterCross: "Cross-domain",
-        filterBlocked: "Blocked",
-        legendAllowed: "Same-domain link",
+        filterBlocked: "Denied only",
+        legendAllowed: "Same-domain allowed",
         legendAllowlisted: "Cross-domain allowlist",
-        legendCross: "Cross-domain blocked",
-        legendBlocked: "Blocklist",
+        legendCross: "Cross-domain denied",
+        legendBlocked: "Blocklist denied",
+        legendArrow: "One-way allowed (arrow)",
         detailTitle: "Mailbox details",
         detailEmpty: "Select a mailbox or graph node",
         searchPlaceholder: "Search mailboxes or domains",
         statMailboxes: "Active mailboxes",
         statDomains: "Domains",
-        statPairs: "Link pairs",
+        statPairs: "Delivery directions",
         statUpdated: "Updated",
         defaultDomain: "Default domain",
         tokenRequired: "Token required",
@@ -551,17 +559,19 @@
         name: "Name",
         responsibilities: "Responsibilities",
         capabilities: "Capabilities",
-        defaultPolicy: "Default (same-domain linked; cross-domain blocked)",
-        peers: "Peers",
+        defaultPolicy: "Default (same-domain allowed; cross-domain denied)",
+        peers: "Delivery",
         none: "None",
         tokenInvalid: "Invalid or missing token",
         requestFailed: "Request failed",
         refreshed: "Refreshed",
         connectFailed: "Connection failed",
-        statusAllowed: "Linked",
+        statusAllowed: "Allowed",
         statusAllowlisted: "Allowlisted",
-        statusCross: "Cross-domain blocked",
-        statusBlocked: "Blocklist",
+        statusCross: "Cross-domain denied",
+        statusBlocked: "Blocklist denied",
+        deliveryOut: "Outbound",
+        deliveryIn: "Inbound",
       },
     };
 
@@ -584,6 +594,25 @@
         blocked: t("statusBlocked"),
       };
       return map[status] || status;
+    }
+
+    function deliveryPermits(status) {
+      return status === "allowed" || status === "allowlisted";
+    }
+
+    function countDirectedEdges(links) {
+      return links.reduce((n, l) => {
+        const fwd = deliveryPermits(l.forward_status);
+        const rev = deliveryPermits(l.reverse_status);
+        if (fwd && rev) return n + 1;
+        return n + 2;
+      }, 0);
+    }
+
+    function pairLineColor(forwardStatus, reverseStatus) {
+      if (!deliveryPermits(forwardStatus) || !deliveryPermits(reverseStatus)) return STATUS_COLORS.blocked;
+      if (forwardStatus === "allowlisted" || reverseStatus === "allowlisted") return STATUS_COLORS.allowlisted;
+      return STATUS_COLORS.allowed;
     }
 
     function detectLang() {
@@ -616,6 +645,8 @@
       $("legend-allowlisted").textContent = t("legendAllowlisted");
       $("legend-cross").textContent = t("legendCross");
       $("legend-blocked").textContent = t("legendBlocked");
+      const legendArrow = $("legend-arrow");
+      if (legendArrow) legendArrow.textContent = t("legendArrow");
       $("detail-title").textContent = t("detailTitle");
       $("detail-empty-text").textContent = t("detailEmpty");
       $("search-input").placeholder = t("searchPlaceholder");
@@ -710,7 +741,7 @@
       const items = [
         ["mb", t("statMailboxes"), g.active_mailboxes],
         ["dm", t("statDomains"), g.domain_count],
-        ["lk", t("statPairs"), data.links.length],
+        ["lk", t("statPairs"), countDirectedEdges(data.links)],
       ];
       let html = items.map(([k, l, v]) =>
         `<div class="stat"><div class="label">${l}</div><div class="value" id="stat-${k}" data-v="${state.prevStats[k] || 0}">${state.prevStats[k] || 0}</div></div>`
@@ -760,9 +791,15 @@
       const body = $("detail-body");
       if (animate) { body.classList.remove("swap"); void body.offsetWidth; body.classList.add("swap"); }
       if (!mb) { $("detail-content").innerHTML = `<div class="detail-empty">${esc(t("detailMissing"))}</div>`; return; }
-      const peers = data.links
-        .filter((l) => l.from === email || l.to === email)
-        .map((l) => ({ peer: l.from === email ? l.to : l.from, status: l.status }));
+      const peerDirs = [];
+      data.links.forEach((l) => {
+        if (l.from === email) {
+          peerDirs.push({ peer: l.to, dir: "out", status: l.forward_status });
+        } else if (l.to === email) {
+          peerDirs.push({ peer: l.from, dir: "in", status: l.reverse_status });
+        }
+      });
+      peerDirs.sort((a, b) => a.peer.localeCompare(b.peer) || a.dir.localeCompare(b.dir));
       const p = mb.profile || {};
 
       $("detail-content").innerHTML = `
@@ -790,8 +827,8 @@
           ${!(mb.inbox_policy?.blocklist?.length || mb.inbox_policy?.allowlist?.length) ? `<div class="detail-kv" style="color:var(--text-3)">${esc(t("defaultPolicy"))}</div>` : ""}
         </div></div>
         <div class="detail-section">
-          <h3 data-sec>${t("peers")} · ${peers.length} <span class="chev">⌄</span></h3>
-          <div class="sec-body link-list">${peers.slice(0, 40).map(peerRow).join("") || `<div class="detail-kv" style="color:var(--text-3)">${t("none")}</div>`}</div>
+          <h3 data-sec>${t("peers")} · ${peerDirs.length} <span class="chev">⌄</span></h3>
+          <div class="sec-body link-list">${peerDirs.slice(0, 60).map(peerRow).join("") || `<div class="detail-kv" style="color:var(--text-3)">${t("none")}</div>`}</div>
         </div>`;
 
       $("detail-content").querySelectorAll("h3[data-sec]").forEach((h) => {
@@ -803,9 +840,11 @@
     }
 
     function peerRow(l) {
+      const arrow = l.dir === "out" ? "→" : "←";
+      const label = l.dir === "out" ? t("deliveryOut") : t("deliveryIn");
       return `<div class="link-row" data-peer="${esc(l.peer)}">
         <span class="status-pill status-${l.status}">${esc(statusLabel(l.status))}</span>
-        <span class="dir">↔ ${esc(l.peer)}</span>
+        <span class="dir">${arrow} ${esc(l.peer)} <span style="color:var(--text-3)">(${label})</span></span>
       </div>`;
     }
 
@@ -823,9 +862,44 @@
     function filteredLinks(data) {
       return data.links.filter((l) => {
         if (state.filter === "cross") return !l.same_domain;
-        if (state.filter === "blocked") return l.status === "blocked" || l.status === "cross_domain_blocked";
+        if (state.filter === "blocked") {
+          return !deliveryPermits(l.forward_status) || !deliveryPermits(l.reverse_status);
+        }
         return true;
       });
+    }
+
+    function shortenSegment(ax, ay, bx, by, pad) {
+      const dx = bx - ax, dy = by - ay;
+      const len = Math.hypot(dx, dy) || 1;
+      return {
+        x1: ax + (dx / len) * pad,
+        y1: ay + (dy / len) * pad,
+        x2: bx - (dx / len) * pad,
+        y2: by - (dy / len) * pad,
+      };
+    }
+
+    function curvedPath(x1, y1, x2, y2, offset) {
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = (-dy / len) * offset * 10;
+      const ny = (dx / len) * offset * 10;
+      return `M ${x1} ${y1} Q ${mx + nx} ${my + ny} ${x2} ${y2}`;
+    }
+
+    function appendDeliveryEdge(htmlParts, from, to, status, offset, sel, related) {
+      const pad = 22;
+      const seg = shortenSegment(from.x, from.y, to.x, to.y, pad);
+      const color = STATUS_COLORS[status] || "#888";
+      const permits = deliveryPermits(status);
+      const opacity = sel ? (related ? 0.92 : 0.1) : (permits ? 0.78 : 0.55);
+      const width = related && sel ? 2.5 : 1.85;
+      const dash = permits ? "" : ' stroke-dasharray="6 5"';
+      const marker = permits ? ` marker-end="url(#arrow-${status})"` : "";
+      const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, offset);
+      htmlParts.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round"${dash}${marker}/>`);
     }
 
     function renderGraph(data) {
@@ -853,22 +927,39 @@
       const isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
         (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
       const links = filteredLinks(data);
-      let html = "";
-
+      const edgeParts = [];
       const sel = state.selected;
-      const linked = (status) => status === "allowed" || status === "allowlisted";
+
+      const markerDefs = ["allowed", "allowlisted"].map((st) => {
+        const c = STATUS_COLORS[st];
+        return `<marker id="arrow-${st}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="${c}"/>
+        </marker>`;
+      }).join("");
+      let html = `<defs>${markerDefs}</defs>`;
+
       links.forEach((l) => {
         const a = positions[l.from], b = positions[l.to];
         if (!a || !b) return;
-        const color = STATUS_COLORS[l.status] || "#888";
         const related = !sel || l.from === sel || l.to === sel;
-        const dim = (linked(l.status) && l.same_domain) || (sel && !related);
-        const opacity = sel ? (related ? 0.9 : 0.08) : (dim ? 0.22 : 0.72);
-        const dash = linked(l.status) ? "" : ' stroke-dasharray="6 5"';
-        const dx = Math.abs(a.x - b.x);
-        const ctrl = dx > 10 ? (a.x + b.x) / 2 : a.x + 60;
-        html += `<path d="M ${a.x} ${a.y} Q ${ctrl} ${(a.y + b.y) / 2} ${b.x} ${b.y}" fill="none" stroke="${color}" stroke-width="${related && sel ? 2.6 : 1.85}" opacity="${opacity}" stroke-linecap="round"${dash}/>`;
+        const fwdOK = deliveryPermits(l.forward_status);
+        const revOK = deliveryPermits(l.reverse_status);
+
+        if (fwdOK && revOK) {
+          const pad = 22;
+          const seg = shortenSegment(a.x, a.y, b.x, b.y, pad);
+          const color = pairLineColor(l.forward_status, l.reverse_status);
+          const opacity = sel ? (related ? 0.9 : 0.1) : 0.75;
+          const width = related && sel ? 2.6 : 1.9;
+          const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, 0);
+          html += `<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round"/>`;
+          return;
+        }
+
+        appendDeliveryEdge(edgeParts, a, b, l.forward_status, 1, sel, related);
+        appendDeliveryEdge(edgeParts, b, a, l.reverse_status, -1, sel, related);
       });
+      html += edgeParts.join("");
 
       const boxFill = isDark ? "rgba(44,44,46,0.5)" : "rgba(255,255,255,0.6)";
       const boxStroke = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
