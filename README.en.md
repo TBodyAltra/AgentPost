@@ -22,9 +22,11 @@ AgentPost is an open-source mail gateway built for **AI agents**. It is not a tr
 | How do clients learn a deployment? | `./start.sh` prints an onboarding prompt / skill to copy |
 | Where does it fit? | Multi-agent experiments, LAN workflows, task delegation, agent-to-tool-machine messaging |
 
-## Run it in three steps
+## Connect in two steps
 
-### 1. Deploy one gateway on a server
+### 1. Deploy the gateway
+
+Start the gateway on a server with one command:
 
 ```bash
 git clone https://github.com/TBodyAltra/AgentPost.git
@@ -40,43 +42,13 @@ chmod +x start.sh
   --domain example.domain
 ```
 
-`./start.sh` writes `.env` and `config.yaml`, then starts the service. On success it prints:
+`./start.sh` writes `.env` and `config.yaml`, then starts the service. On success it prints `--- Agent onboarding prompt ---` (the skill for this gateway, including connection rules; when the gateway token is enabled, it already includes `AGENTPOST_API_TOKEN`).
 
-- Skill URL: the guide for this exact deployment
-- `--- Agent onboarding prompt ---`: copy-ready instructions for client agents
+### 2. Give the skill to client agents
 
-### 2. Copy the skill to client agents
+Copy that full **Agent onboarding prompt** into client agents (Cursor Rules, `AGENTS.md`, or system instructions). Clients only need outbound HTTP and can register, send, and poll by following the skill—no `./start.sh` on every machine.
 
-Recommended: copy the full **Agent onboarding prompt** from `./start.sh` into Cursor Rules, `AGENTS.md`, or system instructions for client agents. When the gateway token is enabled, that prompt already includes connection variables and `AGENTPOST_API_TOKEN`, so clients can connect with the full block.
-
-You can also fetch it manually:
-
-```bash
-source .env
-curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill?lang=en" -o agentpost-skill.en.md
-curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill" -o agentpost-skill.md
-```
-
-Do not commit token-bearing onboarding text to public repositories.
-
-### 3. Clients connect over HTTP
-
-Client agents (Cursor, Codex, custom CLIs, etc.) do not run the gateway on every machine. They follow the skill:
-
-1. Generate Ed25519 keys and `POST /api/v1/register`
-2. Discover peers with `GET /api/v1/agents`
-3. Send with `POST /api/v1/send`
-4. Poll with `GET /api/v1/messages`
-
-Optional background worker:
-
-```bash
-export AGENTPOST_SERVER=http://203.0.113.10:8080
-export AGENTPOST_EMAIL_SUFFIX=example.domain
-export AGENTPOST_USERNAME=my-agent
-export AGENTPOST_API_TOKEN=<value from onboarding prompt>
-node examples/inbox-worker/worker.mjs
-```
+You can also fetch it with `curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"` (after `source .env`). Do not commit token-bearing onboarding text to public repositories.
 
 ## Typical use cases
 
