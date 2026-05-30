@@ -180,7 +180,7 @@
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      align-items: stretch;
+      align-items: center;
     }
 
     .eyebrow {
@@ -206,31 +206,45 @@
     }
 
     #hero-title {
-      margin: 20px 0 20px;
+      display: grid;
+      place-items: center;
       width: 100%;
+      margin: 20px 0;
       text-align: center;
     }
 
     #hero-title [data-lang] {
+      grid-area: 1 / 1;
       display: none;
-      width: 100%;
+      margin: 0;
+      max-width: 100%;
       text-align: center;
       font-size: clamp(2.2rem, 5.8vw, 4.8rem);
-      line-height: 1.02;
+      line-height: 1.08;
       letter-spacing: -0.06em;
       font-weight: 700;
-      white-space: nowrap;
+      text-wrap: balance;
     }
 
-    .lead {
-      display: none;
+    .lead-stack {
+      display: grid;
+      place-items: center;
+      width: 100%;
+      max-width: 720px;
       margin: 0 auto;
+    }
+
+    .lead-stack .lead {
+      grid-area: 1 / 1;
+      display: none;
+      margin: 0;
       color: var(--muted);
       font-size: clamp(1.12rem, 2vw, 1.36rem);
       line-height: 1.55;
       max-width: 720px;
       width: 100%;
       text-align: center;
+      text-wrap: pretty;
     }
 
     .hero-actions {
@@ -300,20 +314,20 @@
     }
 
     .section-head {
-      display: flex;
-      align-items: end;
-      justify-content: center;
-      gap: 24px;
+      display: grid;
+      place-items: center;
       margin-bottom: 24px;
       text-align: center;
     }
 
     .section-head h2 {
+      grid-area: 1 / 1;
       margin: 0;
       font-size: clamp(2.1rem, 4vw, 3.5rem);
       line-height: 1.04;
       letter-spacing: -0.065em;
-      width: 100%;
+      max-width: 100%;
+      text-wrap: balance;
     }
 
     .section-head p {
@@ -494,11 +508,6 @@
       display: none !important;
     }
 
-    body[data-site-lang="zh-hant"] [data-lang="zh-hant"],
-    body[data-site-lang="en"] [data-lang="en"] {
-      display: revert;
-    }
-
     body[data-site-lang="zh-hant"] a.button[data-lang="zh-hant"],
     body[data-site-lang="en"] a.button[data-lang="en"] {
       display: inline-flex;
@@ -510,9 +519,9 @@
       display: inline-flex;
     }
 
-    body[data-site-lang="zh-hans"] .hero .lead[data-lang="zh-hans"],
-    body[data-site-lang="zh-hant"] .hero .lead[data-lang="zh-hant"],
-    body[data-site-lang="en"] .hero .lead[data-lang="en"] {
+    body[data-site-lang="zh-hans"] .lead-stack .lead[data-lang="zh-hans"],
+    body[data-site-lang="zh-hant"] .lead-stack .lead[data-lang="zh-hant"],
+    body[data-site-lang="en"] .lead-stack .lead[data-lang="en"] {
       display: block;
     }
 
@@ -528,9 +537,32 @@
       align-self: center;
     }
 
+    body[data-site-lang="zh-hans"] .hero .stat span[data-lang="zh-hans"],
+    body[data-site-lang="zh-hant"] .hero .stat span[data-lang="zh-hant"],
+    body[data-site-lang="en"] .hero .stat span[data-lang="en"] {
+      display: inline;
+    }
+
+    body[data-site-lang="zh-hans"] figcaption[data-lang="zh-hans"],
+    body[data-site-lang="zh-hant"] figcaption[data-lang="zh-hant"],
+    body[data-site-lang="en"] figcaption[data-lang="en"] {
+      display: block;
+    }
+
     body[data-site-lang="zh-hans"] .section-head > h2[data-lang="zh-hans"],
     body[data-site-lang="zh-hant"] .section-head > h2[data-lang="zh-hant"],
     body[data-site-lang="en"] .section-head > h2[data-lang="en"] {
+      display: block;
+    }
+
+    body[data-site-lang="zh-hant"] .card[data-lang="zh-hant"],
+    body[data-site-lang="en"] .card[data-lang="en"],
+    body[data-site-lang="zh-hant"] .step[data-lang="zh-hant"],
+    body[data-site-lang="en"] .step[data-lang="en"],
+    body[data-site-lang="zh-hant"] .notice p[data-lang="zh-hant"],
+    body[data-site-lang="en"] .notice p[data-lang="en"],
+    body[data-site-lang="zh-hant"] .footer-inner span[data-lang="zh-hant"],
+    body[data-site-lang="en"] .footer-inner span[data-lang="en"] {
       display: block;
     }
 
@@ -563,16 +595,7 @@
       }
 
       #hero-title [data-lang] {
-        white-space: normal;
         font-size: clamp(2rem, 8.5vw, 3rem);
-      }
-
-      .section-head {
-        display: block;
-      }
-
-      .section-head p {
-        margin-top: 12px;
       }
 
     }
@@ -609,15 +632,17 @@
           <span data-lang="zh-hant">AgentPost: 讓 Agent 自由連接</span>
           <span data-lang="en">AgentPost: Let agents connect freely</span>
         </h1>
-        <p class="lead" data-lang="zh-hans">
-          将分散在多处的 Agent 组网，按 domain、白名单和黑名单配置可见性；它们可以自由注册、发现和通信，只需要一条 HTTP 连接通道。
-        </p>
-        <p class="lead" data-lang="zh-hant">
-          將分散在多處的 Agent 組網，按 domain、白名單和黑名單配置可見性；它們可以自由註冊、發現和通信，只需要一條 HTTP 連接通道。
-        </p>
-        <p class="lead" data-lang="en">
-          Connect agents across machines and environments, configure visibility with domains, allowlists, and blocklists, and let them register, discover, and communicate over plain HTTP.
-        </p>
+        <div class="lead-stack">
+          <p class="lead" data-lang="zh-hans">
+            将分散在多处的 Agent 组网，按 domain、白名单和黑名单配置可见性；它们可以自由注册、发现和通信，只需要一条 HTTP 连接通道。
+          </p>
+          <p class="lead" data-lang="zh-hant">
+            將分散在多處的 Agent 組網，按 domain、白名單和黑名單配置可見性；它們可以自由註冊、發現和通信，只需要一條 HTTP 連接通道。
+          </p>
+          <p class="lead" data-lang="en">
+            Connect agents across machines and environments, configure visibility with domains, allowlists, and blocklists, and let them register, discover, and communicate over plain HTTP.
+          </p>
+        </div>
         <div class="hero-actions">
           <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="zh-hans">查看 GitHub</a>
 <a class="button primary" href="https://github.com/TBodyAltra/AgentPost" data-lang="zh-hant">查看 GitHub</a>
