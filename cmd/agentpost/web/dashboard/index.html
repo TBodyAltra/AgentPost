@@ -295,10 +295,9 @@
     .link-row:last-child { border-bottom: none; }
     .link-row .dir { font-family: var(--mono); font-size: 0.72rem; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .status-pill { font-size: 0.66rem; padding: 0.15rem 0.5rem; border-radius: 100px; flex-shrink: 0; font-weight: 600; }
-    .status-allowed { background: rgba(52,199,89,0.16); color: var(--ok); }
-    .status-allowlisted { background: rgba(175,82,222,0.16); color: var(--cross); }
-    .status-blocked { background: rgba(255,59,48,0.16); color: var(--bad); }
-    .status-cross_domain_blocked { background: rgba(255,159,10,0.16); color: var(--warn); }
+    .status-allow { background: rgba(52,199,89,0.16); color: var(--ok); }
+    .status-deny { background: rgba(255,59,48,0.16); color: var(--bad); }
+    .legend-arrow { font-size: 0.9rem; color: var(--ok); line-height: 1; }
 
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 100px; }
@@ -363,11 +362,8 @@
           </div>
         </div>
         <div class="legend" id="legend">
-          <span class="legend-item"><span class="dot" style="background:var(--ok)"></span><span id="legend-allowed">同域允许投递</span></span>
-          <span class="legend-item"><span class="dot" style="background:var(--cross)"></span><span id="legend-allowlisted">跨域白名单允许</span></span>
-          <span class="legend-item"><span class="dot" style="background:var(--warn)"></span><span id="legend-cross">跨域默认禁止</span></span>
-          <span class="legend-item"><span class="dot" style="background:var(--bad)"></span><span id="legend-blocked">黑名单禁止</span></span>
-          <span class="legend-item"><span style="font-size:0.85rem;color:var(--text-3)">→</span><span id="legend-arrow">单向允许（箭头）</span></span>
+          <span class="legend-item"><span class="legend-arrow" aria-hidden="true">→</span><span id="legend-allow">允许投递</span></span>
+          <span class="legend-item"><span class="dot" style="background:var(--bad)"></span><span id="legend-deny">禁止投递</span></span>
         </div>
         <div class="graph-wrap"><svg id="graph-svg"></svg></div>
       </section>
@@ -399,7 +395,11 @@
     const TOKEN_KEY = "agentpost_dashboard_token";
     const THEME_KEY = "agentpost_dashboard_theme";
     const LANG_KEY = "agentpost_dashboard_lang";
-    const STATUS_COLORS = { allowed: "#34c759", allowlisted: "#af52de", cross_domain_blocked: "#ff9f0a", blocked: "#ff3b30" };
+    const DELIVERY_COLORS = { allow: "#34c759", deny: "#ff3b30" };
+
+    function deliveryColor(permits) {
+      return permits ? DELIVERY_COLORS.allow : DELIVERY_COLORS.deny;
+    }
 
     const I18N = {
       "zh-hans": {
@@ -416,11 +416,8 @@
         filterAll: "全部",
         filterCross: "仅跨域",
         filterBlocked: "仅禁止",
-        legendAllowed: "同域允许投递",
-        legendAllowlisted: "跨域白名单允许",
-        legendCross: "跨域默认禁止",
-        legendBlocked: "黑名单禁止",
-        legendArrow: "单向允许（箭头）",
+        legendAllow: "允许投递（箭头指向）",
+        legendDeny: "禁止投递（无箭头）",
         detailTitle: "邮箱详情",
         detailEmpty: "点击邮箱或拓扑节点查看详情",
         searchPlaceholder: "搜索邮箱或 domain",
@@ -453,9 +450,7 @@
         refreshed: "已刷新",
         connectFailed: "连接失败",
         statusAllowed: "允许投递",
-        statusAllowlisted: "白名单允许",
-        statusCross: "跨域禁止",
-        statusBlocked: "黑名单禁止",
+        statusDenied: "禁止投递",
         deliveryOut: "发出",
         deliveryIn: "接收",
       },
@@ -473,11 +468,8 @@
         filterAll: "全部",
         filterCross: "僅跨域",
         filterBlocked: "僅禁止",
-        legendAllowed: "同域允許投遞",
-        legendAllowlisted: "跨域白名單允許",
-        legendCross: "跨域預設禁止",
-        legendBlocked: "黑名單禁止",
-        legendArrow: "單向允許（箭頭）",
+        legendAllow: "允許投遞（箭頭指向）",
+        legendDeny: "禁止投遞（無箭頭）",
         detailTitle: "郵箱詳情",
         detailEmpty: "點擊郵箱或拓撲節點查看詳情",
         searchPlaceholder: "搜尋郵箱或 domain",
@@ -510,9 +502,7 @@
         refreshed: "已重新整理",
         connectFailed: "連線失敗",
         statusAllowed: "允許投遞",
-        statusAllowlisted: "白名單允許",
-        statusCross: "跨域禁止",
-        statusBlocked: "黑名單禁止",
+        statusDenied: "禁止投遞",
         deliveryOut: "發出",
         deliveryIn: "接收",
       },
@@ -530,11 +520,8 @@
         filterAll: "All",
         filterCross: "Cross-domain",
         filterBlocked: "Denied only",
-        legendAllowed: "Same-domain allowed",
-        legendAllowlisted: "Cross-domain allowlist",
-        legendCross: "Cross-domain denied",
-        legendBlocked: "Blocklist denied",
-        legendArrow: "One-way allowed (arrow)",
+        legendAllow: "Allowed (arrow)",
+        legendDeny: "Denied (no arrow)",
         detailTitle: "Mailbox details",
         detailEmpty: "Select a mailbox or graph node",
         searchPlaceholder: "Search mailboxes or domains",
@@ -567,9 +554,7 @@
         refreshed: "Refreshed",
         connectFailed: "Connection failed",
         statusAllowed: "Allowed",
-        statusAllowlisted: "Allowlisted",
-        statusCross: "Cross-domain denied",
-        statusBlocked: "Blocklist denied",
+        statusDenied: "Denied",
         deliveryOut: "Outbound",
         deliveryIn: "Inbound",
       },
@@ -587,13 +572,7 @@
     }
 
     function statusLabel(status) {
-      const map = {
-        allowed: t("statusAllowed"),
-        allowlisted: t("statusAllowlisted"),
-        cross_domain_blocked: t("statusCross"),
-        blocked: t("statusBlocked"),
-      };
-      return map[status] || status;
+      return deliveryPermits(status) ? t("statusAllowed") : t("statusDenied");
     }
 
     function deliveryPermits(status) {
@@ -607,12 +586,6 @@
         if (fwd && rev) return n + 1;
         return n + 2;
       }, 0);
-    }
-
-    function pairLineColor(forwardStatus, reverseStatus) {
-      if (!deliveryPermits(forwardStatus) || !deliveryPermits(reverseStatus)) return STATUS_COLORS.blocked;
-      if (forwardStatus === "allowlisted" || reverseStatus === "allowlisted") return STATUS_COLORS.allowlisted;
-      return STATUS_COLORS.allowed;
     }
 
     function detectLang() {
@@ -641,12 +614,8 @@
       $("filter-all").textContent = t("filterAll");
       $("filter-cross").textContent = t("filterCross");
       $("filter-blocked").textContent = t("filterBlocked");
-      $("legend-allowed").textContent = t("legendAllowed");
-      $("legend-allowlisted").textContent = t("legendAllowlisted");
-      $("legend-cross").textContent = t("legendCross");
-      $("legend-blocked").textContent = t("legendBlocked");
-      const legendArrow = $("legend-arrow");
-      if (legendArrow) legendArrow.textContent = t("legendArrow");
+      $("legend-allow").textContent = t("legendAllow");
+      $("legend-deny").textContent = t("legendDeny");
       $("detail-title").textContent = t("detailTitle");
       $("detail-empty-text").textContent = t("detailEmpty");
       $("search-input").placeholder = t("searchPlaceholder");
@@ -842,8 +811,9 @@
     function peerRow(l) {
       const arrow = l.dir === "out" ? "→" : "←";
       const label = l.dir === "out" ? t("deliveryOut") : t("deliveryIn");
+      const pillClass = deliveryPermits(l.status) ? "status-allow" : "status-deny";
       return `<div class="link-row" data-peer="${esc(l.peer)}">
-        <span class="status-pill status-${l.status}">${esc(statusLabel(l.status))}</span>
+        <span class="status-pill ${pillClass}">${esc(statusLabel(l.status))}</span>
         <span class="dir">${arrow} ${esc(l.peer)} <span style="color:var(--text-3)">(${label})</span></span>
       </div>`;
     }
@@ -892,12 +862,12 @@
     function appendDeliveryEdge(htmlParts, from, to, status, offset, sel, related) {
       const pad = 22;
       const seg = shortenSegment(from.x, from.y, to.x, to.y, pad);
-      const color = STATUS_COLORS[status] || "#888";
       const permits = deliveryPermits(status);
+      const color = deliveryColor(permits);
       const opacity = sel ? (related ? 0.92 : 0.1) : (permits ? 0.78 : 0.55);
       const width = related && sel ? 2.5 : 1.85;
       const dash = permits ? "" : ' stroke-dasharray="6 5"';
-      const marker = permits ? ` marker-end="url(#arrow-${status})"` : "";
+      const marker = permits ? ' marker-end="url(#arrow-allow)"' : "";
       const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, offset);
       htmlParts.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round"${dash}${marker}/>`);
     }
@@ -930,13 +900,10 @@
       const edgeParts = [];
       const sel = state.selected;
 
-      const markerDefs = ["allowed", "allowlisted"].map((st) => {
-        const c = STATUS_COLORS[st];
-        return `<marker id="arrow-${st}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-          <path d="M 0 1 L 9 5 L 0 9 z" fill="${c}"/>
-        </marker>`;
-      }).join("");
-      let html = `<defs>${markerDefs}</defs>`;
+      const arrowFill = deliveryColor(true);
+      let html = `<defs><marker id="arrow-allow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 1 L 9 5 L 0 9 z" fill="${arrowFill}"/>
+      </marker></defs>`;
 
       links.forEach((l) => {
         const a = positions[l.from], b = positions[l.to];
@@ -948,7 +915,7 @@
         if (fwdOK && revOK) {
           const pad = 22;
           const seg = shortenSegment(a.x, a.y, b.x, b.y, pad);
-          const color = pairLineColor(l.forward_status, l.reverse_status);
+          const color = deliveryColor(true);
           const opacity = sel ? (related ? 0.9 : 0.1) : 0.75;
           const width = related && sel ? 2.6 : 1.9;
           const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, 0);
