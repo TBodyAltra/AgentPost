@@ -111,7 +111,8 @@
     }
     .btn:hover { background: var(--accent-press); }
     .btn:active { transform: scale(0.96); }
-    .btn-full { width: 100%; }
+    .btn-full { width: 100%; display: inline-flex; align-items: center; justify-content: center; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
     .btn-ghost {
       background: var(--surface-2); color: var(--text); padding: 0.45rem 1rem; font-size: 0.86rem; border-radius: 10px;
       display: inline-flex; align-items: center; justify-content: center; line-height: 1.1; white-space: nowrap;
@@ -345,7 +346,7 @@
   </style>
 </head>
 <body>
-  <div id="login" class="login-overlay">
+  <div id="login" class="login-overlay hidden">
     <div class="login-card">
       <div class="login-logo">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 6 9-6"/></svg>
@@ -455,6 +456,8 @@
       "zh-hans": {
         loginDesc: "输入网关 API Token 查看注册域、邮箱投递策略与账户详情。",
         loginBtn: "连接",
+        connecting: "连接中…",
+        tokenEmpty: "请输入网关 Token",
         logout: "退出",
         refresh: "刷新",
         themeAuto: "跟随系统",
@@ -514,6 +517,8 @@
       "zh-hant": {
         loginDesc: "輸入閘道 API Token 查看註冊域、郵箱投遞策略與帳戶詳情。",
         loginBtn: "連接",
+        connecting: "連接中…",
+        tokenEmpty: "請輸入閘道 Token",
         logout: "登出",
         refresh: "重新整理",
         themeAuto: "跟隨系統",
@@ -573,6 +578,8 @@
       en: {
         loginDesc: "Enter the gateway API token to inspect domains, delivery policy, and account details.",
         loginBtn: "Connect",
+        connecting: "Connecting…",
+        tokenEmpty: "Enter the gateway token",
         logout: "Log out",
         refresh: "Refresh",
         themeAuto: "System",
@@ -741,16 +748,23 @@
 
     /* ---------- Toast ---------- */
     function showToast(msg, kind) {
-      const t = document.createElement("div");
-      t.className = "toast " + (kind || "");
-      t.innerHTML = `<span class="tdot"></span><span>${esc(msg)}</span>`;
-      $("toast-wrap").appendChild(t);
-      setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 320); }, 3200);
+      const el = document.createElement("div");
+      el.className = "toast " + (kind || "");
+      el.innerHTML = `<span class="tdot"></span><span>${esc(msg)}</span>`;
+      $("toast-wrap").appendChild(el);
+      setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 320); }, 3200);
+    }
+
+    function normalizeToken(raw) {
+      return String(raw ?? "").trim().replace(/^\uFEFF/, "");
     }
 
     function headers() {
       const h = { Accept: "application/json" };
-      if (state.token) h.Authorization = "Bearer " + state.token;
+      if (state.token) {
+        h.Authorization = "Bearer " + state.token;
+        h["X-AgentPost-Token"] = state.token;
+      }
       return h;
     }
 
@@ -1172,9 +1186,9 @@
     function esc(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); }
     function fmtTime(iso) { try { return new Date(iso).toLocaleString(); } catch { return iso; } }
 
-    async function load(manual) {
+    async function load(manual, prefetched) {
       try {
-        const data = await fetchDashboard();
+        const data = prefetched || await fetchDashboard();
         state.data = data;
         if (!state.graphViewTouched && allMailboxes(data).length > 8) {
           state.graphView = "matrix";
@@ -1202,20 +1216,36 @@
     function hideLogin() { $("login").classList.add("hidden"); $("logout-btn").style.display = state.token ? "inline-flex" : "none"; }
 
     async function tryLogin(token) {
-      state.token = token.trim();
+      const normalized = normalizeToken(token);
+      const btn = $("login-btn");
+      const prevLabel = btn.textContent;
       $("login-error").textContent = "";
+      if (!normalized) {
+        $("login-error").textContent = t("tokenEmpty");
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = t("connecting");
+      state.token = normalized;
       try {
-        await fetchDashboard();
+        const data = await fetchDashboard();
         sessionStorage.setItem(TOKEN_KEY, state.token);
         hideLogin();
-        await load();
         if (refreshTimer) clearInterval(refreshTimer);
-        refreshTimer = setInterval(load, 10000);
-      } catch (e) { state.token = ""; $("login-error").textContent = e.message || t("connectFailed"); }
+        await load(false, data);
+        refreshTimer = setInterval(() => load(false), 10000);
+      } catch (e) {
+        state.token = "";
+        sessionStorage.removeItem(TOKEN_KEY);
+        $("login-error").textContent = e.message || t("connectFailed");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = prevLabel;
+      }
     }
 
-    $("login-btn").addEventListener("click", () => tryLogin($("token-input").value));
-    $("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") tryLogin($("token-input").value); });
+    $("login-btn").addEventListener("click", () => { void tryLogin($("token-input").value); });
+    $("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); void tryLogin($("token-input").value); } });
     $("logout-btn").addEventListener("click", () => {
       sessionStorage.removeItem(TOKEN_KEY);
       state.token = ""; state.data = null; state.selected = null;
@@ -1259,12 +1289,25 @@
 
     (async function init() {
       const saved = sessionStorage.getItem(TOKEN_KEY);
-      if (saved) { await tryLogin(saved); return; }
+      if (saved) {
+        await tryLogin(saved);
+        return;
+      }
       try {
         const r = await fetch("/api/v1/dashboard", { headers: { Accept: "application/json" } });
-        if (r.ok) { hideLogin(); state.token = ""; await load(); refreshTimer = setInterval(load, 10000); }
-        else showLogin();
-      } catch { showLogin(); }
+        if (r.ok) {
+          hideLogin();
+          state.token = "";
+          const data = await r.json();
+          if (refreshTimer) clearInterval(refreshTimer);
+          await load(false, data);
+          refreshTimer = setInterval(() => load(false), 10000);
+        } else {
+          showLogin();
+        }
+      } catch {
+        showLogin();
+      }
     })();
   </script>
 </body>

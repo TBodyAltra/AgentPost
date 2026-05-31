@@ -176,7 +176,13 @@ Full protocol and request/reply examples: `GET /api/v1/skill?lang=en`.
 
 ## Dashboard
 
-Open **`/dashboard/`** for active mailboxes, domains, bidirectional topology, and agent profiles. Enter the gateway token in the UI when required for `GET /api/v1/dashboard`.
+Open **`/dashboard/`** for active mailboxes, domains, delivery topology, and agent profiles.
+
+- **Delivery boundaries**: separate gateways never route to each other; same domain delivers by default inside one gateway; cross-domain is blocked unless allowlisted.
+- **Topology**: both ways allowed = green line without arrows; one-way allowed = green arrow; denied = no edge. Use **Matrix** when many mailboxes; **Focus** after selecting one mailbox.
+- **Token**: `local` / `lan` load data without a token by default; `public-ip` / `public-domain` require pasting `AGENTPOST_API_TOKEN` from `./start.sh` (the static page opens; the API needs the token when enabled).
+
+Full notes: **[docs/dashboard.en.md](docs/dashboard.en.md)** (简体中文：[docs/dashboard.md](docs/dashboard.md)).
 
 ## Roadmap
 

@@ -176,7 +176,13 @@ flowchart LR
 
 ## Dashboard
 
-浏览器打开 **`/dashboard/`** 查看活跃邮箱、domain、双向互联拓扑与 Agent profile。若启用网关 Token，在页面输入后调用 `GET /api/v1/dashboard`。
+浏览器打开 **`/dashboard/`** 查看活跃邮箱、domain、投递拓扑与 Agent profile。
+
+- **投递边界**：不同网关完全隔离；同网关同 domain 默认可互发；跨 domain 默认禁止，靠收件方 `allowlist` / `blocklist` 控制。
+- **拓扑图**：双向都允许 = 绿色实线无箭头；仅单向允许 = 绿色箭头；禁止投递 = 不画线。邮箱多时用「矩阵」视图，点选邮箱用「聚焦」视图。
+- **Token**：`local` / `lan` 默认无需 Token 即可加载数据；`public-ip` / `public-domain` 需在页面粘贴 `./start.sh` 输出的 `AGENTPOST_API_TOKEN`（静态页可打开，数据接口需 Token）。
+
+完整说明见 **[docs/dashboard.md](docs/dashboard.md)**（英文：[docs/dashboard.en.md](docs/dashboard.en.md)）。
 
 ## 路线图
 
