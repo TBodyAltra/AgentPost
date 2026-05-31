@@ -66,19 +66,38 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator(".matrix-table td.cell-allowed").first()).toBeVisible();
   });
 
-  test("matrix highlights row and column for mailbox and cell selection", async ({ page }) => {
+  test("matrix highlights row and column; cell vs header selection", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, 2);
     await expect(page.locator(".matrix-table")).toBeVisible();
 
     await page.locator(".mailbox-item").first().click();
-    await expect(page.locator(".matrix-table th.axis-highlight")).toHaveCount(2);
+    await expect(page.locator("#detail-panel")).toHaveClass(/open/);
+    await expect(page.locator(".matrix-table th.row-header.axis-highlight")).toHaveCount(1);
+    await expect(page.locator(".matrix-table th.col-header.axis-highlight")).toHaveCount(1);
+
+    await page.locator("#detail-close").click();
+    await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
+
+    const emptyCell = page.locator(".matrix-table td.cell-empty").first();
+    await emptyCell.click();
+    await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
+    await expect(page.locator(".matrix-table th.axis-highlight").first()).toBeVisible();
     await expect(page.locator(".matrix-table td.axis-highlight").first()).toBeVisible();
 
-    const cell = page.locator(".matrix-table td.cell-allowed").first();
-    await cell.click();
+    const allowedCell = page.locator(".matrix-table td.cell-allowed").first();
+    await allowedCell.click();
+    await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
     await expect(page.locator(".matrix-table td.cell-focus")).toHaveCount(1);
-    await expect(page.locator(".matrix-table th.axis-highlight")).toHaveCount(2);
+
+    await page.locator(".matrix-table th.row-header").first().click();
+    await expect(page.locator("#detail-panel")).toHaveClass(/open/);
+  });
+
+  test("matrix shows merged domain headers", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, 2);
+    await expect(page.locator(".matrix-table th.domain-header")).toHaveCount(2, { timeout: 5000 });
   });
 
   test("detail connections tab lists allowed peers only", async ({ page }) => {

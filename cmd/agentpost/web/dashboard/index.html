@@ -316,6 +316,20 @@
       flex: 1; min-height: 0; min-width: 0;
       overflow: auto; padding: 0.5rem; background: var(--bg);
       -webkit-overflow-scrolling: touch;
+      scrollbar-width: auto;
+      scrollbar-color: color-mix(in srgb, var(--text-2) 55%, transparent) var(--bg);
+    }
+    .matrix-body::-webkit-scrollbar { width: 14px; height: 14px; }
+    .matrix-body::-webkit-scrollbar-track {
+      background: var(--bg); border-radius: 8px; margin: 2px;
+    }
+    .matrix-body::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--text-2) 45%, var(--bg-elevated));
+      border-radius: 8px; border: 3px solid var(--bg);
+      min-height: 48px; min-width: 48px;
+    }
+    .matrix-body::-webkit-scrollbar-thumb:hover {
+      background: color-mix(in srgb, var(--text) 35%, var(--bg-elevated));
     }
     #graph-matrix { display: inline-block; min-width: min(100%, max-content); vertical-align: top; }
     .matrix-table {
@@ -327,42 +341,65 @@
       text-align: center; vertical-align: middle;
     }
     .matrix-table thead th.corner {
-      position: sticky; top: 0; left: 0; z-index: 3; min-width: 2.5rem;
+      position: sticky; top: 0; left: 0; z-index: 5;
+      min-width: 2.5rem; background: var(--bg-elevated);
+    }
+    .matrix-table th.domain-header {
+      font-size: 0.6rem; font-weight: 600; color: var(--text-2);
+      padding: 0.3rem 0.45rem; background: color-mix(in srgb, var(--hairline) 40%, var(--bg-elevated));
+      white-space: nowrap; max-width: 9rem; overflow: hidden; text-overflow: ellipsis;
+    }
+    .matrix-table th.domain-col {
+      position: sticky; top: 0; z-index: 3;
+      border-bottom: 1px solid var(--hairline-strong);
     }
     .matrix-table thead th.col-header {
-      position: sticky; top: 0; z-index: 2; padding: 0.35rem 0.5rem;
-      font-family: var(--mono); font-size: 0.62rem; font-weight: 600; color: var(--text-2);
-      cursor: pointer; white-space: nowrap; resize: horizontal; overflow: hidden;
-      text-overflow: ellipsis; min-width: 4.5rem; max-width: 11rem;
+      position: sticky; top: 1.55rem; z-index: 4; padding: 0.35rem 0.5rem;
+      font-family: var(--mono); font-size: 0.62rem; font-weight: 600; color: var(--text);
+      cursor: pointer; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; min-width: 3.25rem; max-width: 9rem;
+      background: var(--bg-elevated);
+    }
+    .matrix-table tbody th.domain-row {
+      position: sticky; left: 0; z-index: 2;
+      text-align: center; vertical-align: middle;
+      border-right: 1px solid var(--hairline-strong);
     }
     .matrix-table tbody th.row-header {
-      position: sticky; left: 0; z-index: 1; text-align: left;
+      position: sticky; left: 4.5rem; z-index: 3; text-align: left;
       padding: 0.35rem 0.55rem; font-family: var(--mono); font-size: 0.62rem;
-      cursor: pointer; white-space: nowrap; resize: horizontal; overflow: hidden;
-      text-overflow: ellipsis; min-width: 5rem; max-width: 13rem;
+      font-weight: 600; color: var(--text);
+      cursor: pointer; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; min-width: 3.25rem; max-width: 9rem;
+      background: var(--bg-elevated);
     }
-    .matrix-table th .axis-domain { color: var(--text-3); font-weight: 500; }
-    .matrix-table th.selected { background: var(--accent-soft); }
+    .matrix-table th.selected { background: var(--accent-soft); font-weight: 700; }
     .matrix-table th.axis-highlight,
     .matrix-table td.axis-highlight {
-      background: color-mix(in srgb, var(--accent) 16%, var(--bg-elevated));
+      background: color-mix(in srgb, var(--accent) 32%, var(--bg-elevated)) !important;
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    .matrix-table th.domain-header.axis-highlight {
+      background: color-mix(in srgb, var(--accent) 22%, var(--bg-elevated)) !important;
+      color: var(--accent);
     }
     .matrix-table td.cell-focus {
-      background: color-mix(in srgb, var(--accent) 28%, var(--ok-soft));
-      box-shadow: inset 0 0 0 1.5px var(--accent);
+      background: color-mix(in srgb, var(--accent) 42%, var(--ok-soft)) !important;
+      box-shadow: inset 0 0 0 2px var(--accent);
     }
     .matrix-table td { width: 1.6rem; min-width: 1.6rem; height: 1.6rem; padding: 0; }
-    .matrix-table td.cell-allowed { background: var(--ok-soft); cursor: pointer; }
+    .matrix-table td.cell-data { cursor: pointer; }
+    .matrix-table td.cell-allowed { background: var(--ok-soft); }
     .matrix-table td.cell-allowed.axis-highlight {
-      background: color-mix(in srgb, var(--accent) 12%, var(--ok-soft));
+      background: color-mix(in srgb, var(--accent) 24%, var(--ok-soft)) !important;
     }
     .matrix-table td.cell-allowed.cell-focus {
-      background: color-mix(in srgb, var(--accent) 28%, var(--ok-soft));
+      background: color-mix(in srgb, var(--accent) 40%, var(--ok-soft)) !important;
     }
     .matrix-table td.cell-empty { background: var(--bg-elevated); }
     .matrix-table td.cell-self {
       background: color-mix(in srgb, var(--hairline) 35%, var(--bg-elevated));
-      color: var(--text-3); font-size: 0.62rem; line-height: 1;
+      color: var(--text-3); font-size: 0.62rem; line-height: 1; cursor: pointer;
     }
     .matrix-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
     .matrix-note { font-size: 0.72rem; color: var(--text-3); padding: 0.5rem 0.25rem 0; text-align: center; }
@@ -580,7 +617,8 @@
         topology: "投递权限矩阵",
         live: "实时 · 10s",
         legendMatrix: "行 = 发件人，列 = 收件人；绿点 = 允许投递",
-        matrixNote: "绿点表示该行可向该列投递；点击行首或列头选中邮箱。",
+        matrixNote: "点击格子高亮行列；点击行首或列头账号查看详情。",
+        matrixDomain: "域名",
         matrixTruncated: "仅显示前 {n} 个邮箱，请用搜索缩小范围。",
         detailTitle: "邮箱详情",
         searchPlaceholder: "搜索邮箱或 domain，/正则/",
@@ -641,7 +679,8 @@
         topology: "投遞權限矩陣",
         live: "即時 · 10s",
         legendMatrix: "列 = 寄件人，欄 = 收件人；綠點 = 允許投遞",
-        matrixNote: "綠點表示該列可向該欄投遞；點擊列首或欄頭選中郵箱。",
+        matrixNote: "點擊格子高亮行列；點擊列首或欄頭帳號查看詳情。",
+        matrixDomain: "網域",
         matrixTruncated: "僅顯示前 {n} 個郵箱，請用搜尋縮小範圍。",
         detailTitle: "郵箱詳情",
         searchPlaceholder: "搜尋郵箱或 domain，/正則/",
@@ -702,7 +741,8 @@
         topology: "Delivery matrix",
         live: "Live · 10s",
         legendMatrix: "Row = sender, column = recipient; green = allowed",
-        matrixNote: "Green dot = row may deliver to column. Click row/column header to select a mailbox.",
+        matrixNote: "Click a cell to highlight its row and column; click a mailbox header for details.",
+        matrixDomain: "Domain",
         matrixTruncated: "Showing first {n} mailboxes; narrow with search.",
         detailTitle: "Mailbox",
         searchPlaceholder: "Search mailboxes or /regex/",
@@ -944,12 +984,47 @@
       hint.textContent = "";
     }
 
-    function matrixAxisLabel(email) {
+    function matrixUserLabel(email) {
       const at = email.indexOf("@");
       if (at < 0) return esc(email);
-      const user = email.slice(0, at);
-      const domain = email.slice(at + 1);
-      return `${esc(user)}<span class="axis-domain">@${esc(domain)}</span>`;
+      return esc(email.slice(0, at));
+    }
+
+    function sortEmailsForMatrix(emails) {
+      return [...emails].sort((a, b) => {
+        const da = emailDomain(a);
+        const db = emailDomain(b);
+        if (da !== db) return da.localeCompare(db);
+        return a.localeCompare(b);
+      });
+    }
+
+    function groupEmailsByDomain(emails) {
+      const groups = [];
+      emails.forEach((email) => {
+        const domain = emailDomain(email);
+        const last = groups[groups.length - 1];
+        if (!last || last.domain !== domain) {
+          groups.push({ domain, mailboxes: [email] });
+        } else {
+          last.mailboxes.push(email);
+        }
+      });
+      return groups;
+    }
+
+    function matrixHeaderClasses(email, axis) {
+      let cls = "";
+      if (email === state.selected) cls += " selected";
+      if (axis === "row" && state.matrixAxis.row === email) cls += " axis-highlight";
+      if (axis === "col" && state.matrixAxis.col === email) cls += " axis-highlight";
+      return cls;
+    }
+
+    function matrixDomainHeaderClasses(domain, axis) {
+      const axisEmail = axis === "row" ? state.matrixAxis.row : state.matrixAxis.col;
+      if (!axisEmail || emailDomain(axisEmail) !== domain) return "";
+      return " axis-highlight";
     }
 
     function directedDeliveryStatus(from, to, links) {
@@ -1122,7 +1197,7 @@
       if (state.selected) emails.add(state.selected);
       if (state.matrixAxis.row) emails.add(state.matrixAxis.row);
       if (state.matrixAxis.col) emails.add(state.matrixAxis.col);
-      return [...emails].sort();
+      return sortEmailsForMatrix([...emails]);
     }
 
     function matrixAxisClasses(row, col) {
@@ -1156,47 +1231,67 @@
       }
 
       const links = data.links;
-      const sel = state.selected;
       const axis = state.matrixAxis;
-      let table = '<table class="matrix-table"><thead><tr><th class="corner"></th>';
+      const colGroups = groupEmailsByDomain(emails);
+      const rowGroups = colGroups;
+
+      let table = '<table class="matrix-table"><thead>';
+      table += '<tr class="matrix-domain-row"><th class="corner" rowspan="2" colspan="2" title="' + esc(t("matrixDomain")) + '"></th>';
+      colGroups.forEach((g) => {
+        const dCls = "domain-header domain-col" + matrixDomainHeaderClasses(g.domain, "col");
+        table += `<th class="${dCls}" colspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
+      });
+      table += "</tr><tr>";
       emails.forEach((col) => {
-        let cls = "col-header";
-        if (col === sel) cls += " selected";
-        if (axis.col && col === axis.col) cls += " axis-highlight";
-        table += `<th class="${cls}" data-email="${esc(col)}" title="${esc(col)}">${matrixAxisLabel(col)}</th>`;
+        const cls = "col-header" + matrixHeaderClasses(col, "col");
+        table += `<th class="${cls}" data-email="${esc(col)}" title="${esc(col)}">${matrixUserLabel(col)}</th>`;
       });
       table += "</tr></thead><tbody>";
-      emails.forEach((row) => {
-        let rowCls = "row-header";
-        if (row === sel) rowCls += " selected";
-        if (axis.row && row === axis.row) rowCls += " axis-highlight";
-        table += `<tr><th class="${rowCls}" data-email="${esc(row)}" title="${esc(row)}">${matrixAxisLabel(row)}</th>`;
-        emails.forEach((col) => {
-          if (row === col) {
-            const selfCls = axis.row === row && axis.col === col ? "cell-self axis-highlight cell-focus" : "cell-self";
-            table += `<td class="${selfCls}" data-email="${esc(row)}" title="${esc(row)}">·</td>`;
-            return;
+
+      rowGroups.forEach((g) => {
+        g.mailboxes.forEach((row, idx) => {
+          table += "<tr>";
+          if (idx === 0) {
+            const dCls = "domain-header domain-row" + matrixDomainHeaderClasses(g.domain, "row");
+            table += `<th class="${dCls}" rowspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
           }
-          const ok = deliveryAllowed(row, col, links);
-          const axisCls = matrixAxisClasses(row, col);
-          table += ok
-            ? `<td class="cell-allowed${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}"><span class="matrix-dot"></span></td>`
-            : `<td class="cell-empty${axisCls}"></td>`;
+          const rowCls = "row-header" + matrixHeaderClasses(row, "row");
+          table += `<th class="${rowCls}" data-email="${esc(row)}" title="${esc(row)}">${matrixUserLabel(row)}</th>`;
+          emails.forEach((col) => {
+            if (row === col) {
+              const selfCls = axis.row === row && axis.col === col
+                ? "cell-self cell-data axis-highlight cell-focus"
+                : "cell-self cell-data";
+              table += `<td class="${selfCls}" data-row="${esc(row)}" data-col="${esc(col)}" title="${esc(row)}">·</td>`;
+              return;
+            }
+            const ok = deliveryAllowed(row, col, links);
+            const axisCls = matrixAxisClasses(row, col);
+            table += ok
+              ? `<td class="cell-data cell-allowed${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}"><span class="matrix-dot"></span></td>`
+              : `<td class="cell-data cell-empty${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}"></td>`;
+          });
+          table += "</tr>";
         });
-        table += "</tr>";
       });
       table += "</tbody></table>";
       table += `<div class="matrix-note">${esc(t("legendMatrix"))} · ${esc(t("matrixNote"))}${truncated ? " · " + esc(t("matrixTruncated").replace("{n}", String(MATRIX_CAP))) : ""}</div>`;
       matrixEl.innerHTML = table;
 
-      matrixEl.querySelectorAll("th[data-email]").forEach((th) => {
-        th.addEventListener("click", () => selectMailbox(th.getAttribute("data-email")));
+      matrixEl.querySelectorAll("th.row-header[data-email], th.col-header[data-email]").forEach((th) => {
+        th.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          selectMailbox(th.getAttribute("data-email"));
+        });
       });
-      matrixEl.querySelectorAll("td[data-row]").forEach((td) => {
-        td.addEventListener("click", () => selectMatrixCell(td.getAttribute("data-row"), td.getAttribute("data-col")));
-      });
-      matrixEl.querySelectorAll("td.cell-self[data-email]").forEach((td) => {
-        td.addEventListener("click", () => selectMailbox(td.getAttribute("data-email")));
+      matrixEl.querySelectorAll("td.cell-data[data-row]").forEach((td) => {
+        td.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const row = td.getAttribute("data-row");
+          const col = td.getAttribute("data-col");
+          if (row === col) selectMailbox(row);
+          else selectMatrixCell(row, col);
+        });
       });
     }
 
@@ -1341,12 +1436,13 @@
 
     function selectMatrixCell(row, col) {
       setMatrixAxis(row, col);
-      state.selected = row;
+      state.selected = null;
       updateLayout();
       if (state.data) {
         renderMailboxList(state.data);
         renderMatrix(state.data);
-        renderDetail(state.data, row);
+        $("detail-hero").innerHTML = "";
+        $("detail-content").innerHTML = `<p class="muted" style="padding:1rem 0">${esc(t("selectMailbox"))}</p>`;
       }
     }
 
