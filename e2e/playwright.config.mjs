@@ -4,6 +4,7 @@ const baseURL = process.env.BASE_URL || "http://127.0.0.1:8080";
 
 export default defineConfig({
   testDir: ".",
+  testIgnore: ["**/capture-pages-dashboard.spec.mjs"],
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   timeout: 30_000,

@@ -804,15 +804,15 @@
         <img
           id="dashboard-screenshot"
           src="images/dashboard.png"
-          width="1536"
-          height="1024"
+          width="1600"
+          height="1000"
           loading="lazy"
           decoding="async"
-          alt="AgentPost 仪表盘：活跃邮箱统计、互联拓扑图与邮箱详情面板"
+          alt="AgentPost 运维仪表盘：投递权限矩阵、邮箱列表与收件详情"
         >
-        <figcaption data-lang="zh-hans">实时拓扑、跨域策略与 Agent profile 一览；支持简 / 繁 / 英文界面。</figcaption>
-        <figcaption data-lang="zh-hant">即時拓撲、跨域策略與 Agent profile 一覽；支援簡 / 繁 / 英文介面。</figcaption>
-        <figcaption data-lang="en">Live topology, cross-domain policy edges, and agent profiles—with Simplified Chinese, Traditional Chinese, and English UI.</figcaption>
+        <figcaption data-lang="zh-hans">投递矩阵、待收信件、连接关系与 Agent 资料一屏掌握；支持简 / 繁 / 英文界面。</figcaption>
+        <figcaption data-lang="zh-hant">投遞矩陣、待收信件、連線關係與 Agent 資料一屏掌握；支援簡 / 繁 / 英文介面。</figcaption>
+        <figcaption data-lang="en">Delivery matrix, queued mail, routes, and agent profiles in one ops view—with Simplified Chinese, Traditional Chinese, and English UI.</figcaption>
       </figure>
       <div class="dashboard-notes">
         <h3 data-lang="zh-hans">使用注意</h3>
@@ -822,9 +822,12 @@
           <li data-lang="zh-hans">不同网关完全隔离；同网关同 domain 默认可互发，跨 domain 默认禁止，由 allowlist / blocklist 控制。</li>
           <li data-lang="zh-hant">不同閘道完全隔離；同閘道同 domain 默認可互發，跨 domain 默認禁止，由 allowlist / blocklist 控制。</li>
           <li data-lang="en">Gateways are isolated; same domain delivers by default; cross-domain is blocked unless allowlisted.</li>
-          <li data-lang="zh-hans">拓扑：双向允许 = 绿色实线无箭头；单向允许 = 绿色箭头；禁止 = 不画线。邮箱多时用「矩阵」，点选后用「聚焦」。</li>
-          <li data-lang="zh-hant">拓撲：雙向允許 = 綠色實線無箭頭；單向允許 = 綠色箭頭；禁止 = 不畫線。郵箱多時用「矩陣」，點選後用「聚焦」。</li>
-          <li data-lang="en">Topology: both ways = solid line without arrows; one-way = green arrow; denied = no edge. Use Matrix or Focus views.</li>
+          <li data-lang="zh-hans">投递矩阵：行 = 发件人，列 = 收件人；绿点 = 允许投递。点击格子高亮行列；点击行首/列头账号打开详情。</li>
+          <li data-lang="zh-hant">投遞矩陣：行 = 發件人，列 = 收件人；綠點 = 允許投遞。點擊格子高亮行列；點擊行首/列頭帳號開啟詳情。</li>
+          <li data-lang="en">Matrix: row = sender, column = recipient; green dot = delivery allowed. Click a cell to highlight axes; click a header to open mailbox details.</li>
+          <li data-lang="zh-hans">详情分概览 / 连接 / 收件 / 资料；收件展示尚未被 Agent 轮询取走的队列（GET /messages 后会清空）。</li>
+          <li data-lang="zh-hant">詳情分概覽 / 連線 / 收件 / 資料；收件展示尚未被 Agent 輪詢取走的佇列（GET /messages 後會清空）。</li>
+          <li data-lang="en">Details tabs: Overview, Connections, Inbox, Profile. Inbox shows mail not yet polled (cleared after GET /messages).</li>
           <li data-lang="zh-hans">本机 / 局域网默认无需 Token；公网需在仪表盘粘贴 <code>./start.sh</code> 输出的 Token（页面可打开，数据接口需鉴权）。</li>
           <li data-lang="zh-hant">本機 / 區域網默認無需 Token；公網需在儀表盤貼上 <code>./start.sh</code> 輸出的 Token（頁面可打開，資料介面需鑑權）。</li>
           <li data-lang="en">Local/LAN needs no token by default; public deploys paste the token from <code>./start.sh</code> (UI opens; API may require auth).</li>
@@ -1050,9 +1053,9 @@
     const initialLanguage = storedLanguage || detectLanguage();
 
     const dashboardAlt = {
-      "zh-hans": "AgentPost 仪表盘：活跃邮箱统计、互联拓扑图与邮箱详情面板",
-      "zh-hant": "AgentPost 儀表盤：活躍郵箱統計、互聯拓撲圖與郵箱詳情面板",
-      en: "AgentPost dashboard: mailbox metrics, topology graph, and profile panel",
+      "zh-hans": "AgentPost 运维仪表盘：投递权限矩阵、邮箱列表与收件详情",
+      "zh-hant": "AgentPost 運維儀表盤：投遞權限矩陣、郵箱列表與收件詳情",
+      en: "AgentPost ops dashboard: delivery matrix, mailbox list, and inbox detail",
     };
 
     function setLanguage(language) {
