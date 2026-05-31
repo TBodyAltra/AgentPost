@@ -317,9 +317,23 @@
       text-overflow: ellipsis; min-width: 5rem; max-width: 13rem;
     }
     .matrix-table th .axis-domain { color: var(--text-3); font-weight: 500; }
-    .matrix-table th.selected, .matrix-table td.row-selected { background: var(--accent-soft); }
+    .matrix-table th.selected { background: var(--accent-soft); }
+    .matrix-table th.axis-highlight,
+    .matrix-table td.axis-highlight {
+      background: color-mix(in srgb, var(--accent) 16%, var(--bg-elevated));
+    }
+    .matrix-table td.cell-focus {
+      background: color-mix(in srgb, var(--accent) 28%, var(--ok-soft));
+      box-shadow: inset 0 0 0 1.5px var(--accent);
+    }
     .matrix-table td { width: 1.6rem; min-width: 1.6rem; height: 1.6rem; padding: 0; }
     .matrix-table td.cell-allowed { background: var(--ok-soft); cursor: pointer; }
+    .matrix-table td.cell-allowed.axis-highlight {
+      background: color-mix(in srgb, var(--accent) 12%, var(--ok-soft));
+    }
+    .matrix-table td.cell-allowed.cell-focus {
+      background: color-mix(in srgb, var(--accent) 28%, var(--ok-soft));
+    }
     .matrix-table td.cell-empty { background: var(--bg-elevated); }
     .matrix-table td.cell-self {
       background: color-mix(in srgb, var(--hairline) 35%, var(--bg-elevated));
@@ -709,7 +723,14 @@
 
     let lang = "zh-hans";
     let detailTab = localStorage.getItem(TAB_KEY) || "overview";
-    let state = { data: null, selected: null, token: "", search: "", prevStats: {} };
+    let state = {
+      data: null,
+      selected: null,
+      matrixAxis: { row: null, col: null },
+      token: "",
+      search: "",
+      prevStats: {},
+    };
     let refreshTimer = null;
 
     const $ = (id) => document.getElementById(id);
@@ -948,12 +969,35 @@
     }
 
     function emailsForMatrix(data) {
+      const all = allMailboxes(data);
       const q = state.search.trim().toLowerCase();
-      let emails = allMailboxes(data).filter((e) => !q || e.toLowerCase().includes(q));
-      if (state.selected && !emails.includes(state.selected)) {
-        emails = [state.selected, ...emails];
+      if (!q) {
+        const emails = new Set(all);
+        if (state.selected) emails.add(state.selected);
+        return [...emails].sort();
       }
-      return emails.sort();
+      const matched = all.filter((e) => e.toLowerCase().includes(q));
+      const emails = new Set(matched);
+      matched.forEach((email) => {
+        const { outbound, inbound } = collectDeliveryPeers(data, email);
+        outbound.forEach((p) => emails.add(p));
+        inbound.forEach((p) => emails.add(p));
+      });
+      if (state.selected) emails.add(state.selected);
+      if (state.matrixAxis.row) emails.add(state.matrixAxis.row);
+      if (state.matrixAxis.col) emails.add(state.matrixAxis.col);
+      return [...emails].sort();
+    }
+
+    function matrixAxisClasses(row, col) {
+      const axis = state.matrixAxis;
+      const hlRow = axis.row && row === axis.row;
+      const hlCol = axis.col && col === axis.col;
+      const focus = hlRow && hlCol && row !== col;
+      let cls = "";
+      if (hlRow || hlCol) cls += " axis-highlight";
+      if (focus) cls += " cell-focus";
+      return cls;
     }
 
     function renderMatrix(data) {
@@ -977,24 +1021,31 @@
 
       const links = data.links;
       const sel = state.selected;
+      const axis = state.matrixAxis;
       let table = '<table class="matrix-table"><thead><tr><th class="corner"></th>';
       emails.forEach((col) => {
-        const cls = col === sel ? "col-header selected" : "col-header";
+        let cls = "col-header";
+        if (col === sel) cls += " selected";
+        if (axis.col && col === axis.col) cls += " axis-highlight";
         table += `<th class="${cls}" data-email="${esc(col)}" title="${esc(col)}">${matrixAxisLabel(col)}</th>`;
       });
       table += "</tr></thead><tbody>";
       emails.forEach((row) => {
-        const rowCls = row === sel ? "row-header selected" : "row-header";
+        let rowCls = "row-header";
+        if (row === sel) rowCls += " selected";
+        if (axis.row && row === axis.row) rowCls += " axis-highlight";
         table += `<tr><th class="${rowCls}" data-email="${esc(row)}" title="${esc(row)}">${matrixAxisLabel(row)}</th>`;
         emails.forEach((col) => {
           if (row === col) {
-            table += '<td class="cell-self" aria-label="—">·</td>';
+            const selfCls = axis.row === row && axis.col === col ? "cell-self axis-highlight cell-focus" : "cell-self";
+            table += `<td class="${selfCls}" data-email="${esc(row)}" title="${esc(row)}">·</td>`;
             return;
           }
           const ok = deliveryAllowed(row, col, links);
+          const axisCls = matrixAxisClasses(row, col);
           table += ok
-            ? `<td class="cell-allowed${row === sel || col === sel ? " row-selected" : ""}" data-row="${esc(row)}" data-col="${esc(col)}"><span class="matrix-dot"></span></td>`
-            : `<td class="cell-empty"></td>`;
+            ? `<td class="cell-allowed${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}"><span class="matrix-dot"></span></td>`
+            : `<td class="cell-empty${axisCls}"></td>`;
         });
         table += "</tr>";
       });
@@ -1006,7 +1057,10 @@
         th.addEventListener("click", () => selectMailbox(th.getAttribute("data-email")));
       });
       matrixEl.querySelectorAll("td[data-row]").forEach((td) => {
-        td.addEventListener("click", () => selectMailbox(td.getAttribute("data-row")));
+        td.addEventListener("click", () => selectMatrixCell(td.getAttribute("data-row"), td.getAttribute("data-col")));
+      });
+      matrixEl.querySelectorAll("td.cell-self[data-email]").forEach((td) => {
+        td.addEventListener("click", () => selectMailbox(td.getAttribute("data-email")));
       });
     }
 
@@ -1134,8 +1188,13 @@
       $("workspace").classList.toggle("has-detail", open);
     }
 
+    function setMatrixAxis(row, col) {
+      state.matrixAxis = { row: row || null, col: col || null };
+    }
+
     function selectMailbox(email) {
       state.selected = email;
+      setMatrixAxis(email, email);
       updateLayout();
       if (state.data) {
         renderMailboxList(state.data);
@@ -1144,8 +1203,20 @@
       }
     }
 
+    function selectMatrixCell(row, col) {
+      setMatrixAxis(row, col);
+      state.selected = row;
+      updateLayout();
+      if (state.data) {
+        renderMailboxList(state.data);
+        renderMatrix(state.data);
+        renderDetail(state.data, row);
+      }
+    }
+
     function clearMailboxSelection() {
       state.selected = null;
+      setMatrixAxis(null, null);
       updateLayout();
       if (state.data) {
         renderMailboxList(state.data);
