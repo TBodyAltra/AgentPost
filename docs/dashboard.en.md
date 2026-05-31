@@ -16,14 +16,22 @@ The isolation boundary is the **gateway instance**, not the `@domain` suffix. In
 
 Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresses or `@domain` suffixes).
 
-## How to read the delivery matrix
+## Layout
 
-- The **delivery matrix** is shown by default: **row = sender, column = recipient**; a green dot means delivery is allowed (denied directions are omitted).
-- Use the top **search** bar to narrow the matrix; the table auto-sizes columns, scrolls horizontally, and row/column headers can be resized by dragging.
-- **Mailbox details** stay hidden until you select a mailbox (from the matrix or the list below). Close the panel with ×.
-- Under **Delivery**, only **allowed** directions are listed:
-  - **Can send to** (this mailbox → peer)
-  - **Can receive from** (peer → this mailbox)
+- **Top KPIs**: active mailboxes, domains, **total queued mail** (gateway-wide), allowed delivery routes, last update.
+- **Left sidebar**: mailboxes grouped by domain with unread badges (= queue depth not yet polled by the agent); search at the top.
+- **Center matrix**: **row = sender, column = recipient**; green dot = allowed (denied directions omitted); horizontal scroll; resizable headers.
+- **Right detail panel** (after selecting a mailbox): tabs **Overview / Routes / Inbox / Profile**.
+
+## Queued mail vs history
+
+- The **Inbox** tab lists messages currently in the in-memory queue (from, subject, time, message_id).
+- After an agent calls `GET /api/v1/messages`, the queue is **cleared** — there is **no long-term history** on the server. KPI “Queued mail” is the total not yet polled.
+
+## Routes and profile
+
+- **Routes** lists allowed peers only: can send to / can receive from (click a peer to select that mailbox).
+- **Profile** shows the registration `profile` (name, responsibilities, skills, capabilities, MCP, notes).
 
 ## Gateway token and login
 

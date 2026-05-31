@@ -34,17 +34,18 @@ func TestDashboardEmbeddedHTMLHasCriticalUI(t *testing.T) {
 	html := string(readEmbeddedDashboardHTML(t))
 	required := []string{
 		`id="graph-matrix"`,
-		`class="search-toolbar"`,
-		`id="main-layout"`,
+		`id="mailbox-list"`,
+		`id="workspace"`,
 		`id="detail-panel"`,
 		`id="detail-close"`,
+		`id="detail-tabs"`,
+		`id="stats"`,
 		`id="lang-seg"`,
 		`id="login-btn"`,
 		`id="refresh-btn"`,
-		`id="domain-grid"`,
 		`id="detail-content"`,
 		`collectDeliveryPeers`,
-		`renderDeliveryBlock`,
+		`renderTabInbox`,
 	}
 	for _, needle := range required {
 		if !strings.Contains(html, needle) {

@@ -21,12 +21,21 @@ type dashboardResponse struct {
 }
 
 type dashboardGateway struct {
-	DefaultDomain   string `json:"default_domain"`
-	ServerURL       string `json:"server_url"`
-	GatewayToken    bool   `json:"gateway_token_required"`
-	SMTPEnabled     bool   `json:"smtp_inbound_enabled"`
-	ActiveMailboxes int    `json:"active_mailboxes"`
-	DomainCount     int    `json:"domain_count"`
+	DefaultDomain       string `json:"default_domain"`
+	ServerURL           string `json:"server_url"`
+	GatewayToken        bool   `json:"gateway_token_required"`
+	SMTPEnabled         bool   `json:"smtp_inbound_enabled"`
+	ActiveMailboxes     int    `json:"active_mailboxes"`
+	DomainCount         int    `json:"domain_count"`
+	TotalQueuedMessages int    `json:"total_queued_messages"`
+	MailboxesWithQueue  int    `json:"mailboxes_with_queue"`
+}
+
+type dashboardMessagePreview struct {
+	MessageID  string    `json:"message_id"`
+	From       string    `json:"from"`
+	Subject    string    `json:"subject"`
+	ReceivedAt time.Time `json:"received_at"`
 }
 
 type dashboardDomain struct {
@@ -37,15 +46,16 @@ type dashboardDomain struct {
 }
 
 type dashboardMailbox struct {
-	Username            string       `json:"username"`
-	Domain              string       `json:"domain"`
-	Email               string       `json:"email"`
-	ExpiresAt           time.Time    `json:"expires_at"`
-	RegisteredAt        time.Time    `json:"registered_at"`
-	TTLRemainingSeconds int64        `json:"ttl_remaining_seconds"`
-	QueuedMessages      int          `json:"queued_messages"`
-	Profile             AgentProfile `json:"profile,omitempty"`
-	InboxPolicy         InboxPolicy  `json:"inbox_policy"`
+	Username            string                    `json:"username"`
+	Domain              string                    `json:"domain"`
+	Email               string                    `json:"email"`
+	ExpiresAt           time.Time                 `json:"expires_at"`
+	RegisteredAt        time.Time                 `json:"registered_at"`
+	TTLRemainingSeconds int64                     `json:"ttl_remaining_seconds"`
+	QueuedMessages      int                       `json:"queued_messages"`
+	Queue               []dashboardMessagePreview `json:"queue,omitempty"`
+	Profile             AgentProfile              `json:"profile,omitempty"`
+	InboxPolicy         InboxPolicy               `json:"inbox_policy"`
 }
 
 type dashboardLink struct {
@@ -76,6 +86,8 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 	mailboxes := make([]dashboardMailbox, 0, len(a.users))
 	domainMailboxes := make(map[string][]string)
 	activeEmails := make([]string, 0, len(a.users))
+	totalQueued := 0
+	mailboxesWithQueue := 0
 
 	for _, user := range a.users {
 		if !user.ExpiresAt.After(now) {
@@ -87,6 +99,12 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 		if ttlRemaining < 0 {
 			ttlRemaining = 0
 		}
+		queue := a.messages[email]
+		qn := len(queue)
+		totalQueued += qn
+		if qn > 0 {
+			mailboxesWithQueue++
+		}
 		mailboxes = append(mailboxes, dashboardMailbox{
 			Username:            user.Username,
 			Domain:              user.Domain,
@@ -94,7 +112,8 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 			ExpiresAt:           user.ExpiresAt.UTC(),
 			RegisteredAt:        user.RegisteredAt.UTC(),
 			TTLRemainingSeconds: ttlRemaining,
-			QueuedMessages:      len(a.messages[email]),
+			QueuedMessages:      qn,
+			Queue:               dashboardQueuePreviews(queue),
 			Profile:             user.Profile,
 			InboxPolicy:         user.InboxPolicy,
 		})
@@ -167,12 +186,14 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 	return dashboardResponse{
 		GeneratedAt: now,
 		Gateway: dashboardGateway{
-			DefaultDomain:   a.cfg.Domain,
-			ServerURL:       serverURL,
-			GatewayToken:    strings.TrimSpace(a.cfg.APIToken) != "",
-			SMTPEnabled:     strings.TrimSpace(a.cfg.SMTPAddr) != "",
-			ActiveMailboxes: len(mailboxes),
-			DomainCount:     len(domains),
+			DefaultDomain:       a.cfg.Domain,
+			ServerURL:           serverURL,
+			GatewayToken:        strings.TrimSpace(a.cfg.APIToken) != "",
+			SMTPEnabled:         strings.TrimSpace(a.cfg.SMTPAddr) != "",
+			ActiveMailboxes:     len(mailboxes),
+			DomainCount:         len(domains),
+			TotalQueuedMessages: totalQueued,
+			MailboxesWithQueue:  mailboxesWithQueue,
 		},
 		Domains:   domains,
 		Mailboxes: mailboxes,
@@ -213,6 +234,36 @@ func dashboardDirectedStatus(from, recipientEmail string, policy InboxPolicy) st
 
 func deliveryStatusPermits(status string) bool {
 	return status == "allowed" || status == "allowlisted"
+}
+
+const dashboardQueuePreviewMax = 50
+
+func dashboardQueuePreviews(msgs []Message) []dashboardMessagePreview {
+	if len(msgs) == 0 {
+		return nil
+	}
+	start := 0
+	if len(msgs) > dashboardQueuePreviewMax {
+		start = len(msgs) - dashboardQueuePreviewMax
+	}
+	out := make([]dashboardMessagePreview, 0, len(msgs)-start)
+	for _, m := range msgs[start:] {
+		out = append(out, dashboardMessagePreview{
+			MessageID:  m.MessageID,
+			From:       m.From,
+			Subject:    dashboardTruncateSubject(m.Subject),
+			ReceivedAt: m.ReceivedAt.UTC(),
+		})
+	}
+	return out
+}
+
+func dashboardTruncateSubject(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= 160 {
+		return s
+	}
+	return s[:157] + "..."
 }
 
 func (a *App) dashboardHandler() http.Handler {

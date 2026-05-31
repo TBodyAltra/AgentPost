@@ -7,643 +7,706 @@
   <title>AgentPost Dashboard</title>
   <style>
     :root {
-      --bg-grad-1: #fbfbfd;
-      --bg-grad-2: #eef0f4;
-      --surface: rgba(255, 255, 255, 0.72);
-      --surface-solid: #ffffff;
-      --surface-2: #f0f1f4;
+      --bg: #f5f5f7;
+      --bg-elevated: #ffffff;
+      --sidebar-w: 300px;
+      --detail-w: min(400px, 36vw);
       --hairline: rgba(0, 0, 0, 0.08);
-      --hairline-strong: rgba(0, 0, 0, 0.14);
+      --hairline-strong: rgba(0, 0, 0, 0.12);
       --text: #1d1d1f;
       --text-2: #6e6e73;
-      --text-3: #8e8e93;
+      --text-3: #86868b;
       --accent: #0071e3;
-      --accent-press: #0058b0;
       --accent-soft: rgba(0, 113, 227, 0.12);
+      --accent-press: #0058b0;
       --ok: #34c759;
+      --ok-soft: rgba(52, 199, 89, 0.14);
       --warn: #ff9f0a;
       --bad: #ff3b30;
-      --cross: #af52de;
-      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
-      --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
-      --shadow-lg: 0 18px 50px rgba(0,0,0,0.18);
-      --radius-lg: 20px;
-      --radius: 16px;
+      --radius: 14px;
       --radius-sm: 10px;
+      --shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+      --mono: "SF Mono", ui-monospace, Menlo, monospace;
       --spring: cubic-bezier(0.16, 1, 0.3, 1);
-      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", system-ui, sans-serif;
-      --mono: "SF Mono", ui-monospace, "SFMono-Regular", "Cascadia Code", monospace;
     }
-    /* Dark palette: auto (system) + explicit override */
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
-        --bg-grad-1: #1c1c1e; --bg-grad-2: #000000;
-        --surface: rgba(28,28,30,0.72); --surface-solid: #1c1c1e; --surface-2: #2c2c2e;
-        --hairline: rgba(255,255,255,0.10); --hairline-strong: rgba(255,255,255,0.18);
-        --text: #f5f5f7; --text-2: #aeaeb2; --text-3: #8e8e93;
-        --accent: #0a84ff; --accent-press: #409cff; --accent-soft: rgba(10,132,255,0.18);
-        --ok: #30d158; --warn: #ff9f0a; --bad: #ff453a; --cross: #bf5af2;
-        --shadow-sm: 0 1px 2px rgba(0,0,0,0.4); --shadow-md: 0 6px 24px rgba(0,0,0,0.5); --shadow-lg: 0 24px 60px rgba(0,0,0,0.7);
+        --bg: #000000;
+        --bg-elevated: #1c1c1e;
+        --hairline: rgba(255, 255, 255, 0.1);
+        --hairline-strong: rgba(255, 255, 255, 0.16);
+        --text: #f5f5f7;
+        --text-2: #aeaeb2;
+        --text-3: #8e8e93;
+        --accent: #0a84ff;
+        --accent-soft: rgba(10, 132, 255, 0.2);
+        --accent-press: #409cff;
+        --ok: #30d158;
+        --ok-soft: rgba(48, 209, 88, 0.18);
+        --shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
       }
     }
     :root[data-theme="dark"] {
-      --bg-grad-1: #1c1c1e; --bg-grad-2: #000000;
-      --surface: rgba(28,28,30,0.72); --surface-solid: #1c1c1e; --surface-2: #2c2c2e;
-      --hairline: rgba(255,255,255,0.10); --hairline-strong: rgba(255,255,255,0.18);
-      --text: #f5f5f7; --text-2: #aeaeb2; --text-3: #8e8e93;
-      --accent: #0a84ff; --accent-press: #409cff; --accent-soft: rgba(10,132,255,0.18);
-      --ok: #30d158; --warn: #ff9f0a; --bad: #ff453a; --cross: #bf5af2;
-      --shadow-sm: 0 1px 2px rgba(0,0,0,0.4); --shadow-md: 0 6px 24px rgba(0,0,0,0.5); --shadow-lg: 0 24px 60px rgba(0,0,0,0.7);
+      --bg: #000000;
+      --bg-elevated: #1c1c1e;
+      --hairline: rgba(255, 255, 255, 0.1);
+      --hairline-strong: rgba(255, 255, 255, 0.16);
+      --text: #f5f5f7;
+      --text-2: #aeaeb2;
+      --text-3: #8e8e93;
+      --accent: #0a84ff;
+      --accent-soft: rgba(10, 132, 255, 0.2);
+      --accent-press: #409cff;
+      --ok: #30d158;
+      --ok-soft: rgba(48, 209, 88, 0.18);
+      --shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    html { -webkit-font-smoothing: antialiased; }
     body {
       font-family: var(--font);
-      background:
-        radial-gradient(1200px 600px at 20% -10%, var(--bg-grad-1), transparent 60%),
-        radial-gradient(1000px 500px at 100% 0%, var(--accent-soft), transparent 55%),
-        linear-gradient(180deg, var(--bg-grad-1), var(--bg-grad-2));
-      background-attachment: fixed;
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      line-height: 1.47;
+      line-height: 1.45;
       letter-spacing: -0.01em;
     }
-    @media (prefers-reduced-motion: reduce) {
-      * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
-    }
 
-    /* ---------- Login ---------- */
     .login-overlay {
-      position: fixed; inset: 0; z-index: 100;
-      background: rgba(0,0,0,0.28);
-      backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(24px);
       display: flex; align-items: center; justify-content: center; padding: 1.5rem;
-      transition: opacity 0.35s var(--spring);
     }
-    .login-overlay.hidden {
-      display: none !important;
-      opacity: 0;
-      pointer-events: none;
-      visibility: hidden;
-    }
+    .login-overlay.hidden { display: none !important; }
     .login-card {
-      background: var(--surface-solid); border: 1px solid var(--hairline); border-radius: var(--radius-lg);
-      padding: 2.5rem 2.25rem; width: min(400px, 100%); box-shadow: var(--shadow-lg); text-align: center;
-      animation: sheetIn 0.5s var(--spring);
+      background: var(--bg-elevated); border-radius: 20px; padding: 2.25rem;
+      width: min(380px, 100%); box-shadow: var(--shadow); text-align: center;
+      border: 1px solid var(--hairline);
     }
-    .login-overlay.hidden .login-card { animation: sheetOut 0.3s var(--spring) forwards; }
-    @keyframes sheetIn { from { opacity: 0; transform: scale(0.92) translateY(16px); } to { opacity: 1; transform: none; } }
-    @keyframes sheetOut { to { opacity: 0; transform: scale(0.96) translateY(8px); } }
     .login-logo {
-      width: 56px; height: 56px; margin: 0 auto 1.1rem; border-radius: 15px;
-      background: linear-gradient(160deg, #0a84ff, #0071e3 60%, #0058b0);
-      display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 22px rgba(0,113,227,0.35);
+      width: 52px; height: 52px; margin: 0 auto 1rem; border-radius: 14px;
+      background: linear-gradient(145deg, #0a84ff, #0071e3);
+      display: flex; align-items: center; justify-content: center;
     }
-    .login-logo svg { width: 30px; height: 30px; }
-    .login-card h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
-    .login-card p { color: var(--text-2); font-size: 0.92rem; margin-bottom: 1.6rem; line-height: 1.4; }
+    .login-logo svg { width: 28px; height: 28px; }
+    .login-card h1 { font-size: 1.35rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .login-card p { color: var(--text-2); font-size: 0.9rem; margin-bottom: 1.25rem; }
     .login-card input {
-      width: 100%; padding: 0.85rem 1rem; background: var(--surface-2); border: 1px solid transparent;
-      border-radius: 12px; color: var(--text); font-family: var(--mono); font-size: 0.85rem;
-      margin-bottom: 0.9rem; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+      width: 100%; padding: 0.8rem 1rem; border-radius: 12px; border: 1px solid var(--hairline);
+      background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 0.85rem;
+      margin-bottom: 0.85rem;
     }
-    .login-card input::placeholder { color: var(--text-3); font-family: var(--font); }
-    .login-card input:focus { outline: none; border-color: var(--accent); background: var(--surface-solid); box-shadow: 0 0 0 4px var(--accent-soft); }
+    .login-card input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
     .btn {
-      padding: 0.7rem 1.4rem; border: none; border-radius: 12px; background: var(--accent); color: #fff;
-      font-weight: 600; cursor: pointer; font-size: 0.95rem; font-family: var(--font);
-      transition: background 0.18s, transform 0.12s var(--spring), box-shadow 0.18s;
+      border: none; border-radius: 12px; background: var(--accent); color: #fff;
+      font-weight: 600; font-size: 0.92rem; cursor: pointer; font-family: var(--font);
+      padding: 0.7rem 1.2rem; transition: background 0.15s, transform 0.12s var(--spring);
+      display: inline-flex; align-items: center; justify-content: center;
     }
     .btn:hover { background: var(--accent-press); }
-    .btn:active { transform: scale(0.96); }
-    .btn-full { width: 100%; display: inline-flex; align-items: center; justify-content: center; }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-full { width: 100%; }
     .btn-ghost {
-      background: var(--surface-2); color: var(--text); padding: 0.45rem 1rem; font-size: 0.86rem; border-radius: 10px;
-      display: inline-flex; align-items: center; justify-content: center; line-height: 1.1; white-space: nowrap;
+      background: transparent; color: var(--text-2); border: 1px solid var(--hairline);
+      padding: 0.45rem 0.85rem; font-size: 0.84rem;
     }
-    .btn-ghost:hover { background: var(--hairline-strong); }
-    .login-error { color: var(--bad); font-size: 0.85rem; margin-top: 0.7rem; min-height: 1.2em; }
+    .btn-ghost:hover { background: var(--hairline); color: var(--text); }
+    .login-error { color: var(--bad); font-size: 0.84rem; margin-top: 0.6rem; min-height: 1.1em; }
 
-    /* ---------- Top toolbar (no nav bar) ---------- */
-    .top-bar {
-      position: sticky; top: 0; z-index: 40; padding: 0.65rem 1.5rem;
-      border-bottom: 1px solid var(--hairline); display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem 0.9rem;
-      background: var(--surface); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
-    }
-    .header-meta {
-      color: var(--text-2); font-size: 0.8rem; flex: 1 1 200px; min-width: 0;
-      display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center;
-    }
-    .top-actions {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-left: auto;
-    }
-    .meta-chip {
-      display: inline-flex; align-items: center; gap: 0.3rem; background: var(--surface-2);
-      padding: 0.18rem 0.6rem; border-radius: 100px; font-size: 0.74rem; color: var(--text-2); white-space: nowrap;
-    }
-    .meta-chip code { font-family: var(--mono); color: var(--text); }
-
-    /* iOS segmented control */
-    .segmented {
-      display: inline-flex; background: var(--surface-2); border-radius: 9px; padding: 2px; gap: 2px; position: relative;
-    }
-    .segmented button {
-      border: none; background: transparent; color: var(--text-2); font-family: var(--font);
-      font-size: 0.78rem; font-weight: 500; min-height: 28px; padding: 0.35rem 0.65rem; border-radius: 7px; cursor: pointer;
-      display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem;
-      line-height: 1.1; white-space: nowrap; transition: color 0.2s; z-index: 1;
-    }
-    .segmented button.active { color: var(--text); background: var(--surface-solid); box-shadow: var(--shadow-sm); font-weight: 600; }
-    .segmented button svg { width: 14px; height: 14px; }
-
-    .icon-btn {
-      width: 34px; height: 34px; border-radius: 9px; border: none; background: var(--surface-2); color: var(--text-2);
-      display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
-      transition: background 0.18s, transform 0.15s var(--spring);
-    }
-    .icon-btn:hover { background: var(--hairline-strong); color: var(--text); }
-    .icon-btn:active { transform: scale(0.9); }
-    .icon-btn svg { width: 17px; height: 17px; }
-    .icon-btn.spinning svg { animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ---------- Stats ---------- */
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.9rem; padding: 1.4rem 1.5rem 0.4rem; }
-    .stat {
-      background: var(--surface-solid); border: 1px solid var(--hairline); border-radius: var(--radius);
-      padding: 1.05rem 1.2rem; box-shadow: var(--shadow-sm); animation: rise 0.5s var(--spring) backwards;
-    }
-    .stat:nth-child(2) { animation-delay: 0.05s; }
-    .stat:nth-child(3) { animation-delay: 0.1s; }
-    .stat:nth-child(4) { animation-delay: 0.15s; }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-    .stat .label { font-size: 0.78rem; color: var(--text-2); font-weight: 500; }
-    .stat .value { font-size: 2rem; font-weight: 700; margin-top: 0.2rem; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-    .stat .value.small { font-size: 1.2rem; font-weight: 600; }
-    .skeleton { background: linear-gradient(100deg, var(--surface-2) 30%, var(--hairline) 50%, var(--surface-2) 70%); background-size: 200% 100%; animation: shimmer 1.3s infinite; border-radius: 6px; color: transparent !important; }
-    @keyframes shimmer { to { background-position: -200% 0; } }
-
-    /* ---------- Toast ---------- */
-    .toast-wrap { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 90; display: flex; flex-direction: column; gap: 0.5rem; align-items: center; pointer-events: none; }
-    .toast {
-      background: var(--surface-solid); border: 1px solid var(--hairline); border-radius: 100px;
-      padding: 0.6rem 1.1rem; box-shadow: var(--shadow-lg); font-size: 0.86rem; display: flex; align-items: center; gap: 0.5rem;
-      animation: toastIn 0.4s var(--spring); max-width: 90vw;
-    }
-    .toast.out { animation: toastOut 0.3s var(--spring) forwards; }
-    @keyframes toastIn { from { opacity: 0; transform: translateY(-16px) scale(0.95); } to { opacity: 1; transform: none; } }
-    @keyframes toastOut { to { opacity: 0; transform: translateY(-12px) scale(0.96); } }
-    .toast .tdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .toast.err .tdot { background: var(--bad); }
-    .toast.ok .tdot { background: var(--ok); }
-
-    /* ---------- Layout ---------- */
-    .layout { display: grid; grid-template-columns: 1fr; gap: 1.25rem; padding: 1.1rem 1.5rem 2rem; align-items: start; }
-    .layout.has-detail { grid-template-columns: 1fr min(360px, 38vw); }
-    @media (max-width: 1000px) {
-      .layout.has-detail { grid-template-columns: 1fr; }
-    }
-    .card { background: var(--surface-solid); border: 1px solid var(--hairline); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
-
-    .panel-head {
-      padding: 1.05rem 1.3rem 0.9rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem 0.8rem;
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+    .app-header {
+      position: sticky; top: 0; z-index: 50;
+      display: flex; align-items: center; gap: 0.75rem 1rem; flex-wrap: wrap;
+      padding: 0.75rem 1.25rem;
+      background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
+      backdrop-filter: saturate(180%) blur(20px);
       border-bottom: 1px solid var(--hairline);
     }
-    .panel-head .segmented { flex-shrink: 0; }
-    .panel-title { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.02em; }
-    .spacer { flex: 1; }
+    .brand {
+      display: flex; align-items: center; gap: 0.55rem; font-weight: 700;
+      font-size: 1.05rem; letter-spacing: -0.02em; flex-shrink: 0;
+    }
+    .brand-mark {
+      width: 32px; height: 32px; border-radius: 9px;
+      background: linear-gradient(145deg, #0a84ff, #0071e3);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .brand-mark svg { width: 18px; height: 18px; }
+    .header-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; flex: 1; min-width: 0; }
+    .chip {
+      font-size: 0.72rem; color: var(--text-2); background: var(--bg);
+      border: 1px solid var(--hairline); border-radius: 100px;
+      padding: 0.2rem 0.55rem; white-space: nowrap;
+    }
+    .chip code { font-family: var(--mono); color: var(--text); font-size: 0.7rem; }
+    .header-actions { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; }
+    .segmented {
+      display: inline-flex; background: var(--bg); border-radius: 9px; padding: 2px;
+      border: 1px solid var(--hairline);
+    }
+    .segmented button {
+      border: none; background: transparent; color: var(--text-2);
+      font-size: 0.76rem; font-weight: 500; padding: 0.32rem 0.55rem;
+      border-radius: 7px; cursor: pointer; font-family: var(--font);
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 28px; line-height: 1;
+    }
+    .segmented button.active {
+      background: var(--bg-elevated); color: var(--text); font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .icon-btn {
+      width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--hairline);
+      background: var(--bg); color: var(--text-2); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:hover { color: var(--text); border-color: var(--hairline-strong); }
+    .icon-btn svg { width: 16px; height: 16px; }
+    .icon-btn.spinning svg { animation: spin 0.75s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .refresh-note {
-      font-size: 0.76rem; color: var(--text-3); display: inline-flex; align-items: center; gap: 0.4rem;
-      line-height: 1; white-space: nowrap; flex-shrink: 0;
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.65rem; padding: 0.85rem 1.25rem 0;
+    }
+    .kpi {
+      background: var(--bg-elevated); border: 1px solid var(--hairline);
+      border-radius: var(--radius); padding: 0.85rem 1rem;
+    }
+    .kpi .label { font-size: 0.72rem; color: var(--text-2); font-weight: 500; }
+    .kpi .value {
+      font-size: 1.75rem; font-weight: 700; letter-spacing: -0.03em;
+      margin-top: 0.15rem; font-variant-numeric: tabular-nums;
+    }
+    .kpi .value.small { font-size: 0.95rem; font-weight: 600; }
+    .kpi.highlight .value { color: var(--ok); }
+
+    .workspace {
+      flex: 1; display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      gap: 0; padding: 0.85rem 1.25rem 1.25rem;
+      min-height: 0;
+    }
+    .workspace.has-detail {
+      grid-template-columns: var(--sidebar-w) 1fr var(--detail-w);
+    }
+    @media (max-width: 1100px) {
+      .workspace, .workspace.has-detail { grid-template-columns: 1fr; }
+      .detail-drawer {
+        position: fixed; right: 0; top: 0; bottom: 0; z-index: 60;
+        width: min(100%, 420px); box-shadow: var(--shadow);
+        transform: translateX(100%); transition: transform 0.35s var(--spring);
+      }
+      .detail-drawer.open { transform: translateX(0); }
+    }
+
+    .sidebar, .canvas, .detail-drawer {
+      background: var(--bg-elevated);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius);
+      min-height: 520px;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 0.85rem 1rem; border-bottom: 1px solid var(--hairline);
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .panel-title { font-size: 0.92rem; font-weight: 600; }
+    .panel-sub { font-size: 0.72rem; color: var(--text-3); margin-left: auto; }
+    .live-pill {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.7rem; color: var(--text-3);
     }
     .live-dot {
-      width: 7px; height: 7px; min-width: 7px; min-height: 7px; flex-shrink: 0;
-      border-radius: 50%; background: var(--ok); animation: pulse 2s infinite;
+      width: 6px; height: 6px; border-radius: 50%; background: var(--ok);
+      animation: pulse 2s ease-in-out infinite;
     }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes pulse { 50% { opacity: 0.35; } }
 
-    .legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem; padding: 0.8rem 1.3rem; font-size: 0.78rem; border-bottom: 1px solid var(--hairline); }
-    .legend-item { display: flex; align-items: center; gap: 0.4rem; color: var(--text-2); }
-    .dot { width: 9px; height: 9px; border-radius: 50%; }
-
-    .hidden { display: none !important; }
-    .graph-wrap {
-      position: relative; min-height: 440px; padding: 0.5rem;
-      background: var(--surface-2); border-radius: 14px;
-    }
-    :root[data-theme="dark"] .graph-wrap { background: rgba(44, 44, 46, 0.55); }
-    #graph-svg { width: 100%; height: 100%; min-height: 440px; display: block; }
-    #graph-svg circle[data-email] { transition: r 0.2s var(--spring); }
-    #graph-svg .node-label { font-size: 11px; font-weight: 600; pointer-events: none; }
-    #graph-svg .node-domain { font-size: 9px; fill: var(--text-3); pointer-events: none; }
-    .graph-empty, .graph-hint {
-      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      color: var(--text-3); font-size: 0.9rem; flex-direction: column; gap: 0.5rem; text-align: center;
-      padding: 1.5rem; line-height: 1.45; pointer-events: none;
-    }
-    .graph-hint strong { color: var(--text-2); font-weight: 600; }
-    #graph-matrix {
-      display: block; width: 100%; max-height: min(62vh, 560px); overflow: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    #graph-svg { display: none !important; }
-    .matrix-table {
-      border-collapse: separate; border-spacing: 0; font-size: 0.72rem;
-      width: max-content; table-layout: auto; margin: 0 auto;
-    }
-    .matrix-table th, .matrix-table td {
-      border: 1px solid var(--hairline); text-align: center; vertical-align: middle;
-      background: var(--surface-solid);
-    }
-    .matrix-table thead th.corner {
-      position: sticky; top: 0; left: 0; z-index: 3; min-width: 2.75rem; width: 2.75rem;
-      background: var(--surface-solid);
-    }
-    .matrix-table thead th.col-header {
-      position: sticky; top: 0; z-index: 2; font-weight: 600; color: var(--text-2);
-      padding: 0.4rem 0.5rem; font-family: var(--mono); font-size: 0.68rem;
-      white-space: nowrap; cursor: pointer; resize: horizontal; overflow: auto;
-      min-width: 2.25rem; max-width: 14rem;
-    }
-    .matrix-table tbody th.row-header {
-      position: sticky; left: 0; z-index: 1; text-align: left; font-weight: 600;
-      padding: 0.4rem 0.65rem; font-family: var(--mono); font-size: 0.68rem; cursor: pointer;
-      white-space: nowrap; resize: horizontal; overflow: auto;
-      min-width: 4rem; max-width: 16rem;
-    }
-    .matrix-table tbody th.selected, .matrix-table thead th.selected-col { background: var(--accent-soft); color: var(--accent); }
-    .matrix-table td {
-      width: 1.75rem; min-width: 1.75rem; height: 1.75rem; padding: 0; cursor: default;
-    }
-    .matrix-table td.cell-allowed { background: rgba(52, 199, 89, 0.22); }
-    :root[data-theme="dark"] .matrix-table td.cell-allowed { background: rgba(48, 209, 88, 0.28); }
-    .matrix-table td.cell-self { background: var(--surface-2); }
-    .matrix-table td.cell-empty { background: transparent; }
-    .matrix-note { font-size: 0.76rem; color: var(--text-3); padding: 0.55rem 0.15rem 0; }
-    .matrix-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
-
-    /* Search */
-    .search-toolbar { padding: 0.35rem 1.5rem 0.15rem; max-width: 520px; }
-    .search-bar { padding: 1.1rem 0 0; }
+    .search-wrap { padding: 0.65rem 0.75rem 0.5rem; }
     .search-field { position: relative; }
-    .search-field svg { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-3); pointer-events: none; }
-    .search-field input {
-      width: 100%; padding: 0.65rem 2.2rem; background: var(--surface-solid); border: 1px solid var(--hairline);
-      border-radius: 12px; color: var(--text); font-family: var(--font); font-size: 0.9rem;
-      transition: border-color 0.2s, box-shadow 0.2s;
+    .search-field svg {
+      position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
+      width: 15px; height: 15px; color: var(--text-3); pointer-events: none;
     }
-    .search-field input::placeholder { color: var(--text-3); }
-    .search-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+    .search-field input {
+      width: 100%; padding: 0.55rem 2rem 0.55rem 2.1rem;
+      border-radius: 10px; border: 1px solid var(--hairline);
+      background: var(--bg); color: var(--text); font-size: 0.88rem; font-family: var(--font);
+    }
+    .search-field input:focus {
+      outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+    }
     .search-clear {
-      position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); width: 20px; height: 20px;
-      border: none; background: var(--text-3); color: var(--surface-solid); border-radius: 50%; cursor: pointer;
-      display: none; align-items: center; justify-content: center; font-size: 0.7rem; line-height: 1;
+      position: absolute; right: 0.45rem; top: 50%; transform: translateY(-50%);
+      width: 18px; height: 18px; border: none; border-radius: 50%;
+      background: var(--text-3); color: var(--bg-elevated); font-size: 0.65rem;
+      cursor: pointer; display: none; align-items: center; justify-content: center;
     }
     .search-field.has-value .search-clear { display: flex; }
 
-    /* Domains */
-    .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; padding: 1rem 0 0; }
-    .domain-card { overflow: hidden; transition: transform 0.25s var(--spring), box-shadow 0.25s; animation: rise 0.5s var(--spring) backwards; }
-    .domain-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-    .domain-card.default { box-shadow: 0 0 0 1.5px var(--accent), var(--shadow-sm); border-color: transparent; }
-    .domain-card.dimmed { opacity: 0.4; }
-    .domain-head { padding: 0.85rem 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); }
-    .domain-head .name { font-weight: 600; font-family: var(--mono); font-size: 0.85rem; word-break: break-all; }
-    .badge { font-size: 0.66rem; padding: 0.2rem 0.5rem; border-radius: 100px; background: var(--accent); color: #fff; font-weight: 600; flex-shrink: 0; }
-    .pill { font-size: 0.7rem; padding: 0.18rem 0.55rem; border-radius: 100px; background: var(--surface-2); color: var(--text-2); flex-shrink: 0; }
-    .domain-body { padding: 0.45rem; }
-    .mailbox-row {
-      padding: 0.6rem 0.7rem; border-radius: 10px; cursor: pointer; font-size: 0.85rem;
-      display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
-      transition: background 0.15s, transform 0.12s var(--spring);
+    #mailbox-list { flex: 1; overflow: auto; padding: 0 0.5rem 0.75rem; }
+    .domain-group { margin-bottom: 0.65rem; }
+    .domain-label {
+      font-size: 0.68rem; font-weight: 600; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 0.35rem 0.5rem 0.25rem; font-family: var(--mono);
     }
-    .mailbox-row .mb-name { font-family: var(--mono); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .mailbox-row:hover { background: var(--surface-2); }
-    .mailbox-row:active { transform: scale(0.98); }
-    .mailbox-row.selected { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
-    .mailbox-row.hide { display: none; }
-    .mailbox-row mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 0 1px; }
-    .queue-badge { font-size: 0.7rem; background: var(--surface-2); padding: 0.12rem 0.45rem; border-radius: 100px; color: var(--text-3); flex-shrink: 0; }
-    .queue-badge.has-msg { background: rgba(52,199,89,0.16); color: var(--ok); font-weight: 600; }
+    .domain-label .def { color: var(--accent); margin-left: 0.35rem; font-weight: 600; }
+    .mailbox-item {
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0.55rem 0.6rem; border-radius: 10px; cursor: pointer;
+      transition: background 0.12s;
+    }
+    .mailbox-item:hover { background: var(--bg); }
+    .mailbox-item.selected { background: var(--accent-soft); }
+    .mailbox-item.hide { display: none; }
+    .mailbox-avatar {
+      width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+      background: var(--bg); border: 1px solid var(--hairline);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 700; color: var(--accent);
+      font-family: var(--mono);
+    }
+    .mailbox-item.has-unread .mailbox-avatar { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
+    .mailbox-meta { flex: 1; min-width: 0; }
+    .mailbox-name {
+      font-size: 0.86rem; font-weight: 600; font-family: var(--mono);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mailbox-sub { font-size: 0.72rem; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .unread-badge {
+      flex-shrink: 0; min-width: 1.35rem; height: 1.35rem; border-radius: 100px;
+      background: var(--ok); color: #fff; font-size: 0.68rem; font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center; padding: 0 0.35rem;
+    }
 
-    /* Detail */
-    .detail-panel { display: none; position: sticky; top: 58px; overflow: hidden; }
-    .detail-panel.open { display: block; }
+    .canvas { min-width: 0; }
+    .matrix-body { flex: 1; overflow: auto; padding: 0.5rem; background: var(--bg); }
+    #graph-matrix { display: block; width: 100%; }
+    .matrix-table {
+      border-collapse: separate; border-spacing: 0; font-size: 0.7rem;
+      width: max-content; margin: 0 auto;
+    }
+    .matrix-table th, .matrix-table td {
+      border: 1px solid var(--hairline); background: var(--bg-elevated);
+      text-align: center; vertical-align: middle;
+    }
+    .matrix-table thead th.corner {
+      position: sticky; top: 0; left: 0; z-index: 3; min-width: 2.5rem;
+    }
+    .matrix-table thead th.col-header {
+      position: sticky; top: 0; z-index: 2; padding: 0.35rem 0.45rem;
+      font-family: var(--mono); font-size: 0.65rem; font-weight: 600; color: var(--text-2);
+      cursor: pointer; white-space: nowrap; resize: horizontal; overflow: auto;
+      min-width: 2rem; max-width: 12rem;
+    }
+    .matrix-table tbody th.row-header {
+      position: sticky; left: 0; z-index: 1; text-align: left;
+      padding: 0.35rem 0.55rem; font-family: var(--mono); font-size: 0.65rem;
+      cursor: pointer; white-space: nowrap; resize: horizontal; overflow: auto;
+      min-width: 3.5rem; max-width: 14rem;
+    }
+    .matrix-table th.selected, .matrix-table td.row-selected { background: var(--accent-soft); }
+    .matrix-table td { width: 1.6rem; min-width: 1.6rem; height: 1.6rem; padding: 0; }
+    .matrix-table td.cell-allowed { background: var(--ok-soft); cursor: pointer; }
+    .matrix-table td.cell-self { background: var(--bg); }
+    .matrix-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+    .matrix-note { font-size: 0.72rem; color: var(--text-3); padding: 0.5rem 0.25rem 0; text-align: center; }
+    .empty-state {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--text-3); padding: 2rem; text-align: center; gap: 0.5rem;
+    }
+    .empty-state svg { width: 40px; height: 40px; opacity: 0.35; }
+
+    .detail-drawer { display: none; }
+    .detail-drawer.open { display: flex; }
     .detail-close {
-      margin-left: auto; width: 30px; height: 30px; border: none; border-radius: 8px;
-      background: var(--surface-2); color: var(--text-2); cursor: pointer; font-size: 1.1rem; line-height: 1;
-      display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+      margin-left: auto; width: 28px; height: 28px; border-radius: 8px;
+      border: none; background: var(--bg); color: var(--text-2); cursor: pointer;
+      font-size: 1.1rem; line-height: 1;
     }
-    .detail-close:hover { background: var(--hairline-strong); color: var(--text); }
-    .delivery-block { margin-bottom: 1rem; }
-    .delivery-block:last-child { margin-bottom: 0; }
-    .delivery-block h4 { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.45rem; font-weight: 600; }
-    .delivery-block .hint { font-size: 0.76rem; color: var(--text-3); margin-bottom: 0.5rem; }
-    .delivery-list { max-height: 200px; overflow: auto; }
-    .detail-body { padding: 1.25rem 1.3rem; max-height: calc(100vh - 150px); overflow: auto; }
-    .detail-body.swap { animation: detailSwap 0.32s var(--spring); }
-    @keyframes detailSwap { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
-    .detail-empty { color: var(--text-3); font-size: 0.92rem; padding: 3rem 1rem; text-align: center; }
-    .detail-empty svg { width: 38px; height: 38px; opacity: 0.4; margin-bottom: 0.6rem; }
-    .detail-email { font-family: var(--mono); font-size: 1.05rem; font-weight: 600; word-break: break-all; margin-bottom: 1rem; letter-spacing: -0.01em; }
-    .detail-section { margin-bottom: 1.4rem; }
-    .detail-section:last-child { margin-bottom: 0; }
-    .detail-section h3 { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.6rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-    .detail-section h3 .chev { transition: transform 0.25s var(--spring); }
-    .detail-section.collapsed h3 .chev { transform: rotate(-90deg); }
-    .detail-section.collapsed .sec-body { display: none; }
-    .kv-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 0.85rem; font-size: 0.85rem; }
-    .kv-grid dt { color: var(--text-2); }
-    .kv-grid dd { text-align: right; word-break: break-all; }
-    .detail-kv { font-size: 0.85rem; margin-bottom: 0.3rem; }
-    .detail-kv strong { color: var(--text-2); font-weight: 500; margin-right: 0.4rem; }
-    .tag-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
-    .tag { font-size: 0.74rem; padding: 0.25rem 0.55rem; border-radius: 100px; background: var(--surface-2); color: var(--text); }
-    .link-list { max-height: 220px; overflow: auto; }
-    .link-row { padding: 0.45rem 0; border-bottom: 1px solid var(--hairline); display: flex; gap: 0.5rem; align-items: center; font-size: 0.78rem; cursor: pointer; transition: background 0.15s; border-radius: 6px; }
-    .link-row:hover { background: var(--surface-2); }
-    .link-row:last-child { border-bottom: none; }
-    .link-row .dir { font-family: var(--mono); font-size: 0.72rem; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .status-pill { font-size: 0.66rem; padding: 0.15rem 0.5rem; border-radius: 100px; flex-shrink: 0; font-weight: 600; }
-    .status-allowed { background: rgba(52,199,89,0.16); color: var(--ok); }
-    .status-allowlisted { background: rgba(175,82,222,0.16); color: var(--cross); }
-    .status-blocked { background: rgba(255,59,48,0.16); color: var(--bad); }
-    .status-cross_domain_blocked { background: rgba(255,159,10,0.16); color: var(--warn); }
+    .detail-hero { padding: 0 1rem 0.85rem; border-bottom: 1px solid var(--hairline); }
+    .detail-email { font-family: var(--mono); font-size: 0.95rem; font-weight: 600; word-break: break-all; }
+    .detail-display { font-size: 1.1rem; font-weight: 700; margin-top: 0.25rem; letter-spacing: -0.02em; }
+    .detail-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.55rem; }
+    .mini-chip {
+      font-size: 0.68rem; padding: 0.18rem 0.5rem; border-radius: 100px;
+      background: var(--bg); border: 1px solid var(--hairline); color: var(--text-2);
+    }
+    .mini-chip.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+    .mini-chip.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
 
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    .detail-tabs {
+      display: flex; gap: 0; border-bottom: 1px solid var(--hairline); padding: 0 0.5rem;
+    }
+    .detail-tabs button {
+      flex: 1; border: none; background: transparent; padding: 0.6rem 0.35rem;
+      font-size: 0.78rem; font-weight: 500; color: var(--text-3); cursor: pointer;
+      font-family: var(--font); border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .detail-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .detail-scroll { flex: 1; overflow: auto; padding: 0.85rem 1rem 1rem; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    .stat-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.85rem;
+    }
+    .stat-cell {
+      background: var(--bg); border-radius: var(--radius-sm); padding: 0.65rem 0.75rem;
+      border: 1px solid var(--hairline);
+    }
+    .stat-cell .k { font-size: 0.68rem; color: var(--text-3); }
+    .stat-cell .v { font-size: 1.05rem; font-weight: 700; margin-top: 0.1rem; }
+
+    .section-title {
+      font-size: 0.68rem; font-weight: 600; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: 0.05em; margin: 0.85rem 0 0.45rem;
+    }
+    .section-title:first-child { margin-top: 0; }
+    .peer-list { display: flex; flex-direction: column; gap: 0.35rem; }
+    .peer-row {
+      display: flex; align-items: center; gap: 0.45rem; padding: 0.45rem 0.55rem;
+      border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--hairline);
+      cursor: pointer; font-size: 0.8rem;
+    }
+    .peer-row:hover { border-color: var(--accent); }
+    .peer-row .arrow { color: var(--ok); font-weight: 700; font-family: var(--mono); }
+    .peer-row .addr { font-family: var(--mono); font-size: 0.74rem; overflow: hidden; text-overflow: ellipsis; }
+
+    .inbox-list { display: flex; flex-direction: column; gap: 0.45rem; }
+    .inbox-item {
+      padding: 0.65rem 0.75rem; border-radius: var(--radius-sm);
+      background: var(--bg); border: 1px solid var(--hairline);
+    }
+    .inbox-item.unread { border-left: 3px solid var(--ok); }
+    .inbox-from { font-size: 0.72rem; color: var(--text-2); font-family: var(--mono); }
+    .inbox-subject { font-size: 0.86rem; font-weight: 600; margin: 0.2rem 0; line-height: 1.35; }
+    .inbox-time { font-size: 0.68rem; color: var(--text-3); }
+    .inbox-hint {
+      font-size: 0.76rem; color: var(--text-3); line-height: 1.45;
+      padding: 0.65rem; background: var(--bg); border-radius: var(--radius-sm);
+      border: 1px dashed var(--hairline); margin-bottom: 0.65rem;
+    }
+
+    .tag-cloud { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .tag {
+      font-size: 0.72rem; padding: 0.22rem 0.55rem; border-radius: 100px;
+      background: var(--bg); border: 1px solid var(--hairline);
+    }
+    .prose { font-size: 0.84rem; color: var(--text-2); line-height: 1.5; white-space: pre-wrap; }
+    .muted { color: var(--text-3); font-size: 0.82rem; }
+
+    .toast-wrap {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 300; pointer-events: none;
+    }
+    .toast {
+      background: var(--bg-elevated); border: 1px solid var(--hairline);
+      border-radius: 100px; padding: 0.5rem 1rem; font-size: 0.84rem;
+      box-shadow: var(--shadow); display: flex; align-items: center; gap: 0.45rem;
+    }
+    .toast .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .toast.ok .dot { background: var(--ok); }
+    .toast.err .dot { background: var(--bad); }
+
+    .hidden { display: none !important; }
+    mark { background: var(--accent-soft); color: var(--accent); border-radius: 2px; padding: 0 1px; }
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
     ::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 100px; }
-    ::-webkit-scrollbar-track { background: transparent; }
   </style>
 </head>
 <body>
   <div id="login" class="login-overlay hidden" aria-hidden="true">
     <div class="login-card">
       <div class="login-logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 6 9-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 6 9-6"/></svg>
       </div>
       <h1>AgentPost</h1>
-      <p id="login-desc">输入网关 API Token 查看注册域、邮箱投递策略与账户详情。</p>
-      <input type="password" id="token-input" placeholder="AGENTPOST_API_TOKEN" autocomplete="off">
-      <button type="button" id="login-btn" class="btn btn-full">连接</button>
+      <p id="login-desc"></p>
+      <input type="password" id="token-input" autocomplete="off">
+      <button type="button" id="login-btn" class="btn btn-full"></button>
       <div id="login-error" class="login-error"></div>
     </div>
   </div>
 
   <div class="toast-wrap" id="toast-wrap"></div>
 
-  <div class="top-bar">
-    <div class="header-meta" id="gateway-meta"></div>
-    <div class="top-actions">
-      <div class="segmented" id="lang-seg" role="tablist" aria-label="Language">
-        <button type="button" data-lang="zh-hans" class="active">简</button>
-        <button type="button" data-lang="zh-hant">繁</button>
-        <button type="button" data-lang="en">EN</button>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 6 9-6"/></svg>
+        </span>
+        <span>AgentPost</span>
       </div>
-      <div class="segmented" id="theme-seg" role="tablist" aria-label="Theme">
-        <button data-theme="auto" class="active" title="跟随系统">自动</button>
-        <button data-theme="light" title="浅色">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <div class="header-chips" id="gateway-meta"></div>
+      <div class="header-actions">
+        <div class="segmented" id="lang-seg" role="tablist">
+          <button type="button" data-lang="zh-hans" class="active">简</button>
+          <button type="button" data-lang="zh-hant">繁</button>
+          <button type="button" data-lang="en">EN</button>
+        </div>
+        <div class="segmented" id="theme-seg" role="tablist">
+          <button type="button" data-theme="auto" class="active" id="theme-auto-btn">自动</button>
+          <button type="button" data-theme="light" title="Light">☀</button>
+          <button type="button" data-theme="dark" title="Dark">☾</button>
+        </div>
+        <button type="button" class="icon-btn" id="refresh-btn" title="Refresh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
         </button>
-        <button data-theme="dark" title="深色">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-        </button>
+        <button type="button" class="btn btn-ghost hidden" id="logout-btn">Logout</button>
       </div>
-      <button type="button" class="icon-btn" id="refresh-btn" title="Refresh">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-      </button>
-      <button type="button" class="btn btn-ghost" id="logout-btn" style="display:none">Logout</button>
-    </div>
-  </div>
+    </header>
 
-  <div id="error-banner" class="error-banner hidden" style="display:none"></div>
+    <div class="kpi-row" id="stats"></div>
 
-  <div class="stats" id="stats"></div>
+    <div class="workspace" id="workspace">
+      <aside class="sidebar">
+        <div class="panel-head">
+          <span class="panel-title" id="sidebar-title">邮箱</span>
+        </div>
+        <div class="search-wrap">
+          <div class="search-field" id="search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="search" id="search-input" autocomplete="off">
+            <button type="button" class="search-clear" id="search-clear" aria-label="Clear">×</button>
+          </div>
+        </div>
+        <div id="mailbox-list"></div>
+      </aside>
 
-  <div class="search-toolbar">
-    <div class="search-field" id="search-field">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-      <input type="search" id="search-input" placeholder="Search mailboxes or domains" autocomplete="off">
-      <button type="button" class="search-clear" id="search-clear" aria-label="清除">✕</button>
-    </div>
-  </div>
-
-  <div class="layout" id="main-layout">
-    <div>
-      <section class="card">
+      <section class="canvas">
         <div class="panel-head">
           <span class="panel-title" id="topology-title">投递矩阵</span>
-          <span class="spacer"></span>
-          <span class="refresh-note" id="refresh-note"><span class="live-dot"></span>实时 · 10s</span>
+          <span class="live-pill" id="refresh-note"><span class="live-dot"></span></span>
         </div>
-        <div class="legend" id="legend">
-          <span class="legend-item">
-            <span class="matrix-dot" style="vertical-align:middle;margin-right:0.35rem"></span><span id="legend-matrix">行 → 列：允许投递</span>
-          </span>
-        </div>
-        <div class="graph-wrap" id="graph-wrap">
-          <svg id="graph-svg" aria-hidden="true"></svg>
+        <div class="matrix-body" id="graph-wrap">
           <div id="graph-matrix" aria-label="Delivery matrix"></div>
         </div>
       </section>
 
-      <div class="domain-grid" id="domain-grid"></div>
+      <aside class="detail-drawer" id="detail-panel">
+        <div class="panel-head">
+          <span class="panel-title" id="detail-title">邮箱详情</span>
+          <button type="button" class="detail-close" id="detail-close" aria-label="Close">×</button>
+        </div>
+        <div class="detail-hero" id="detail-hero"></div>
+        <div class="detail-tabs" id="detail-tabs" role="tablist">
+          <button type="button" data-tab="overview" class="active"></button>
+          <button type="button" data-tab="connections"></button>
+          <button type="button" data-tab="inbox"></button>
+          <button type="button" data-tab="profile"></button>
+        </div>
+        <div class="detail-scroll">
+          <div id="detail-content"></div>
+        </div>
+      </aside>
     </div>
-
-    <aside class="card detail-panel" id="detail-panel">
-      <div class="panel-head">
-        <span class="panel-title" id="detail-title">邮箱详情</span>
-        <button type="button" class="detail-close" id="detail-close" aria-label="Close">×</button>
-      </div>
-      <div class="detail-body" id="detail-body">
-        <div id="detail-content"></div>
-      </div>
-    </aside>
   </div>
 
   <script>
     const TOKEN_KEY = "agentpost_dashboard_token";
     const THEME_KEY = "agentpost_dashboard_theme";
     const LANG_KEY = "agentpost_dashboard_lang";
-    const STATUS_COLORS = { allowed: "#34c759", allowlisted: "#af52de", cross_domain_blocked: "#ff9f0a", blocked: "#ff3b30" };
+    const TAB_KEY = "agentpost_dashboard_tab";
+    const MATRIX_CAP = 24;
 
     const I18N = {
       "zh-hans": {
-        loginDesc: "输入网关 API Token 查看注册域、邮箱投递策略与账户详情。",
+        loginDesc: "输入网关 API Token 以查看邮箱、投递关系与待收信件。",
         loginBtn: "连接",
         connecting: "连接中…",
         tokenEmpty: "请输入网关 Token",
         logout: "退出",
         refresh: "刷新",
-        themeAuto: "跟随系统",
-        themeAutoBtn: "自动",
-        themeLight: "浅色",
-        themeDark: "深色",
-        topology: "投递矩阵",
+        themeAuto: "自动",
+        sidebarTitle: "邮箱",
+        topology: "投递权限矩阵",
         live: "实时 · 10s",
         legendMatrix: "行 = 发件人，列 = 收件人；绿点 = 允许投递",
-        matrixNote: "绿点表示该行邮箱可向列邮箱投递；点击行首或列头可选中邮箱。",
-        matrixTruncated: "邮箱较多，仅显示前 {n} 个；请用搜索缩小范围。",
+        matrixNote: "绿点表示该行可向该列投递；点击行首或列头选中邮箱。",
+        matrixTruncated: "仅显示前 {n} 个邮箱，请用搜索缩小范围。",
         detailTitle: "邮箱详情",
-        detailEmpty: "点击邮箱或拓扑节点查看详情",
         searchPlaceholder: "搜索邮箱或 domain",
         statMailboxes: "活跃邮箱",
-        statDomains: "Domain 数",
-        statPairs: "允许连接",
-        statUpdated: "更新时间",
+        statDomains: "网域",
+        statUnread: "待收信件",
+        statPairs: "允许投递",
+        statUpdated: "更新",
         defaultDomain: "默认域",
         tokenRequired: "需 Token",
         noToken: "无 Token",
-        smtpOn: "SMTP 开",
+        smtpOn: "SMTP",
         defaultBadge: "默认",
-        mailboxes: "邮箱",
         queued: "待收",
         graphEmpty: "暂无注册邮箱",
         detailMissing: "邮箱不存在或已过期",
-        overview: "概览",
-        registered: "注册",
-        expires: "过期",
-        queuedMail: "待收邮件",
+        tabOverview: "概览",
+        tabConnections: "连接",
+        tabInbox: "收件",
+        tabProfile: "资料",
+        registered: "注册时间",
+        expires: "剩余 TTL",
+        queuedMail: "待收",
+        outboundPeers: "可发出",
+        inboundPeers: "可接收",
+        outCount: "可发向",
+        inCount: "可收自",
         expired: "已过期",
         name: "名称",
+        host: "主机",
         responsibilities: "职责",
+        skills: "技能",
+        mcp: "MCP",
         capabilities: "能力",
-        peers: "投递关系",
+        notes: "备注",
         none: "无",
         tokenInvalid: "Token 无效或未配置",
         requestFailed: "请求失败",
         refreshed: "已刷新",
         connectFailed: "连接失败",
-        deliveryOut: "发出",
-        deliveryIn: "接收",
-        deliveryOutboundTitle: "可发出至",
-        deliveryInboundTitle: "可接收自",
-        deliveryOutboundHint: "本账号 → 对方邮箱",
-        deliveryInboundHint: "对方邮箱 → 本账号",
-        closeDetail: "关闭详情",
+        closeDetail: "关闭",
+        inboxEmpty: "收件箱为空",
+        inboxHint: "此处显示尚未被 Agent 轮询取走的信件。Agent 调用 GET /messages 后队列会清空，不会保留历史。",
+        selectMailbox: "在左侧选择一个邮箱查看详情",
+        noDisplayName: "未命名 Agent",
       },
       "zh-hant": {
-        loginDesc: "輸入閘道 API Token 查看註冊域、郵箱投遞策略與帳戶詳情。",
+        loginDesc: "輸入閘道 API Token 以查看郵箱、投遞關係與待收信件。",
         loginBtn: "連接",
         connecting: "連接中…",
         tokenEmpty: "請輸入閘道 Token",
         logout: "登出",
         refresh: "重新整理",
-        themeAuto: "跟隨系統",
-        themeAutoBtn: "自動",
-        themeLight: "淺色",
-        themeDark: "深色",
-        topology: "投遞矩陣",
+        themeAuto: "自動",
+        sidebarTitle: "郵箱",
+        topology: "投遞權限矩陣",
         live: "即時 · 10s",
         legendMatrix: "列 = 寄件人，欄 = 收件人；綠點 = 允許投遞",
-        matrixNote: "綠點表示該列郵箱可向該欄郵箱投遞；點擊列首或欄頭可選中郵箱。",
-        matrixTruncated: "郵箱較多，僅顯示前 {n} 個；請用搜尋縮小範圍。",
+        matrixNote: "綠點表示該列可向該欄投遞；點擊列首或欄頭選中郵箱。",
+        matrixTruncated: "僅顯示前 {n} 個郵箱，請用搜尋縮小範圍。",
         detailTitle: "郵箱詳情",
-        detailEmpty: "點擊郵箱或拓撲節點查看詳情",
         searchPlaceholder: "搜尋郵箱或 domain",
         statMailboxes: "活躍郵箱",
-        statDomains: "網域數",
-        statPairs: "允許連接",
-        statUpdated: "更新時間",
+        statDomains: "網域",
+        statUnread: "待收信件",
+        statPairs: "允許投遞",
+        statUpdated: "更新",
         defaultDomain: "預設域",
         tokenRequired: "需 Token",
         noToken: "無 Token",
-        smtpOn: "SMTP 開",
+        smtpOn: "SMTP",
         defaultBadge: "預設",
-        mailboxes: "郵箱",
         queued: "待收",
         graphEmpty: "暫無註冊郵箱",
         detailMissing: "郵箱不存在或已過期",
-        overview: "概覽",
-        registered: "註冊",
-        expires: "過期",
-        queuedMail: "待收郵件",
+        tabOverview: "概覽",
+        tabConnections: "連線",
+        tabInbox: "收件",
+        tabProfile: "資料",
+        registered: "註冊時間",
+        expires: "剩餘 TTL",
+        queuedMail: "待收",
+        outboundPeers: "可發出",
+        inboundPeers: "可接收",
+        outCount: "可發向",
+        inCount: "可收自",
         expired: "已過期",
         name: "名稱",
+        host: "主機",
         responsibilities: "職責",
+        skills: "技能",
+        mcp: "MCP",
         capabilities: "能力",
-        peers: "投遞關係",
+        notes: "備註",
         none: "無",
         tokenInvalid: "Token 無效或未設定",
         requestFailed: "請求失敗",
         refreshed: "已重新整理",
         connectFailed: "連線失敗",
-        deliveryOut: "發出",
-        deliveryIn: "接收",
-        deliveryOutboundTitle: "可發出至",
-        deliveryInboundTitle: "可接收自",
-        deliveryOutboundHint: "本帳號 → 對方郵箱",
-        deliveryInboundHint: "對方郵箱 → 本帳號",
-        closeDetail: "關閉詳情",
+        closeDetail: "關閉",
+        inboxEmpty: "收件匣為空",
+        inboxHint: "此處顯示尚未被 Agent 輪詢取走的信件。Agent 呼叫 GET /messages 後佇列會清空，不會保留歷史。",
+        selectMailbox: "在左側選擇一個郵箱查看詳情",
+        noDisplayName: "未命名 Agent",
       },
       en: {
-        loginDesc: "Enter the gateway API token to inspect domains, delivery policy, and account details.",
+        loginDesc: "Enter the gateway API token to inspect mailboxes, delivery routes, and queued mail.",
         loginBtn: "Connect",
         connecting: "Connecting…",
         tokenEmpty: "Enter the gateway token",
         logout: "Log out",
         refresh: "Refresh",
-        themeAuto: "System",
-        themeAutoBtn: "Auto",
-        themeLight: "Light",
-        themeDark: "Dark",
+        themeAuto: "Auto",
+        sidebarTitle: "Mailboxes",
         topology: "Delivery matrix",
         live: "Live · 10s",
-        legendMatrix: "Row = sender, column = recipient; green dot = allowed",
-        matrixNote: "Green dot = row mailbox can deliver to column mailbox. Click row or column header to select.",
-        matrixTruncated: "Showing first {n} mailboxes only; use search to narrow the list.",
-        detailTitle: "Mailbox details",
-        detailEmpty: "Select a mailbox or graph node",
+        legendMatrix: "Row = sender, column = recipient; green = allowed",
+        matrixNote: "Green dot = row may deliver to column. Click row/column header to select a mailbox.",
+        matrixTruncated: "Showing first {n} mailboxes; narrow with search.",
+        detailTitle: "Mailbox",
         searchPlaceholder: "Search mailboxes or domains",
-        statMailboxes: "Active mailboxes",
+        statMailboxes: "Active",
         statDomains: "Domains",
-        statPairs: "Allowed links",
+        statUnread: "Queued mail",
+        statPairs: "Allowed routes",
         statUpdated: "Updated",
-        defaultDomain: "Default domain",
+        defaultDomain: "Default",
         tokenRequired: "Token required",
         noToken: "No token",
-        smtpOn: "SMTP on",
+        smtpOn: "SMTP",
         defaultBadge: "default",
-        mailboxes: "mailboxes",
         queued: "queued",
-        graphEmpty: "No registered mailboxes",
+        graphEmpty: "No mailboxes registered",
         detailMissing: "Mailbox missing or expired",
-        overview: "Overview",
+        tabOverview: "Overview",
+        tabConnections: "Routes",
+        tabInbox: "Inbox",
+        tabProfile: "Profile",
         registered: "Registered",
-        expires: "Expires",
+        expires: "TTL left",
         queuedMail: "Queued",
+        outboundPeers: "Can send to",
+        inboundPeers: "Can receive from",
+        outCount: "Outbound",
+        inCount: "Inbound",
         expired: "Expired",
         name: "Name",
+        host: "Host",
         responsibilities: "Responsibilities",
+        skills: "Skills",
+        mcp: "MCP",
         capabilities: "Capabilities",
-        peers: "Delivery",
+        notes: "Notes",
         none: "None",
         tokenInvalid: "Invalid or missing token",
         requestFailed: "Request failed",
         refreshed: "Refreshed",
         connectFailed: "Connection failed",
-        deliveryOut: "Outbound",
-        deliveryIn: "Inbound",
-        deliveryOutboundTitle: "Can send to",
-        deliveryInboundTitle: "Can receive from",
-        deliveryOutboundHint: "This mailbox → peer",
-        deliveryInboundHint: "Peer → this mailbox",
-        closeDetail: "Close details",
+        closeDetail: "Close",
+        inboxEmpty: "Inbox is empty",
+        inboxHint: "Messages waiting for the agent to poll. GET /messages clears the queue; history is not retained on the server.",
+        selectMailbox: "Select a mailbox on the left to inspect details",
+        noDisplayName: "Unnamed agent",
       },
     };
 
     let lang = "zh-hans";
+    let detailTab = localStorage.getItem(TAB_KEY) || "overview";
     let state = { data: null, selected: null, token: "", search: "", prevStats: {} };
-    const MATRIX_CAP = 20;
     let refreshTimer = null;
 
     const $ = (id) => document.getElementById(id);
 
     function t(key) {
-      const pack = I18N[lang] || I18N["zh-hans"];
-      return pack[key] ?? I18N["zh-hans"][key] ?? key;
+      return (I18N[lang] || I18N["zh-hans"])[key] ?? I18N["zh-hans"][key] ?? key;
     }
 
     function deliveryPermits(status) {
@@ -660,16 +723,12 @@
       }, 0);
     }
 
-    function edgeColor(status) {
-      return status === "allowlisted" ? STATUS_COLORS.allowlisted : STATUS_COLORS.allowed;
-    }
-
     function detectLang() {
       const stored = localStorage.getItem(LANG_KEY);
       if (stored && I18N[stored]) return stored;
       const nav = (navigator.language || "").toLowerCase();
       if (nav.startsWith("en")) return "en";
-      if (nav === "zh-tw" || nav === "zh-hk" || nav === "zh-mo" || nav.includes("hant")) return "zh-hant";
+      if (nav === "zh-tw" || nav === "zh-hk" || nav.includes("hant")) return "zh-hant";
       if (nav.startsWith("zh")) return "zh-hans";
       return "zh-hans";
     }
@@ -680,29 +739,21 @@
       $("login-btn").textContent = t("loginBtn");
       $("logout-btn").textContent = t("logout");
       $("refresh-btn").title = t("refresh");
+      $("sidebar-title").textContent = t("sidebarTitle");
       $("topology-title").textContent = t("topology");
-      const note = $("refresh-note");
-      note.textContent = "";
-      const dot = document.createElement("span");
-      dot.className = "live-dot";
-      dot.setAttribute("aria-hidden", "true");
-      note.append(dot, document.createTextNode(t("live")));
-      $("legend-matrix").textContent = t("legendMatrix");
-      $("detail-close").setAttribute("aria-label", t("closeDetail"));
+      $("refresh-note").innerHTML = `<span class="live-dot"></span>${esc(t("live"))}`;
       $("detail-title").textContent = t("detailTitle");
+      $("detail-close").setAttribute("aria-label", t("closeDetail"));
       $("search-input").placeholder = t("searchPlaceholder");
-      const themeSeg = $("theme-seg");
-      const autoThemeBtn = themeSeg.querySelector('[data-theme="auto"]');
-      autoThemeBtn.title = t("themeAuto");
-      autoThemeBtn.textContent = t("themeAutoBtn");
-      themeSeg.querySelector('[data-theme="light"]').title = t("themeLight");
-      themeSeg.querySelector('[data-theme="dark"]').title = t("themeDark");
+      $("theme-auto-btn").textContent = t("themeAuto");
       $("lang-seg").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.lang === lang));
+      const tabs = $("detail-tabs");
+      tabs.querySelector('[data-tab="overview"]').textContent = t("tabOverview");
+      tabs.querySelector('[data-tab="connections"]').textContent = t("tabConnections");
+      tabs.querySelector('[data-tab="inbox"]').textContent = t("tabInbox");
+      tabs.querySelector('[data-tab="profile"]').textContent = t("tabProfile");
       if (state.data) {
-        renderStats(state.data);
-        renderDomains(state.data);
-        renderGraph(state.data);
-        if (state.selected) renderDetail(state.data, state.selected, false);
+        renderAll();
       }
     }
 
@@ -713,26 +764,23 @@
     }
 
     $("lang-seg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
-    setLang(detectLang());
 
-    /* ---------- Theme ---------- */
     function applyTheme(mode) {
       if (mode === "auto") document.documentElement.removeAttribute("data-theme");
       else document.documentElement.setAttribute("data-theme", mode);
       localStorage.setItem(THEME_KEY, mode);
       $("theme-seg").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.theme === mode));
-      if (state.data) renderGraph(state.data);
     }
     $("theme-seg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => applyTheme(b.dataset.theme)));
     applyTheme(localStorage.getItem(THEME_KEY) || "auto");
+    setLang(detectLang());
 
-    /* ---------- Toast ---------- */
     function showToast(msg, kind) {
       const el = document.createElement("div");
       el.className = "toast " + (kind || "");
-      el.innerHTML = `<span class="tdot"></span><span>${esc(msg)}</span>`;
+      el.innerHTML = `<span class="dot"></span><span>${esc(msg)}</span>`;
       $("toast-wrap").appendChild(el);
-      setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 320); }, 3200);
+      setTimeout(() => el.remove(), 3000);
     }
 
     function normalizeToken(raw) {
@@ -758,45 +806,20 @@
     function formatTTL(sec) {
       if (sec <= 0) return t("expired");
       const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-      if (h > 0) return h + "h " + m + "m";
-      return m + "m " + (sec % 60) + "s";
+      if (h > 0) return `${h}h ${m}m`;
+      return `${m}m`;
     }
 
-    function animateCount(el, to) {
-      const from = Number(el.dataset.v || 0);
-      if (from === to) { el.textContent = to; return; }
-      const dur = 600, start = performance.now();
-      function step(now) {
-        const p = Math.min((now - start) / dur, 1);
-        const eased = 1 - Math.pow(1 - p, 3);
-        el.textContent = Math.round(from + (to - from) * eased);
-        if (p < 1) requestAnimationFrame(step);
-        else el.dataset.v = to;
-      }
-      requestAnimationFrame(step);
+    function esc(s) {
+      return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     }
 
-    function renderStats(data) {
-      const g = data.gateway;
-      const chips = [
-        `<span class="meta-chip"><code>${esc(g.server_url || "—")}</code></span>`,
-        `<span class="meta-chip">${t("defaultDomain")} <code>${esc(g.default_domain)}</code></span>`,
-        `<span class="meta-chip">${g.gateway_token_required ? t("tokenRequired") : t("noToken")}</span>`,
-      ];
-      if (g.smtp_inbound_enabled) chips.push(`<span class="meta-chip">${t("smtpOn")}</span>`);
-      $("gateway-meta").innerHTML = chips.join("");
+    function fmtTime(iso) {
+      try { return new Date(iso).toLocaleString(); } catch { return iso; }
+    }
 
-      const items = [
-        ["mb", t("statMailboxes"), g.active_mailboxes],
-        ["dm", t("statDomains"), g.domain_count],
-        ["lk", t("statPairs"), countAllowedEdges(data.links)],
-      ];
-      let html = items.map(([k, l, v]) =>
-        `<div class="stat"><div class="label">${l}</div><div class="value" id="stat-${k}" data-v="${state.prevStats[k] || 0}">${state.prevStats[k] || 0}</div></div>`
-      ).join("");
-      html += `<div class="stat"><div class="label">${t("statUpdated")}</div><div class="value small">${new Date(data.generated_at).toLocaleTimeString()}</div></div>`;
-      $("stats").innerHTML = html;
-      items.forEach(([k, , v]) => { animateCount($("stat-" + k), v); state.prevStats[k] = v; });
+    function shortUser(email) {
+      return email.split("@")[0];
     }
 
     function highlight(text, q) {
@@ -806,175 +829,88 @@
       return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
     }
 
-    function renderDomains(data) {
-      const q = state.search.trim().toLowerCase();
-      $("domain-grid").innerHTML = data.domains.map((d, di) => {
-        const domainMatch = d.domain.toLowerCase().includes(q);
-        const rows = d.mailboxes.map((email) => {
-          const mb = data.mailboxes.find((m) => m.email === email);
-          const qn = mb ? mb.queued_messages : 0;
-          const sel = state.selected === email ? " selected" : "";
-          const name = email.split("@")[0];
-          const match = !q || domainMatch || email.toLowerCase().includes(q);
-          return `<div class="mailbox-row${sel}${match ? "" : " hide"}" data-email="${esc(email)}">
-            <span class="mb-name">${highlight(name, q && !domainMatch ? state.search.trim() : "")}</span>
-            <span class="queue-badge${qn > 0 ? " has-msg" : ""}">${qn} ${t("queued")}</span>
-          </div>`;
-        }).join("");
-        const anyVisible = !q || domainMatch || d.mailboxes.some((e) => e.toLowerCase().includes(q));
-        return `<div class="card domain-card${d.is_default ? " default" : ""}${anyVisible ? "" : " dimmed"}" style="animation-delay:${di * 0.04}s">
-          <div class="domain-head">
-            <span class="name">${highlight(d.domain, domainMatch ? state.search.trim() : "")}</span>
-            ${d.is_default ? `<span class="badge">${t("defaultBadge")}</span>` : `<span class="pill">${d.mailbox_count} ${t("mailboxes")}</span>`}
-          </div>
-          <div class="domain-body">${rows}</div>
-        </div>`;
-      }).join("");
+    function animateCount(el, to) {
+      const from = Number(el.dataset.v || 0);
+      if (from === to) { el.textContent = to; el.dataset.v = to; return; }
+      const dur = 500, start = performance.now();
+      function step(now) {
+        const p = Math.min((now - start) / dur, 1);
+        el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(step);
+        else { el.dataset.v = to; el.textContent = to; }
+      }
+      requestAnimationFrame(step);
+    }
 
-      document.querySelectorAll(".mailbox-row").forEach((el) => el.addEventListener("click", () => selectMailbox(el.dataset.email)));
+    function renderStats(data) {
+      const g = data.gateway;
+      $("gateway-meta").innerHTML = [
+        `<span class="chip"><code>${esc(g.server_url || "—")}</code></span>`,
+        `<span class="chip">${t("defaultDomain")} <code>${esc(g.default_domain)}</code></span>`,
+        `<span class="chip">${g.gateway_token_required ? t("tokenRequired") : t("noToken")}</span>`,
+        g.smtp_inbound_enabled ? `<span class="chip">${t("smtpOn")}</span>` : "",
+      ].filter(Boolean).join("");
+
+      const items = [
+        ["mb", t("statMailboxes"), g.active_mailboxes, ""],
+        ["dm", t("statDomains"), g.domain_count, ""],
+        ["unread", t("statUnread"), g.total_queued_messages ?? 0, "highlight"],
+        ["lk", t("statPairs"), countAllowedEdges(data.links), ""],
+      ];
+      $("stats").innerHTML = items.map(([k, l, , cls]) =>
+        `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value" id="stat-${k}" data-v="0">0</div></div>`
+      ).join("") + `<div class="kpi"><div class="label">${t("statUpdated")}</div><div class="value small">${new Date(data.generated_at).toLocaleTimeString()}</div></div>`;
+
+      items.forEach(([k, , v]) => {
+        const el = $("stat-" + k);
+        if (el) animateCount(el, v);
+      });
     }
 
     function collectDeliveryPeers(data, email) {
       const outbound = [];
       const inbound = [];
       data.links.forEach((l) => {
-        if (l.from === email && deliveryPermits(l.forward_status)) outbound.push({ peer: l.to });
-        if (l.to === email && deliveryPermits(l.reverse_status)) inbound.push({ peer: l.from });
+        if (l.from === email && deliveryPermits(l.forward_status)) outbound.push(l.to);
+        if (l.to === email && deliveryPermits(l.reverse_status)) inbound.push(l.from);
       });
-      const sortPeers = (list) => list.sort((a, b) => a.peer.localeCompare(b.peer));
-      return { outbound: sortPeers(outbound), inbound: sortPeers(inbound) };
+      outbound.sort();
+      inbound.sort();
+      return { outbound, inbound };
     }
 
-    function renderDetail(data, email, animate) {
-      const mb = data.mailboxes.find((m) => m.email === email);
-      const body = $("detail-body");
-      if (animate) { body.classList.remove("swap"); void body.offsetWidth; body.classList.add("swap"); }
-      if (!mb) { $("detail-content").innerHTML = `<div class="detail-empty">${esc(t("detailMissing"))}</div>`; return; }
-      const { outbound, inbound } = collectDeliveryPeers(data, email);
-      const p = mb.profile || {};
-
-      $("detail-content").innerHTML = `
-        <div class="detail-email">${esc(mb.email)}</div>
-        <div class="detail-section">
-          <h3 data-sec>${t("overview")} <span class="chev">⌄</span></h3>
-          <div class="sec-body"><dl class="kv-grid">
-            <dt>Domain</dt><dd>${esc(mb.domain)}</dd>
-            <dt>${t("registered")}</dt><dd>${fmtTime(mb.registered_at)}</dd>
-            <dt>${t("expires")}</dt><dd>${formatTTL(mb.ttl_remaining_seconds)}</dd>
-            <dt>${t("queuedMail")}</dt><dd>${mb.queued_messages}</dd>
-          </dl></div>
-        </div>
-        ${p.display_name ? `<div class="detail-section"><h3 data-sec>Profile <span class="chev">⌄</span></h3><div class="sec-body">
-          <div class="detail-kv"><strong>${t("name")}</strong>${esc(p.display_name)}</div>
-          ${p.host ? `<div class="detail-kv"><strong>Host</strong>${esc(p.host)}</div>` : ""}
-          ${p.responsibilities ? `<div class="detail-kv"><strong>${t("responsibilities")}</strong>${esc(p.responsibilities)}</div>` : ""}
-          ${renderTags("Skills", p.skills)}${renderTags("MCP", p.mcp_services)}${renderTags(t("capabilities"), p.capabilities)}
-          ${p.notes ? `<div class="detail-kv" style="margin-top:0.5rem;color:var(--text-2)">${esc(p.notes)}</div>` : ""}
-        </div></div>` : ""}
-        <div class="detail-section">
-          <h3 data-sec>${t("peers")} <span class="chev">⌄</span></h3>
-          <div class="sec-body">
-            ${renderDeliveryBlock(t("deliveryOutboundTitle"), t("deliveryOutboundHint"), outbound, "out")}
-            ${renderDeliveryBlock(t("deliveryInboundTitle"), t("deliveryInboundHint"), inbound, "in")}
-          </div>
-        </div>`;
-
-      $("detail-content").querySelectorAll("h3[data-sec]").forEach((h) => {
-        h.addEventListener("click", () => h.parentElement.classList.toggle("collapsed"));
+    function renderMailboxList(data) {
+      const q = state.search.trim().toLowerCase();
+      let html = "";
+      data.domains.forEach((d) => {
+        const visible = d.mailboxes.filter((email) => {
+          if (!q) return true;
+          return email.toLowerCase().includes(q) || d.domain.toLowerCase().includes(q);
+        });
+        if (!visible.length) return;
+        html += `<div class="domain-group"><div class="domain-label">${highlight(d.domain, q)}${d.is_default ? `<span class="def">${t("defaultBadge")}</span>` : ""}</div>`;
+        visible.forEach((email) => {
+          const mb = data.mailboxes.find((m) => m.email === email);
+          const qn = mb?.queued_messages ?? 0;
+          const sel = state.selected === email ? " selected" : "";
+          const unread = qn > 0 ? " has-unread" : "";
+          const display = mb?.profile?.display_name || t("noDisplayName");
+          const initials = shortUser(email).slice(0, 2).toUpperCase();
+          html += `<div class="mailbox-item${sel}${unread}" data-email="${esc(email)}">
+            <div class="mailbox-avatar">${esc(initials)}</div>
+            <div class="mailbox-meta">
+              <div class="mailbox-name">${highlight(shortUser(email), q)}</div>
+              <div class="mailbox-sub">${esc(display)}</div>
+            </div>
+            ${qn > 0 ? `<span class="unread-badge">${qn}</span>` : ""}
+          </div>`;
+        });
+        html += "</div>";
       });
-      $("detail-content").querySelectorAll(".link-row[data-peer]").forEach((r) => {
-        r.addEventListener("click", () => selectMailbox(r.dataset.peer));
+      $("mailbox-list").innerHTML = html || `<div class="empty-state"><p>${esc(t("graphEmpty"))}</p></div>`;
+      document.querySelectorAll(".mailbox-item").forEach((el) => {
+        el.addEventListener("click", () => selectMailbox(el.dataset.email));
       });
-    }
-
-    function renderDeliveryBlock(title, hint, peers, dir) {
-      const arrow = dir === "out" ? "→" : "←";
-      const rows = peers.slice(0, 60).map((l) => peerRow(l, arrow)).join("");
-      return `<div class="delivery-block">
-        <h4>${esc(title)}</h4>
-        <div class="hint">${esc(hint)}</div>
-        <div class="delivery-list link-list">${rows || `<div class="detail-kv" style="color:var(--text-3)">${t("none")}</div>`}</div>
-      </div>`;
-    }
-
-    function peerRow(l, arrow) {
-      return `<div class="link-row" data-peer="${esc(l.peer)}">
-        <span class="matrix-dot" aria-hidden="true"></span>
-        <span class="dir">${arrow} ${esc(l.peer)}</span>
-      </div>`;
-    }
-
-    function renderTags(label, items) {
-      if (!items || !items.length) return "";
-      return `<div class="detail-kv"><strong>${label}</strong></div><div class="tag-list">${items.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>`;
-    }
-
-    function updateDetailPanel() {
-      const open = !!state.selected;
-      $("detail-panel").classList.toggle("open", open);
-      $("main-layout").classList.toggle("has-detail", open);
-    }
-
-    function clearMailboxSelection() {
-      state.selected = null;
-      updateDetailPanel();
-      if (state.data) {
-        renderDomains(state.data);
-        renderGraph(state.data);
-      }
-    }
-
-    function selectMailbox(email) {
-      const changed = state.selected !== email;
-      state.selected = email;
-      updateDetailPanel();
-      if (state.data) {
-        renderDomains(state.data);
-        renderDetail(state.data, email, changed);
-        renderGraph(state.data);
-      }
-    }
-
-    function allMailboxes(data) {
-      return data.domains.flatMap((d) => d.mailboxes);
-    }
-
-    function ensureSelection(data) {
-      const emails = allMailboxes(data);
-      if (!emails.length) {
-        state.selected = null;
-        updateDetailPanel();
-        return;
-      }
-      if (state.selected && !emails.includes(state.selected)) {
-        state.selected = null;
-        updateDetailPanel();
-      }
-    }
-
-    function mailboxDomain(data, email) {
-      for (const d of data.domains) {
-        if (d.mailboxes.includes(email)) return d.domain;
-      }
-      return email.split("@")[1] || "";
-    }
-
-    function shortUser(email) {
-      return email.split("@")[0];
-    }
-
-    function mailboxesMatchingSearch(emails) {
-      const q = (state.search || "").trim().toLowerCase();
-      if (!q) return emails;
-      return emails.filter((e) => e.toLowerCase().includes(q) || mailboxDomain(state.data, e).toLowerCase().includes(q));
-    }
-
-    function emailsForMatrix(data) {
-      let emails = mailboxesMatchingSearch(allMailboxes(data));
-      if (state.selected && !emails.includes(state.selected)) {
-        emails = [state.selected, ...emails];
-      }
-      return emails.sort();
     }
 
     function deliveryAllowed(from, to, links) {
@@ -982,27 +918,27 @@
       return link && deliveryPermits(link.forward_status);
     }
 
-    function clearGraphOverlays(wrap) {
-      wrap.querySelector(".graph-empty")?.remove();
-      wrap.querySelector(".graph-hint")?.remove();
+    function allMailboxes(data) {
+      return data.domains.flatMap((d) => d.mailboxes);
     }
 
-    function renderGraph(data) {
-      const wrap = $("graph-wrap");
-      clearGraphOverlays(wrap);
-      $("graph-matrix").innerHTML = "";
-      if (!data.domains.length) {
-        const e = document.createElement("div");
-        e.className = "graph-empty";
-        e.innerHTML = `<div>${esc(t("graphEmpty"))}</div>`;
-        wrap.appendChild(e);
-        return;
+    function emailsForMatrix(data) {
+      const q = state.search.trim().toLowerCase();
+      let emails = allMailboxes(data).filter((e) => !q || e.toLowerCase().includes(q));
+      if (state.selected && !emails.includes(state.selected)) {
+        emails = [state.selected, ...emails];
       }
-      renderMatrix(data);
+      return emails.sort();
     }
 
     function renderMatrix(data) {
+      const wrap = $("graph-wrap");
       const matrixEl = $("graph-matrix");
+      if (!data.domains.length) {
+        matrixEl.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><p>${esc(t("graphEmpty"))}</p></div>`;
+        return;
+      }
+
       let emails = emailsForMatrix(data);
       let truncated = false;
       if (emails.length > MATRIX_CAP) {
@@ -1010,20 +946,20 @@
         emails = emails.slice(0, MATRIX_CAP);
       }
       if (!emails.length) {
-        matrixEl.innerHTML = `<div class="graph-hint" style="position:relative;min-height:200px"><div>${esc(t("graphEmpty"))}</div></div>`;
+        matrixEl.innerHTML = `<div class="empty-state"><p>${esc(t("graphEmpty"))}</p></div>`;
         return;
       }
 
       const links = data.links;
       const sel = state.selected;
-      let table = '<table class="matrix-table"><thead><tr><th class="corner" aria-hidden="true"></th>';
+      let table = '<table class="matrix-table"><thead><tr><th class="corner"></th>';
       emails.forEach((col) => {
-        const cls = col === sel ? "selected-col col-header" : "col-header";
+        const cls = col === sel ? "col-header selected" : "col-header";
         table += `<th class="${cls}" data-email="${esc(col)}" title="${esc(col)}">${esc(shortUser(col))}</th>`;
       });
       table += "</tr></thead><tbody>";
       emails.forEach((row) => {
-        const rowCls = row === sel ? "selected row-header" : "row-header";
+        const rowCls = row === sel ? "row-header selected" : "row-header";
         table += `<tr><th class="${rowCls}" data-email="${esc(row)}" title="${esc(row)}">${esc(shortUser(row))}</th>`;
         emails.forEach((col) => {
           if (row === col) {
@@ -1032,19 +968,16 @@
           }
           const ok = deliveryAllowed(row, col, links);
           table += ok
-            ? `<td class="cell-allowed" data-row="${esc(row)}" data-col="${esc(col)}" title="${esc(row)} → ${esc(col)}"><span class="matrix-dot" aria-label="allowed"></span></td>`
-            : `<td class="cell-empty" data-row="${esc(row)}"></td>`;
+            ? `<td class="cell-allowed${row === sel || col === sel ? " row-selected" : ""}" data-row="${esc(row)}" data-col="${esc(col)}"><span class="matrix-dot"></span></td>`
+            : `<td class="cell-empty"></td>`;
         });
         table += "</tr>";
       });
       table += "</tbody></table>";
-      const note = `<div class="matrix-note">${esc(t("matrixNote"))}${truncated ? " " + esc(t("matrixTruncated").replace("{n}", String(MATRIX_CAP))) : ""}</div>`;
-      matrixEl.innerHTML = table + note;
-      fitMatrixColumns(matrixEl);
-      matrixEl.querySelectorAll("tbody th[data-email]").forEach((th) => {
-        th.addEventListener("click", () => selectMailbox(th.getAttribute("data-email")));
-      });
-      matrixEl.querySelectorAll("thead th[data-email]").forEach((th) => {
+      table += `<div class="matrix-note">${esc(t("legendMatrix"))} · ${esc(t("matrixNote"))}${truncated ? " · " + esc(t("matrixTruncated").replace("{n}", String(MATRIX_CAP))) : ""}</div>`;
+      matrixEl.innerHTML = table;
+
+      matrixEl.querySelectorAll("th[data-email]").forEach((th) => {
         th.addEventListener("click", () => selectMailbox(th.getAttribute("data-email")));
       });
       matrixEl.querySelectorAll("td[data-row]").forEach((td) => {
@@ -1052,53 +985,178 @@
       });
     }
 
-    function fitMatrixColumns(matrixEl) {
-      const table = matrixEl.querySelector(".matrix-table");
-      if (!table) return;
-      const measure = document.createElement("span");
-      measure.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:600 0.68rem var(--mono);padding:0 0.65rem";
-      document.body.appendChild(measure);
-      const colHeaders = table.querySelectorAll("thead th.col-header");
-      colHeaders.forEach((th) => {
-        measure.textContent = th.textContent;
-        const w = Math.ceil(measure.getBoundingClientRect().width + 14);
-        th.style.width = Math.min(180, Math.max(36, w)) + "px";
-      });
-      const rowHeaders = table.querySelectorAll("tbody th.row-header");
-      rowHeaders.forEach((th) => {
-        measure.textContent = th.textContent;
-        const w = Math.ceil(measure.getBoundingClientRect().width + 18);
-        th.style.width = Math.min(220, Math.max(64, w)) + "px";
-      });
-      measure.remove();
-      colHeaders.forEach((th, i) => {
-        const w = th.style.width;
-        if (!w) return;
-        table.querySelectorAll("tbody tr").forEach((tr) => {
-          const cell = tr.children[i + 1];
-          if (cell && cell.tagName === "TD") {
-            cell.style.width = w;
-            cell.style.minWidth = w;
-          }
-        });
-      });
+    function renderDetailHero(mb) {
+      const p = mb.profile || {};
+      const { outbound, inbound } = collectDeliveryPeers(state.data, mb.email);
+      $("detail-hero").innerHTML = `
+        <div class="detail-email">${esc(mb.email)}</div>
+        <div class="detail-display">${esc(p.display_name || shortUser(mb.email))}</div>
+        <div class="detail-chips">
+          <span class="mini-chip">${esc(mb.domain)}</span>
+          <span class="mini-chip ${mb.queued_messages ? "ok" : ""}">${mb.queued_messages} ${t("queuedMail")}</span>
+          <span class="mini-chip">${formatTTL(mb.ttl_remaining_seconds)}</span>
+          <span class="mini-chip">${outbound.length} ${t("outCount")}</span>
+          <span class="mini-chip">${inbound.length} ${t("inCount")}</span>
+        </div>`;
     }
 
-    function esc(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); }
-    function fmtTime(iso) { try { return new Date(iso).toLocaleString(); } catch { return iso; } }
+    function renderTabOverview(mb) {
+      const { outbound, inbound } = collectDeliveryPeers(state.data, mb.email);
+      return `
+        <div class="stat-grid">
+          <div class="stat-cell"><div class="k">${t("queuedMail")}</div><div class="v">${mb.queued_messages}</div></div>
+          <div class="stat-cell"><div class="k">${t("expires")}</div><div class="v">${formatTTL(mb.ttl_remaining_seconds)}</div></div>
+          <div class="stat-cell"><div class="k">${t("outCount")}</div><div class="v">${outbound.length}</div></div>
+          <div class="stat-cell"><div class="k">${t("inCount")}</div><div class="v">${inbound.length}</div></div>
+        </div>
+        <div class="section-title">${t("registered")}</div>
+        <p class="muted">${fmtTime(mb.registered_at)}</p>`;
+    }
+
+    function renderTabConnections(mb) {
+      const { outbound, inbound } = collectDeliveryPeers(state.data, mb.email);
+      const outHtml = outbound.length
+        ? outbound.map((p) => `<div class="peer-row" data-peer="${esc(p)}"><span class="arrow">→</span><span class="addr">${esc(p)}</span></div>`).join("")
+        : `<p class="muted">${t("none")}</p>`;
+      const inHtml = inbound.length
+        ? inbound.map((p) => `<div class="peer-row" data-peer="${esc(p)}"><span class="arrow">←</span><span class="addr">${esc(p)}</span></div>`).join("")
+        : `<p class="muted">${t("none")}</p>`;
+      return `
+        <div class="section-title">${t("outboundPeers")}</div>
+        <div class="peer-list">${outHtml}</div>
+        <div class="section-title">${t("inboundPeers")}</div>
+        <div class="peer-list">${inHtml}</div>`;
+    }
+
+    function renderTabInbox(mb) {
+      const queue = mb.queue || [];
+      if (!queue.length) {
+        return `<p class="inbox-hint">${esc(t("inboxHint"))}</p><p class="muted">${esc(t("inboxEmpty"))}</p>`;
+      }
+      const items = [...queue].reverse().map((m) => `
+        <div class="inbox-item unread">
+          <div class="inbox-from">${esc(m.from)}</div>
+          <div class="inbox-subject">${esc(m.subject || "—")}</div>
+          <div class="inbox-time">${fmtTime(m.received_at)} · <code>${esc(m.message_id)}</code></div>
+        </div>`).join("");
+      return `<p class="inbox-hint">${esc(t("inboxHint"))}</p><div class="inbox-list">${items}</div>`;
+    }
+
+    function renderTabProfile(mb) {
+      const p = mb.profile || {};
+      if (!p.display_name && !p.responsibilities && !(p.skills?.length) && !(p.capabilities?.length)) {
+        return `<p class="muted">${t("none")}</p>`;
+      }
+      let html = "";
+      if (p.display_name) html += `<div class="section-title">${t("name")}</div><p>${esc(p.display_name)}</p>`;
+      if (p.host) html += `<div class="section-title">${t("host")}</div><p class="mono prose">${esc(p.host)}</p>`;
+      if (p.responsibilities) html += `<div class="section-title">${t("responsibilities")}</div><p class="prose">${esc(p.responsibilities)}</p>`;
+      if (p.skills?.length) html += `<div class="section-title">${t("skills")}</div><div class="tag-cloud">${p.skills.map((s) => `<span class="tag">${esc(s)}</span>`).join("")}</div>`;
+      if (p.mcp_services?.length) html += `<div class="section-title">${t("mcp")}</div><div class="tag-cloud">${p.mcp_services.map((s) => `<span class="tag">${esc(s)}</span>`).join("")}</div>`;
+      if (p.capabilities?.length) html += `<div class="section-title">${t("capabilities")}</div><div class="tag-cloud">${p.capabilities.map((s) => `<span class="tag">${esc(s)}</span>`).join("")}</div>`;
+      if (p.notes) html += `<div class="section-title">${t("notes")}</div><p class="prose">${esc(p.notes)}</p>`;
+      return html;
+    }
+
+    function renderDetailContent(mb) {
+      const panes = {
+        overview: renderTabOverview(mb),
+        connections: renderTabConnections(mb),
+        inbox: renderTabInbox(mb),
+        profile: renderTabProfile(mb),
+      };
+      $("detail-content").innerHTML = Object.entries(panes).map(([id, html]) =>
+        `<div class="tab-pane${detailTab === id ? " active" : ""}" data-pane="${id}">${html}</div>`
+      ).join("");
+
+      $("detail-content").querySelectorAll(".peer-row[data-peer]").forEach((row) => {
+        row.addEventListener("click", () => selectMailbox(row.dataset.peer));
+      });
+
+      const inboxTab = $("detail-tabs").querySelector('[data-tab="inbox"]');
+      if (inboxTab) {
+        const badge = mb.queued_messages > 0 ? ` (${mb.queued_messages})` : "";
+        inboxTab.textContent = t("tabInbox") + badge;
+      }
+    }
+
+    function setDetailTab(tab) {
+      detailTab = tab;
+      localStorage.setItem(TAB_KEY, tab);
+      $("detail-tabs").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+      $("detail-content").querySelectorAll(".tab-pane").forEach((p) => p.classList.toggle("active", p.dataset.pane === tab));
+    }
+
+    $("detail-tabs").querySelectorAll("button").forEach((b) => {
+      b.addEventListener("click", () => setDetailTab(b.dataset.tab));
+    });
+
+    function renderDetail(data, email) {
+      const mb = data.mailboxes.find((m) => m.email === email);
+      if (!mb) {
+        $("detail-hero").innerHTML = "";
+        $("detail-content").innerHTML = `<p class="muted">${esc(t("detailMissing"))}</p>`;
+        return;
+      }
+      renderDetailHero(mb);
+      renderDetailContent(mb);
+      setDetailTab(detailTab);
+    }
+
+    function updateLayout() {
+      const open = !!state.selected;
+      $("detail-panel").classList.toggle("open", open);
+      $("workspace").classList.toggle("has-detail", open);
+    }
+
+    function selectMailbox(email) {
+      state.selected = email;
+      updateLayout();
+      if (state.data) {
+        renderMailboxList(state.data);
+        renderMatrix(state.data);
+        renderDetail(state.data, email);
+      }
+    }
+
+    function clearMailboxSelection() {
+      state.selected = null;
+      updateLayout();
+      if (state.data) {
+        renderMailboxList(state.data);
+        renderMatrix(state.data);
+      }
+    }
+
+    function ensureSelection(data) {
+      if (state.selected && !allMailboxes(data).includes(state.selected)) {
+        state.selected = null;
+        updateLayout();
+      }
+    }
+
+    function renderAll() {
+      if (!state.data) return;
+      renderStats(state.data);
+      renderMailboxList(state.data);
+      renderMatrix(state.data);
+      if (state.selected) renderDetail(state.data, state.selected);
+      else {
+        $("detail-hero").innerHTML = "";
+        $("detail-content").innerHTML = `<p class="muted" style="padding:1rem 0">${esc(t("selectMailbox"))}</p>`;
+      }
+    }
 
     async function load(manual, prefetched) {
       try {
         const data = prefetched || await fetchDashboard();
         state.data = data;
         ensureSelection(data);
-        updateDetailPanel();
-        renderStats(data); renderDomains(data); renderGraph(data);
-        if (state.selected) renderDetail(data, state.selected, false);
+        renderAll();
         if (manual) showToast(t("refreshed"), "ok");
       } catch (e) {
         showToast(e.message || String(e), "err");
-        if (e.message && (e.message.includes("Token") || e.message.includes("token"))) showLogin();
+        if (String(e.message).toLowerCase().includes("token")) showLogin();
       }
     }
 
@@ -1106,27 +1164,26 @@
       const btn = $("refresh-btn");
       btn.classList.add("spinning");
       await load(true);
-      setTimeout(() => btn.classList.remove("spinning"), 600);
+      setTimeout(() => btn.classList.remove("spinning"), 500);
     }
 
     function showLogin() {
-      const el = $("login");
-      el.classList.remove("hidden");
-      el.setAttribute("aria-hidden", "false");
-      $("logout-btn").style.display = "none";
-      setTimeout(() => $("token-input").focus(), 100);
+      $("login").classList.remove("hidden");
+      $("login").setAttribute("aria-hidden", "false");
+      $("logout-btn").classList.add("hidden");
+      setTimeout(() => $("token-input").focus(), 80);
     }
+
     function hideLogin() {
-      const el = $("login");
-      el.classList.add("hidden");
-      el.setAttribute("aria-hidden", "true");
-      $("logout-btn").style.display = state.token ? "inline-flex" : "none";
+      $("login").classList.add("hidden");
+      $("login").setAttribute("aria-hidden", "true");
+      $("logout-btn").classList.toggle("hidden", !state.token);
     }
 
     async function tryLogin(token) {
       const normalized = normalizeToken(token);
       const btn = $("login-btn");
-      const prevLabel = btn.textContent;
+      const prev = btn.textContent;
       $("login-error").textContent = "";
       if (!normalized) {
         $("login-error").textContent = t("tokenEmpty");
@@ -1150,51 +1207,50 @@
         return false;
       } finally {
         btn.disabled = false;
-        btn.textContent = prevLabel;
+        btn.textContent = prev;
       }
     }
 
     $("login-btn").addEventListener("click", () => { void tryLogin($("token-input").value); });
-    $("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); void tryLogin($("token-input").value); } });
+    $("token-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); void tryLogin($("token-input").value); }
+    });
     $("logout-btn").addEventListener("click", () => {
       sessionStorage.removeItem(TOKEN_KEY);
-      state.token = ""; state.data = null; state.selected = null;
-      updateDetailPanel();
+      state.token = "";
+      state.data = null;
+      state.selected = null;
       if (refreshTimer) clearInterval(refreshTimer);
+      updateLayout();
       showLogin();
     });
     $("refresh-btn").addEventListener("click", doRefresh);
-
     $("detail-close").addEventListener("click", clearMailboxSelection);
 
     const searchInput = $("search-input");
     searchInput.addEventListener("input", () => {
       state.search = searchInput.value;
       $("search-field").classList.toggle("has-value", !!searchInput.value);
-      if (state.data) { renderDomains(state.data); renderGraph(state.data); }
+      if (state.data) { renderMailboxList(state.data); renderMatrix(state.data); }
     });
     $("search-clear").addEventListener("click", () => {
-      searchInput.value = ""; state.search = "";
+      searchInput.value = "";
+      state.search = "";
       $("search-field").classList.remove("has-value");
       searchInput.focus();
-      if (state.data) { renderDomains(state.data); renderGraph(state.data); }
+      if (state.data) { renderMailboxList(state.data); renderMatrix(state.data); }
     });
 
     document.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); searchInput.focus(); }
-      if (e.key === "Escape" && document.activeElement === searchInput) {
-        searchInput.value = ""; state.search = ""; $("search-field").classList.remove("has-value");
-        if (state.data) { renderDomains(state.data); renderGraph(state.data); }
-      }
     });
 
-    window.addEventListener("resize", () => state.data && renderGraph(state.data));
+    window.addEventListener("resize", () => state.data && renderMatrix(state.data));
 
     (async function init() {
       const saved = sessionStorage.getItem(TOKEN_KEY);
       if (saved) {
-        const ok = await tryLogin(saved);
-        if (!ok) showLogin();
+        if (!(await tryLogin(saved))) showLogin();
         return;
       }
       try {
@@ -1206,9 +1262,7 @@
           if (refreshTimer) clearInterval(refreshTimer);
           await load(false, data);
           refreshTimer = setInterval(() => load(false), 10000);
-        } else {
-          showLogin();
-        }
+        } else showLogin();
       } catch {
         showLogin();
       }
