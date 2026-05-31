@@ -1148,6 +1148,49 @@ func TestSkillEndpointInfersHostWhenPublicURLUnset(t *testing.T) {
 	}
 }
 
+func TestSkillEndpointListsConnectionURLs(t *testing.T) {
+	t.Setenv("AGENTPOST_PUBLIC_URL", "")
+	t.Setenv("AGENTPOST_CONNECT_LOCALHOST", "http://127.0.0.1:8080")
+	t.Setenv("AGENTPOST_CONNECT_LAN", "http://192.168.1.50:8080")
+	t.Setenv("AGENTPOST_CONNECT_PUBLIC", "http://203.0.113.10:8080")
+	t.Setenv("AGENTPOST_CONNECT_DOMAIN", "https://example.domain")
+
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":8080",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
+	req.Header.Set("Accept", "application/json")
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("skill status = %d", resp.Code)
+	}
+	var got skillResponse
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode skill json: %v", err)
+	}
+	if got.Meta.ConnectionURLs.Localhost != "http://127.0.0.1:8080" {
+		t.Fatalf("localhost url: %+v", got.Meta.ConnectionURLs)
+	}
+	if got.Meta.ConnectionURLs.LAN != "http://192.168.1.50:8080" {
+		t.Fatalf("lan url: %+v", got.Meta.ConnectionURLs)
+	}
+	if got.Meta.ConnectionURLs.PublicIP != "http://203.0.113.10:8080" {
+		t.Fatalf("public ip url: %+v", got.Meta.ConnectionURLs)
+	}
+	if got.Meta.ConnectionURLs.Domain != "https://example.domain" {
+		t.Fatalf("domain url: %+v", got.Meta.ConnectionURLs)
+	}
+	if !strings.Contains(got.Content, "客户端可用连接地址") {
+		t.Fatalf("skill body should list connection URLs table")
+	}
+}
+
 func TestAuthenticateRejectsStaleAndFutureTimestamps(t *testing.T) {
 	now := time.Date(2026, 5, 29, 12, 0, 0, 0, time.UTC)
 	app := NewApp(Config{
