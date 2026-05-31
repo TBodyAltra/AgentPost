@@ -127,13 +127,28 @@ func TestDashboardJavaScriptSupportsRegexMailboxSearch(t *testing.T) {
 	}
 	for _, needle := range []string{
 		"function parseSearchQuery",
+		"function parseSlashRegex",
 		"function mailboxMatchesSearch",
 		"function emailDomain",
-		`trimmed.startsWith("/")`,
+		"function mailboxLocalPart",
+		"kind: \"incomplete\"",
 	} {
 		if !strings.Contains(script, needle) {
 			t.Fatalf("dashboard search missing %q", needle)
 		}
+	}
+}
+
+func TestDashboardSearchParseUnit(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("node not installed")
+	}
+	path := filepath.Join("web", "dashboard", "search-parse.test.mjs")
+	cmd := exec.Command("node", path)
+	cmd.Dir = filepath.Join(repoRoot(t), "cmd", "agentpost")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("search parse unit test: %v\n%s", err, out)
 	}
 }
 
