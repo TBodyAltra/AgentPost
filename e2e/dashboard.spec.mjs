@@ -90,6 +90,13 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
     await expect(page.locator(".matrix-table td.cell-focus")).toHaveCount(1);
 
+    const diagonalCell = page.locator(".matrix-table td.cell-self").first();
+    await diagonalCell.click();
+    await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
+    await expect(page.locator(".matrix-table td.cell-self.cell-focus")).toHaveCount(1);
+    await expect(page.locator(".matrix-table th.row-header.axis-highlight")).toHaveCount(1);
+    await expect(page.locator(".matrix-table th.col-header.axis-highlight")).toHaveCount(1);
+
     await page.locator(".matrix-table th.row-header").first().click();
     await expect(page.locator("#detail-panel")).toHaveClass(/open/);
   });
