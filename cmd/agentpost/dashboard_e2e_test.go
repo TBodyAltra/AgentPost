@@ -57,8 +57,13 @@ func TestDashboardPlaywrightE2E(t *testing.T) {
 
 	pubA, _, _ := ed25519.GenerateKey(crand.Reader)
 	pubB, _, _ := ed25519.GenerateKey(crand.Reader)
+	pubG, _, _ := ed25519.GenerateKey(crand.Reader)
 	registerDashboardUser(t, handler, "alpha", "agent.test", pubA, nil)
 	registerDashboardUser(t, handler, "beta", "agent.test", pubB, nil)
+	// gamma blocks alpha so the delivery matrix has non-delivery (empty) cells for E2E.
+	registerDashboardUser(t, handler, "gamma", "agent.test", pubG, &InboxPolicy{
+		Blocklist: []string{"alpha@agent.test"},
+	})
 
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)

@@ -1131,9 +1131,10 @@
     function collectDeliveryPeers(data, email) {
       const outbound = [];
       const inbound = [];
-      data.links.forEach((l) => {
-        if (l.from === email && deliveryPermits(l.forward_status)) outbound.push(l.to);
-        if (l.to === email && deliveryPermits(l.reverse_status)) inbound.push(l.from);
+      allMailboxes(data).forEach((peer) => {
+        if (peer === email) return;
+        if (deliveryPermits(directedDeliveryStatus(email, peer, data.links))) outbound.push(peer);
+        if (deliveryPermits(directedDeliveryStatus(peer, email, data.links))) inbound.push(peer);
       });
       outbound.sort();
       inbound.sort();
