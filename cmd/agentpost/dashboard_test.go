@@ -151,6 +151,94 @@ func TestDashboardSnapshotDomainsAndLinks(t *testing.T) {
 	}
 }
 
+func TestDashboardAPIWorksWithoutTokenWhenDisabled(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+		APIToken:        "",
+	})
+	handler := app.routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("dashboard without token status = %d, want 200, body = %s", resp.Code, resp.Body.String())
+	}
+
+	var got dashboardResponse
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode dashboard: %v", err)
+	}
+	if got.Gateway.GatewayToken {
+		t.Fatalf("gateway_token_required = true, want false when API token disabled")
+	}
+}
+
+func TestDashboardLinksHaveDirectedStatuses(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "team.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubA, _, _ := ed25519.GenerateKey(crand.Reader)
+	pubB, _, _ := ed25519.GenerateKey(crand.Reader)
+	registerDashboardUser(t, handler, "alice", "team.test", pubA, nil)
+	registerDashboardUser(t, handler, "bob", "team.test", pubB, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("dashboard status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+
+	var got dashboardResponse
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode dashboard: %v", err)
+	}
+	if len(got.Links) != 1 {
+		t.Fatalf("expected 1 link pair for 2 mailboxes, got %d", len(got.Links))
+	}
+	link := got.Links[0]
+	if link.ForwardStatus == "" || link.ReverseStatus == "" {
+		t.Fatalf("link missing directed statuses: %+v", link)
+	}
+	if link.ForwardStatus != "allowed" || link.ReverseStatus != "allowed" {
+		t.Fatalf("same-domain pair statuses = forward %q reverse %q, want allowed/allowed", link.ForwardStatus, link.ReverseStatus)
+	}
+}
+
+func registerDashboardUser(t *testing.T, handler http.Handler, username, domain string, key ed25519.PublicKey, policy *InboxPolicy) {
+	registerDashboardUserWithGateway(t, handler, "", username, domain, key, policy)
+}
+
+func registerDashboardUserWithGateway(t *testing.T, handler http.Handler, gatewayToken, username, domain string, key ed25519.PublicKey, policy *InboxPolicy) {
+	t.Helper()
+	body := mustJSON(t, registerRequest{
+		Username:    username,
+		Domain:      domain,
+		PublicKey:   hex.EncodeToString(key),
+		TTLSeconds:  3600,
+		InboxPolicy: policy,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/register", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if gatewayToken != "" {
+		req.Header.Set("Authorization", "Bearer "+gatewayToken)
+	}
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("register %s@%s status = %d, body = %s", username, domain, resp.Code, resp.Body.String())
+	}
+}
+
 func TestDashboardDirectedDeliveryStatus(t *testing.T) {
 	users := map[string]*User{
 		"alice@a.test": {

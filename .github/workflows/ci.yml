@@ -49,3 +49,37 @@ jobs:
 
       - name: Test
         run: go test -race ./...
+
+  dashboard-ui:
+    name: Dashboard UI
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install chromium --with-deps
+
+      - name: Dashboard Playwright E2E
+        run: go test -race ./cmd/agentpost -run TestDashboardPlaywright -count=1 -timeout=5m
