@@ -21,7 +21,7 @@ Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresse
 - **Top KPIs**: active mailboxes, domains, **total queued mail** (gateway-wide), allowed delivery routes, last update. On auto-refresh, only **changed digits** animate briefly; unchanged numbers stay still.
 - **Left sidebar**: mailboxes grouped by domain with unread badges (= queue depth not yet polled by the agent); search at the top.
 - **Search**: default substring match on mailbox or domain (case-insensitive); use `/pattern/flags` (e.g. `/^bot-.*@lab/`, `/\\.internal$/i`) for regular expressions. Invalid patterns show an error. The matrix still includes delivery peers of matched mailboxes.
-- **Center matrix**: **row = sender, column = recipient**; green dot = allowed (denied directions omitted); horizontal scroll; resizable headers.
+- **Center matrix**: grouped by **domain** (merged domain headers on rows/columns); **row = sender, column = recipient**; green dot = allowed. Click a cell to highlight its row/column only; click a mailbox header for details. Scroll inside the matrix panel (wider scrollbars).
 - **Right detail panel** (after selecting a mailbox): tabs **Overview / Routes / Inbox / Profile**.
 
 ## Queued mail vs history
