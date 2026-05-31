@@ -29,12 +29,12 @@ type skillMeta struct {
 	Domain          string              `json:"domain"`
 	ConnectionURLs  skillConnectionURLs `json:"connection_urls,omitempty"`
 	PublicURLSource string              `json:"public_url_source"`
-	Language           string              `json:"language"`
-	GatewayToken       bool                `json:"gateway_token_required"`
-	SMTPEnabled        bool                `json:"smtp_inbound_enabled"`
-	Storage            string              `json:"storage"`
-	MaxTTLSeconds      int64               `json:"max_ttl_seconds"`
-	MaxMessageBytes    int64               `json:"max_message_bytes"`
+	Language        string              `json:"language"`
+	GatewayToken    bool                `json:"gateway_token_required"`
+	SMTPEnabled     bool                `json:"smtp_inbound_enabled"`
+	Storage         string              `json:"storage"`
+	MaxTTLSeconds   int64               `json:"max_ttl_seconds"`
+	MaxMessageBytes int64               `json:"max_message_bytes"`
 }
 
 func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
@@ -50,12 +50,12 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 		Domain:          a.cfg.Domain,
 		ConnectionURLs:  readSkillConnectionURLs(),
 		PublicURLSource: urlSource,
-		Language:           language,
-		GatewayToken:       strings.TrimSpace(a.cfg.APIToken) != "",
-		SMTPEnabled:        strings.TrimSpace(a.cfg.SMTPAddr) != "",
-		Storage:            "in-memory",
-		MaxTTLSeconds:      maxTTLSeconds,
-		MaxMessageBytes:    a.cfg.MaxMessageBytes,
+		Language:        language,
+		GatewayToken:    strings.TrimSpace(a.cfg.APIToken) != "",
+		SMTPEnabled:     strings.TrimSpace(a.cfg.SMTPAddr) != "",
+		Storage:         "in-memory",
+		MaxTTLSeconds:   maxTTLSeconds,
+		MaxMessageBytes: a.cfg.MaxMessageBytes,
 	}
 	content := buildSkillMarkdown(meta, language)
 

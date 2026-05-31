@@ -88,11 +88,11 @@ func TestStartScriptConfigureDefault(t *testing.T) {
 			name: "HTTPS domain with Caddy",
 			args: []string{"configure", "--non-interactive", "--domain", "example.domain", "--caddy", "--smtp", "--no-lan-detect", "--no-public-detect"},
 			wantEnv: map[string]string{
-				"AGENTPOST_DOMAIN":            "example.domain",
-				"AGENTPOST_CONNECT_DOMAIN":    "https://example.domain",
-				"AGENTPOST_ENABLE_SMTP":       "1",
-				"AGENTPOST_ENABLE_CADDY":      "1",
-				"AGENTPOST_REQUIRE_TOKEN":     "1",
+				"AGENTPOST_DOMAIN":         "example.domain",
+				"AGENTPOST_CONNECT_DOMAIN": "https://example.domain",
+				"AGENTPOST_ENABLE_SMTP":    "1",
+				"AGENTPOST_ENABLE_CADDY":   "1",
+				"AGENTPOST_REQUIRE_TOKEN":  "1",
 			},
 			wantAbsent: []string{"AGENTPOST_SCENARIO", "AGENTPOST_PUBLIC_URL"},
 			wantConfig: Config{
