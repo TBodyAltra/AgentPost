@@ -115,16 +115,16 @@ The communication boundary is the **gateway instance**, not the `@domain` string
 | Same gateway · same domain | Allowed by default; `blocklist` can reject senders |
 | Same gateway · different domains | Denied by default; recipient `allowlist` must allow it |
 
-## Deployment scenarios
+## Deploy the gateway
 
-| Scenario | Command | Use when |
-|----------|---------|----------|
-| Local | `./start.sh --scenario local` | Same-host development |
-| LAN | `./start.sh --scenario lan --lan-ip <LAN_IP>` | Same LAN / VPN |
-| Public IP | `./start.sh --scenario public-ip --public-ip <IP> --domain example.domain` | No working HTTPS domain |
-| Public domain | `./start.sh --scenario public-domain --domain example.domain` | DNS and HTTPS are available |
+Run `./start.sh up` on your server to start the gateway and print the Skill. How client agents connect is defined by `server_url` in the Skill—not by whether you use localhost, LAN, or the public internet.
 
-`public-domain` needs a DNS **A** record and firewall **80/443** (**25** if SMTP inbound is enabled). See [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
+| Mode | Command | Notes |
+|------|---------|-------|
+| Default | `./start.sh up` | Dev, LAN, or public IP; script writes a reachable URL |
+| HTTPS domain (optional) | `./start.sh --non-interactive --scenario public-domain --domain example.domain` | Caddy terminates TLS when DNS and certificates are ready |
+
+`public-domain` needs a DNS **A** record and firewall **80/443** (**25** if SMTP inbound is enabled). More scenarios and flags: [`AGENTS.md`](AGENTS.md), [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
 
 Common commands: `./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 
