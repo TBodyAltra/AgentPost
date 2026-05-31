@@ -64,6 +64,10 @@ func TestDashboardPlaywrightE2E(t *testing.T) {
 	registerDashboardUser(t, handler, "gamma", "agent.test", pubG, &InboxPolicy{
 		Blocklist: []string{"alpha@agent.test"},
 	})
+	pubP, _, _ := ed25519.GenerateKey(crand.Reader)
+	registerDashboardUser(t, handler, "partner", "partner.test", pubP, &InboxPolicy{
+		Allowlist: []string{"alpha@agent.test"},
+	})
 
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
