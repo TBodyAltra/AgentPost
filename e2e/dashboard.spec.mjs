@@ -87,4 +87,20 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator("#refresh-btn")).not.toHaveClass(/spinning/, { timeout: 10_000 });
     await expect(page.locator(".toast.err")).toHaveCount(0);
   });
+
+  test("refresh keeps stable KPI values without rolling from zero", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, 2);
+
+    const mb = page.locator("#stat-mb");
+    await expect(mb).toHaveAttribute("data-v", "2");
+    const before = await mb.textContent();
+
+    await page.locator("#refresh-btn").click();
+    await expect(page.locator("#refresh-btn")).not.toHaveClass(/spinning/, { timeout: 10_000 });
+
+    await expect(mb).toHaveAttribute("data-v", "2");
+    await expect(mb).toHaveText(before ?? "2");
+    await expect(mb).not.toHaveText("0");
+  });
 });

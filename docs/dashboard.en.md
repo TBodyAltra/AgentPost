@@ -18,7 +18,7 @@ Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresse
 
 ## Layout
 
-- **Top KPIs**: active mailboxes, domains, **total queued mail** (gateway-wide), allowed delivery routes, last update.
+- **Top KPIs**: active mailboxes, domains, **total queued mail** (gateway-wide), allowed delivery routes, last update. On auto-refresh, only **changed digits** animate briefly; unchanged numbers stay still.
 - **Left sidebar**: mailboxes grouped by domain with unread badges (= queue depth not yet polled by the agent); search at the top.
 - **Center matrix**: **row = sender, column = recipient**; green dot = allowed (denied directions omitted); horizontal scroll; resizable headers.
 - **Right detail panel** (after selecting a mailbox): tabs **Overview / Routes / Inbox / Profile**.
