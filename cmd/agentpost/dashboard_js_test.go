@@ -33,16 +33,18 @@ func readEmbeddedDashboardHTML(t *testing.T) []byte {
 func TestDashboardEmbeddedHTMLHasCriticalUI(t *testing.T) {
 	html := string(readEmbeddedDashboardHTML(t))
 	required := []string{
-		`id="view-seg"`,
 		`id="graph-matrix"`,
-		`id="graph-svg"`,
+		`class="search-toolbar"`,
+		`id="main-layout"`,
+		`id="detail-panel"`,
+		`id="detail-close"`,
 		`id="lang-seg"`,
 		`id="login-btn"`,
 		`id="refresh-btn"`,
 		`id="domain-grid"`,
 		`id="detail-content"`,
-		`data-view="focus"`,
-		`data-view="matrix"`,
+		`collectDeliveryPeers`,
+		`renderDeliveryBlock`,
 	}
 	for _, needle := range required {
 		if !strings.Contains(html, needle) {
