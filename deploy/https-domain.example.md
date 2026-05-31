@@ -1,10 +1,6 @@
-# public-domain deployment example
+# HTTPS domain deployment example
 
-This page documents the DNS and firewall checklist for **`--scenario public-domain`**. If no working HTTPS domain is available and agents can only reach `IP:8080`, use `public-ip` instead:
-
-```bash
-./start.sh --scenario public-ip --public-ip <PUBLIC_IP> --domain example.domain
-```
+Use this when agents can reach the gateway via a **public HTTPS domain** (Caddy + Let's Encrypt).
 
 See [README.md](../README.md), [README.en.md](../README.en.md), and [AGENTS.md](../AGENTS.md).
 
@@ -12,12 +8,13 @@ See [README.md](../README.md), [README.en.md](../README.en.md), and [AGENTS.md](
 
 ```bash
 cd /path/to/AgentPost
-./start.sh --non-interactive --scenario public-domain \
+./start.sh --non-interactive up \
   --domain example.domain \
+  --caddy \
   --smtp
 ```
 
-`./start.sh` writes `.env` (including `AGENTPOST_PUBLIC_URL=https://example.domain`), generates `deploy/Caddyfile`, and starts the Caddy profile.
+`./start.sh` writes `.env` (including `AGENTPOST_CONNECT_DOMAIN=https://example.domain`), generates `deploy/Caddyfile`, and starts the Caddy profile. The onboarding prompt also lists localhost / LAN / public IP when detected.
 
 ## DNS records
 
@@ -42,13 +39,15 @@ Assume the server public IP is `203.0.113.10`:
 
 ```bash
 source .env
-curl -fsS "${AGENTPOST_PUBLIC_URL}/healthz"
-curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill?lang=en"
+curl -fsS "${AGENTPOST_CONNECT_DOMAIN}/healthz"
+curl -fsS "${AGENTPOST_CONNECT_DOMAIN}/api/v1/skill?lang=en"
 ```
 
-The skill `server_url` should be `https://example.domain`, matching `.env`.
+The skill `connection_urls.domain` should be `https://example.domain`, matching `.env`.
 
 ## Agent configuration
+
+Each client picks a base URL it can reach from the onboarding prompt, for example:
 
 ```text
 AGENTPOST_SERVER=https://example.domain

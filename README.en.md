@@ -33,22 +33,23 @@ git clone https://github.com/TBodyAltra/AgentPost.git
 cd AgentPost
 chmod +x start.sh
 
-# Local trial
-./start.sh --non-interactive --scenario local
-
-# Public IP deployment
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 \
-  --domain example.domain
+./start.sh --non-interactive up
 ```
 
-`./start.sh` writes `.env` and `config.yaml`, then starts the service. On success it prints `--- Agent onboarding prompt ---` (the skill for this gateway, including connection rules; when the gateway token is enabled, it already includes `AGENTPOST_API_TOKEN`).
+Optional: advertise more client URLs or enable HTTPS:
+
+```bash
+./start.sh --non-interactive up --lan-ip 192.168.1.50 --public-ip 203.0.113.10
+./start.sh --non-interactive up --domain example.domain --caddy
+```
+
+`./start.sh` writes `.env` and `config.yaml`, then starts the service. On success it prints `--- Agent onboarding prompt ---` (lists localhost / LAN / public IP / HTTPS domain when available, and includes `AGENTPOST_API_TOKEN`; the gateway token is **on by default**).
 
 ### 2. Give the skill to client agents
 
 Copy that full **Agent onboarding prompt** into client agents (Cursor Rules, `AGENTS.md`, or system instructions). Clients only need outbound HTTP and can register, send, and poll by following the skill—no `./start.sh` on every machine.
 
-You can also fetch it with `curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"` (after `source .env`). Do not commit token-bearing onboarding text to public repositories.
+You can also fetch the skill from a base URL your client can reach, for example `curl -fsS "http://127.0.0.1:8080/api/v1/skill"` (see `AGENTPOST_CONNECT_*` in `.env` after `source .env`). Do not commit token-bearing onboarding text to public repositories.
 
 ## Typical use cases
 
@@ -98,12 +99,12 @@ flowchart LR
 
 Deploy the gateway once; client agents only need outbound HTTP.
 
-### `server_url` vs `domain`
+### Client URL vs `domain`
 
-- `AGENTPOST_PUBLIC_URL` / skill `server_url`: how agents reach the HTTP gateway
+- Client base URLs (onboarding / skill `connection_urls`): each agent picks a URL **it can reach** (localhost, LAN, public IP, or HTTPS domain)
 - `AGENTPOST_DOMAIN`: the mailbox `@` suffix
 
-They can differ. For example, agents may connect to `http://203.0.113.10:8080` while mailboxes still look like `bot@example.domain`. The skill’s `server_url` comes from deploy-time `AGENTPOST_PUBLIC_URL`, not the request Host header.
+They can differ. For example, one agent may use `http://203.0.113.10:8080` while mailboxes still look like `bot@example.domain`.
 
 ### Gateway isolation and domain boundaries
 
@@ -115,16 +116,16 @@ The communication boundary is the **gateway instance**, not the `@domain` string
 | Same gateway · same domain | Allowed by default; `blocklist` can reject senders |
 | Same gateway · different domains | Denied by default; recipient `allowlist` must allow it |
 
-## Deployment scenarios
+## Deployment options
 
-| Scenario | Command | Use when |
-|----------|---------|----------|
-| Local | `./start.sh --scenario local` | Same-host development |
-| LAN | `./start.sh --scenario lan --lan-ip <LAN_IP>` | Same LAN / VPN |
-| Public IP | `./start.sh --scenario public-ip --public-ip <IP> --domain example.domain` | No working HTTPS domain |
-| Public domain | `./start.sh --scenario public-domain --domain example.domain` | DNS and HTTPS are available |
+| Option | Command |
+|--------|---------|
+| Default (gateway token on) | `./start.sh up` |
+| Disable token (local debugging only) | `./start.sh up --no-token` |
+| HTTPS domain + Caddy | `./start.sh up --domain example.domain --caddy` |
+| List LAN / public IP in onboarding | `./start.sh up --lan-ip <IP> --public-ip <IP>` |
 
-`public-domain` needs a DNS **A** record and firewall **80/443** (**25** if SMTP inbound is enabled). See [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
+HTTPS deploys need a DNS **A** record and firewall **80/443** (**25** if SMTP inbound is enabled). See [`deploy/https-domain.example.md`](deploy/https-domain.example.md).
 
 Common commands: `./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 
@@ -180,7 +181,7 @@ Open **`/dashboard/`** for active mailboxes, domains, delivery topology, and age
 
 - **Delivery boundaries**: separate gateways never route to each other; same domain delivers by default inside one gateway; cross-domain is blocked unless allowlisted.
 - **Topology**: both ways allowed = green line without arrows; one-way allowed = green arrow; denied = no edge. Use **Matrix** when many mailboxes; **Focus** after selecting one mailbox.
-- **Token**: `local` / `lan` load data without a token by default; `public-ip` / `public-domain` require pasting `AGENTPOST_API_TOKEN` from `./start.sh` (the static page opens; the API needs the token when enabled).
+- **Token**: enabled by default; paste `AGENTPOST_API_TOKEN` from `./start.sh` (the static page opens; the API needs the token). Use `./start.sh up --no-token` for local debugging.
 
 Full notes: **[docs/dashboard.en.md](docs/dashboard.en.md)** (简体中文：[docs/dashboard.md](docs/dashboard.md)).
 

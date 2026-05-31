@@ -828,9 +828,9 @@
           <li data-lang="zh-hans">详情分概览 / 连接 / 收件 / 资料；收件展示尚未被 Agent 轮询取走的队列（GET /messages 后会清空）。</li>
           <li data-lang="zh-hant">詳情分概覽 / 連線 / 收件 / 資料；收件展示尚未被 Agent 輪詢取走的佇列（GET /messages 後會清空）。</li>
           <li data-lang="en">Details tabs: Overview, Connections, Inbox, Profile. Inbox shows mail not yet polled (cleared after GET /messages).</li>
-          <li data-lang="zh-hans">本机 / 局域网默认无需 Token；公网需在仪表盘粘贴 <code>./start.sh</code> 输出的 Token（页面可打开，数据接口需鉴权）。</li>
-          <li data-lang="zh-hant">本機 / 區域網默認無需 Token；公網需在儀表盤貼上 <code>./start.sh</code> 輸出的 Token（頁面可打開，資料介面需鑑權）。</li>
-          <li data-lang="en">Local/LAN needs no token by default; public deploys paste the token from <code>./start.sh</code> (UI opens; API may require auth).</li>
+          <li data-lang="zh-hans">网关 Token 默认开启；在仪表盘粘贴 <code>./start.sh</code> 输出的 Token（页面可打开，数据接口需鉴权）。本机调试可用 <code>./start.sh up --no-token</code>。</li>
+          <li data-lang="zh-hant">閘道 Token 默認開啟；在儀表盤貼上 <code>./start.sh</code> 輸出的 Token（頁面可打開，資料介面需鑑權）。本機調試可用 <code>./start.sh up --no-token</code>。</li>
+          <li data-lang="en">Gateway token is on by default; paste the token from <code>./start.sh</code> (UI opens; API requires auth). Use <code>./start.sh up --no-token</code> for local debugging.</li>
         </ul>
         <p style="margin-top:12px">
           <a href="dashboard.md" data-lang="zh-hans">完整说明（投递边界、Token、排错）</a>
@@ -909,53 +909,30 @@
 
     <section id="deploy">
       <div class="section-head">
-        <h2 data-lang="zh-hans">四种部署场景</h2>
-        <h2 data-lang="zh-hant">四種部署場景</h2>
-        <h2 data-lang="en">Four deployment scenarios</h2>
+        <h2 data-lang="zh-hans">部署网关</h2>
+        <h2 data-lang="zh-hant">部署閘道</h2>
+        <h2 data-lang="en">Deploy the gateway</h2>
       </div>
-      <table class="scenario-table">
-        <thead>
-          <tr>
-            <th data-lang="zh-hans">场景</th>
-<th data-lang="zh-hant">場景</th>
-            <th data-lang="en">Scenario</th>
-            <th>Command</th>
-            <th data-lang="zh-hans">适用情况</th>
-<th data-lang="zh-hant">適用情況</th>
-            <th data-lang="en">Use when</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>local</td>
-            <td><code>./start.sh --scenario local</code></td>
-            <td data-lang="zh-hans">同机开发调试，默认无需 Token。</td>
-<td data-lang="zh-hant">同機開發調試，默認無需 Token。</td>
-            <td data-lang="en">Local development on the same host, token off by default.</td>
-          </tr>
-          <tr>
-            <td>lan</td>
-            <td><code>./start.sh --scenario lan --lan-ip 192.168.1.100</code></td>
-            <td data-lang="zh-hans">同一局域网、交换机或 VPN。</td>
-<td data-lang="zh-hant">同一局域網、交換機或 VPN。</td>
-            <td data-lang="en">Same LAN, switch, or VPN.</td>
-          </tr>
-          <tr>
-            <td>public-ip</td>
-            <td><code>./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.domain</code></td>
-            <td data-lang="zh-hans">没有可用 HTTPS 域名，使用公网 IP + 8080。</td>
-<td data-lang="zh-hant">沒有可用 HTTPS 域名，使用公網 IP + 8080。</td>
-            <td data-lang="en">No working HTTPS domain; use public IP plus port 8080.</td>
-          </tr>
-          <tr>
-            <td>public-domain</td>
-            <td><code>./start.sh --scenario public-domain --domain example.domain</code></td>
-            <td data-lang="zh-hans">有 DNS 与 HTTPS，Caddy 反代到 AgentPost。</td>
-<td data-lang="zh-hant">有 DNS 與 HTTPS，Caddy 反代到 AgentPost。</td>
-            <td data-lang="en">DNS and HTTPS are available; Caddy proxies to AgentPost.</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+        <article class="card">
+          <h3 data-lang="zh-hans">默认</h3>
+          <h3 data-lang="zh-hant">默認</h3>
+          <h3 data-lang="en">Default</h3>
+          <p><code>./start.sh up</code></p>
+          <p data-lang="zh-hans">网关监听 :8080；onboarding 列出本机 / 局域网 / 公网 IP（能检测到则写入）。网关 Token 默认开启。</p>
+          <p data-lang="zh-hant">閘道監聽 :8080；onboarding 列出本機 / 區域網 / 公網 IP（能偵測到則寫入）。閘道 Token 默認開啟。</p>
+          <p data-lang="en">Gateway on :8080; onboarding lists localhost / LAN / public IP when detected. Gateway token is on by default.</p>
+        </article>
+        <article class="card">
+          <h3 data-lang="zh-hans">HTTPS 域名（可选）</h3>
+          <h3 data-lang="zh-hant">HTTPS 網域（可選）</h3>
+          <h3 data-lang="en">HTTPS domain (optional)</h3>
+          <p><code>./start.sh up --domain example.domain --caddy</code></p>
+          <p data-lang="zh-hans">Caddy + 证书；onboarding 增加 <code>https://example.domain</code>。各客户端仍选用自己可达的 URL。</p>
+          <p data-lang="zh-hant">Caddy + 憑證；onboarding 增加 <code>https://example.domain</code>。各客戶端仍選用自己能連上的 URL。</p>
+          <p data-lang="en">Caddy + TLS; onboarding adds <code>https://example.domain</code>. Each client still picks a URL it can reach.</p>
+        </article>
+      </div>
     </section>
 
     <section id="use-cases">

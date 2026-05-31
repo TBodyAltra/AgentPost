@@ -13,17 +13,28 @@ type skillResponse struct {
 	Meta    skillMeta `json:"meta"`
 }
 
+type skillConnectionURLs struct {
+	Localhost string `json:"localhost,omitempty"`
+	LAN       string `json:"lan,omitempty"`
+	PublicIP  string `json:"public_ip,omitempty"`
+	Domain    string `json:"domain,omitempty"`
+}
+
+func (u skillConnectionURLs) hasAny() bool {
+	return u.Localhost != "" || u.LAN != "" || u.PublicIP != "" || u.Domain != ""
+}
+
 type skillMeta struct {
-	ServerURL          string `json:"server_url"`
-	Domain             string `json:"domain"`
-	DeploymentScenario string `json:"deployment_scenario,omitempty"`
-	PublicURLSource    string `json:"public_url_source"`
-	Language           string `json:"language"`
-	GatewayToken       bool   `json:"gateway_token_required"`
-	SMTPEnabled        bool   `json:"smtp_inbound_enabled"`
-	Storage            string `json:"storage"`
-	MaxTTLSeconds      int64  `json:"max_ttl_seconds"`
-	MaxMessageBytes    int64  `json:"max_message_bytes"`
+	ServerURL       string              `json:"server_url"`
+	Domain          string              `json:"domain"`
+	ConnectionURLs  skillConnectionURLs `json:"connection_urls,omitempty"`
+	PublicURLSource string              `json:"public_url_source"`
+	Language           string              `json:"language"`
+	GatewayToken       bool                `json:"gateway_token_required"`
+	SMTPEnabled        bool                `json:"smtp_inbound_enabled"`
+	Storage            string              `json:"storage"`
+	MaxTTLSeconds      int64               `json:"max_ttl_seconds"`
+	MaxMessageBytes    int64               `json:"max_message_bytes"`
 }
 
 func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
@@ -35,10 +46,10 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 	serverURL, urlSource := a.resolveServerURL(r)
 	language := selectSkillLanguage(r)
 	meta := skillMeta{
-		ServerURL:          serverURL,
-		Domain:             a.cfg.Domain,
-		DeploymentScenario: strings.TrimSpace(os.Getenv("AGENTPOST_SCENARIO")),
-		PublicURLSource:    urlSource,
+		ServerURL:       serverURL,
+		Domain:          a.cfg.Domain,
+		ConnectionURLs:  readSkillConnectionURLs(),
+		PublicURLSource: urlSource,
 		Language:           language,
 		GatewayToken:       strings.TrimSpace(a.cfg.APIToken) != "",
 		SMTPEnabled:        strings.TrimSpace(a.cfg.SMTPAddr) != "",
@@ -118,6 +129,59 @@ func (a *App) resolveServerURL(r *http.Request) (string, string) {
 	return "http://127.0.0.1" + normalizeListenPort(a.cfg.HTTPAddr), "default"
 }
 
+func readSkillConnectionURLs() skillConnectionURLs {
+	trim := func(key string) string {
+		return strings.TrimRight(strings.TrimSpace(os.Getenv(key)), "/")
+	}
+	return skillConnectionURLs{
+		Localhost: trim("AGENTPOST_CONNECT_LOCALHOST"),
+		LAN:       trim("AGENTPOST_CONNECT_LAN"),
+		PublicIP:  trim("AGENTPOST_CONNECT_PUBLIC"),
+		Domain:    trim("AGENTPOST_CONNECT_DOMAIN"),
+	}
+}
+
+func appendSkillConnectionURLsMarkdown(b *strings.Builder, urls skillConnectionURLs, language string) {
+	if !urls.hasAny() {
+		return
+	}
+	if language == "en" {
+		fmt.Fprintf(b, "### Client base URLs\n\n")
+		fmt.Fprintf(b, "Each agent uses the URL **it can reach** (same gateway, different networks):\n\n")
+		fmt.Fprintf(b, "| Route | Base URL |\n|-------|----------|\n")
+		if urls.Localhost != "" {
+			fmt.Fprintf(b, "| Localhost | `%s` |\n", urls.Localhost)
+		}
+		if urls.LAN != "" {
+			fmt.Fprintf(b, "| LAN | `%s` |\n", urls.LAN)
+		}
+		if urls.PublicIP != "" {
+			fmt.Fprintf(b, "| Public IP | `%s` |\n", urls.PublicIP)
+		}
+		if urls.Domain != "" {
+			fmt.Fprintf(b, "| Domain (HTTPS) | `%s` |\n", urls.Domain)
+		}
+		fmt.Fprintf(b, "\nFetch this skill from your chosen base URL, for example:\n\n```bash\ncurl -fsS <base-url>/api/v1/skill\n```\n\nSet `AGENTPOST_SERVER` to that same base URL.\n\n")
+		return
+	}
+	fmt.Fprintf(b, "### 客户端可用连接地址\n\n")
+	fmt.Fprintf(b, "同一网关、不同网络下的 Agent 请选用**自己可达**的地址：\n\n")
+	fmt.Fprintf(b, "| 路径 | 基础 URL |\n|------|----------|\n")
+	if urls.Localhost != "" {
+		fmt.Fprintf(b, "| 本机 | `%s` |\n", urls.Localhost)
+	}
+	if urls.LAN != "" {
+		fmt.Fprintf(b, "| 局域网 | `%s` |\n", urls.LAN)
+	}
+	if urls.PublicIP != "" {
+		fmt.Fprintf(b, "| 公网 IP | `%s` |\n", urls.PublicIP)
+	}
+	if urls.Domain != "" {
+		fmt.Fprintf(b, "| 域名 (HTTPS) | `%s` |\n", urls.Domain)
+	}
+	fmt.Fprintf(b, "\n请用所选地址拉取 Skill，例如：\n\n```bash\ncurl -fsS <基础-url>/api/v1/skill\n```\n\n`AGENTPOST_SERVER` 设为同一基础 URL。\n\n")
+}
+
 func normalizeListenPort(httpAddr string) string {
 	if httpAddr == "" {
 		return ":8080"
@@ -143,30 +207,22 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "# AgentPost 使用说明（Skill）\n\n")
 	fmt.Fprintf(&b, "AgentPost 是面向 AI Agent 的 HTTP 邮件网关，本文档描述**本部署实例**的连接方式与使用规则。\n\n")
-	if meta.DeploymentScenario != "" {
-		fmt.Fprintf(&b, "部署场景：**`%s`**（安装时通过 `./start.sh` 设定）。\n\n", meta.DeploymentScenario)
-	}
-	if meta.PublicURLSource == "deployment_env" {
+	if meta.ConnectionURLs.hasAny() {
+		fmt.Fprintf(&b, "> 每个客户端使用**自己可达**的基础 URL 连接（见下表）。`AGENTPOST_SERVER` 设为该 URL，不要用其他 Host。\n\n")
+	} else if meta.PublicURLSource == "deployment_env" {
 		fmt.Fprintf(&b, "> 下文 `AGENTPOST_SERVER` 来自部署时的 **`AGENTPOST_PUBLIC_URL`**，请原样使用，不要替换为其他 Host（例如未备案域名或错误 IP）。\n\n")
 	} else if meta.PublicURLSource == "request_host" {
-		fmt.Fprintf(&b, "> 因未设置 `AGENTPOST_PUBLIC_URL`，`AGENTPOST_SERVER` 由本次 HTTP 请求推断。生产环境请用 `./start.sh --scenario ...` 重新部署，以保证 Skill URL 稳定。\n\n")
+		fmt.Fprintf(&b, "> 未设置固定 `AGENTPOST_PUBLIC_URL`；下表 `AGENTPOST_SERVER` 由本次 HTTP 请求推断。客户端应使用自己可达的地址拉取 Skill。\n\n")
 	}
 
 	fmt.Fprintf(&b, "## 连接信息\n\n")
 	fmt.Fprintf(&b, "| 变量 | 值 |\n|------|----|\n")
-	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` |\n", meta.ServerURL)
+	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s`（本次请求的参考地址；客户端请改用下表自己可达的 URL） |\n", meta.ServerURL)
 	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s`（注册时省略 `domain` 的默认值） |\n\n", meta.Domain)
+	appendSkillConnectionURLsMarkdown(&b, meta.ConnectionURLs, "zh")
 	fmt.Fprintf(&b, "注册时可选择**任意合法 mailbox domain**；完整地址 `user@domain` 在本网关上必须唯一。\n\n")
-
-	switch meta.DeploymentScenario {
-	case "public-ip":
-		fmt.Fprintf(&b, "本部署使用**公网 IP + 端口**（无 HTTPS 域名），常见于域名未备案场景。请开放防火墙端口 **%s**。\n\n", portFromURL(meta.ServerURL))
-	case "lan":
-		fmt.Fprintf(&b, "本部署使用**局域网 IP**，Agent 须在私网内可达；无需公网 DNS。\n\n")
-	case "local":
-		fmt.Fprintf(&b, "本部署为**本机**（`127.0.0.1`），仅同机进程可连接。\n\n")
-	case "public-domain":
-		fmt.Fprintf(&b, "本部署使用**公网 HTTPS 域名**（通常经 Caddy）。公网请用 `https://`，不要直接暴露 `:8080`。\n\n")
+	if meta.ConnectionURLs.hasAny() {
+		fmt.Fprintf(&b, "网关由 `./start.sh up` 启动。每个客户端从**上表**选用自己可达的基础 URL；可选 **域名 (HTTPS)** 行表示已启用 Caddy。\n\n")
 	}
 
 	fmt.Fprintf(&b, "健康检查：\n\n```bash\ncurl -fsS %s/healthz\n```\n\n", meta.ServerURL)
@@ -376,30 +432,22 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 
 	fmt.Fprintf(&b, "# AgentPost Skill Guide\n\n")
 	fmt.Fprintf(&b, "AgentPost is an HTTP mail gateway for AI agents. This skill describes how to connect to **this deployment** and how agents should use it.\n\n")
-	if meta.DeploymentScenario != "" {
-		fmt.Fprintf(&b, "Deployment scenario: **`%s`** (set by `./start.sh` during deployment).\n\n", meta.DeploymentScenario)
-	}
-	if meta.PublicURLSource == "deployment_env" {
+	if meta.ConnectionURLs.hasAny() {
+		fmt.Fprintf(&b, "> Each client uses the **base URL it can reach** (see table below). Set `AGENTPOST_SERVER` to that URL; do not substitute another host.\n\n")
+	} else if meta.PublicURLSource == "deployment_env" {
 		fmt.Fprintf(&b, "> `AGENTPOST_SERVER` below comes from the deployed **`AGENTPOST_PUBLIC_URL`**. Use it exactly as shown; do not replace it with another host, blocked domain, or guessed IP.\n\n")
 	} else if meta.PublicURLSource == "request_host" {
-		fmt.Fprintf(&b, "> `AGENTPOST_PUBLIC_URL` is not set, so `AGENTPOST_SERVER` was inferred from this HTTP request. For production, redeploy with `./start.sh --scenario ...` so the Skill URL stays stable.\n\n")
+		fmt.Fprintf(&b, "> No fixed `AGENTPOST_PUBLIC_URL`; `AGENTPOST_SERVER` below was inferred from this HTTP request. Clients should fetch the skill using the base URL they can reach.\n\n")
 	}
 
 	fmt.Fprintf(&b, "## Connection information\n\n")
 	fmt.Fprintf(&b, "| Variable | Value |\n|----------|-------|\n")
-	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` |\n", meta.ServerURL)
+	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` (reference from this request; clients should use a reachable URL from the table below) |\n", meta.ServerURL)
 	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` (default domain when registration omits `domain`) |\n\n", meta.Domain)
+	appendSkillConnectionURLsMarkdown(&b, meta.ConnectionURLs, "en")
 	fmt.Fprintf(&b, "Agents may register any valid mailbox domain. The full address `user@domain` must be unique on this gateway.\n\n")
-
-	switch meta.DeploymentScenario {
-	case "public-ip":
-		fmt.Fprintf(&b, "This deployment uses a **public IP + port** without an HTTPS domain. Open firewall port **%s**.\n\n", portFromURL(meta.ServerURL))
-	case "lan":
-		fmt.Fprintf(&b, "This deployment uses a **LAN IP**. Agents must be able to reach the private network; public DNS is not required.\n\n")
-	case "local":
-		fmt.Fprintf(&b, "This deployment is **local-only** (`127.0.0.1`) and is reachable only from the same machine.\n\n")
-	case "public-domain":
-		fmt.Fprintf(&b, "This deployment uses a **public HTTPS domain** (usually through Caddy). Use the `https://` URL; do not expose `:8080` directly to the public internet.\n\n")
+	if meta.ConnectionURLs.hasAny() {
+		fmt.Fprintf(&b, "The gateway was started with `./start.sh up`. Each client picks a reachable base URL from the table above; **Domain (HTTPS)** appears when Caddy is enabled.\n\n")
 	}
 
 	fmt.Fprintf(&b, "Health check:\n\n```bash\ncurl -fsS %s/healthz\n```\n\n", meta.ServerURL)
@@ -603,24 +651,4 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 	fmt.Fprintf(&b, "- The MVP does not support external SMTP relay sending\n")
 
 	return b.String()
-}
-
-func portFromURL(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "8080"
-	}
-	if idx := strings.LastIndex(raw, ":"); idx >= 0 && idx < len(raw)-1 {
-		port := raw[idx+1:]
-		if slash := strings.Index(port, "/"); slash >= 0 {
-			port = port[:slash]
-		}
-		if port != "" {
-			return port
-		}
-	}
-	if strings.HasPrefix(strings.ToLower(raw), "https://") {
-		return "443"
-	}
-	return "8080"
 }

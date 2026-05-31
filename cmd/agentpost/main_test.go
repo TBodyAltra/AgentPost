@@ -977,8 +977,10 @@ func TestExternalRelayFlagOnlyChangesMissingRecipientResponse(t *testing.T) {
 }
 
 func TestSkillEndpoint(t *testing.T) {
-	t.Setenv("AGENTPOST_PUBLIC_URL", "https://gateway.example.com")
-	t.Setenv("AGENTPOST_SCENARIO", "public-domain")
+	t.Setenv("AGENTPOST_CONNECT_LOCALHOST", "http://127.0.0.1:8080")
+	t.Setenv("AGENTPOST_CONNECT_LAN", "http://192.168.1.50:8080")
+	t.Setenv("AGENTPOST_CONNECT_PUBLIC", "http://203.0.113.10:8080")
+	t.Setenv("AGENTPOST_CONNECT_DOMAIN", "https://gateway.example.com")
 
 	app := NewApp(Config{
 		Domain:          "agent.test",
@@ -1001,17 +1003,17 @@ func TestSkillEndpoint(t *testing.T) {
 	if strings.Contains(body, "secret-gateway-token") {
 		t.Fatalf("skill must not contain the gateway token")
 	}
-	if !strings.Contains(body, "https://gateway.example.com") {
-		t.Fatalf("skill should use AGENTPOST_PUBLIC_URL, got: %s", body)
+	if !strings.Contains(body, "客户端可用连接地址") {
+		t.Fatalf("skill should list connection URLs")
 	}
-	if strings.Contains(body, "wrong.example.com") {
-		t.Fatalf("skill must not fall back to request Host when PUBLIC_URL is set")
+	if !strings.Contains(body, "http://127.0.0.1:8080") {
+		t.Fatalf("skill should include localhost URL")
+	}
+	if !strings.Contains(body, "https://gateway.example.com") {
+		t.Fatalf("skill should include HTTPS domain URL")
 	}
 	if !strings.Contains(body, "agent.test") {
 		t.Fatalf("skill should include domain")
-	}
-	if !strings.Contains(body, "public-domain") {
-		t.Fatalf("skill should include deployment scenario")
 	}
 	if !strings.Contains(body, "/api/v1/agents") {
 		t.Fatalf("skill should document agent directory endpoint")
@@ -1046,14 +1048,17 @@ func TestSkillEndpoint(t *testing.T) {
 	if got.Meta.Domain != "agent.test" || !got.Meta.GatewayToken {
 		t.Fatalf("unexpected skill meta: %+v", got.Meta)
 	}
-	if got.Meta.ServerURL != "https://gateway.example.com" || got.Meta.PublicURLSource != "deployment_env" {
-		t.Fatalf("unexpected skill URL meta: %+v", got.Meta)
+	if got.Meta.ConnectionURLs.Domain != "https://gateway.example.com" {
+		t.Fatalf("unexpected connection_urls: %+v", got.Meta.ConnectionURLs)
+	}
+	if got.Meta.ConnectionURLs.Localhost != "http://127.0.0.1:8080" {
+		t.Fatalf("unexpected localhost URL: %+v", got.Meta.ConnectionURLs)
 	}
 }
 
 func TestSkillEndpointEnglish(t *testing.T) {
-	t.Setenv("AGENTPOST_PUBLIC_URL", "https://gateway.example.com")
-	t.Setenv("AGENTPOST_SCENARIO", "public-ip")
+	t.Setenv("AGENTPOST_CONNECT_LOCALHOST", "http://127.0.0.1:8080")
+	t.Setenv("AGENTPOST_CONNECT_PUBLIC", "http://203.0.113.10:8080")
 
 	app := NewApp(Config{
 		Domain:          "example.domain",
@@ -1079,7 +1084,9 @@ func TestSkillEndpointEnglish(t *testing.T) {
 	}
 	for _, want := range []string{
 		"AgentPost Skill Guide",
-		"https://gateway.example.com",
+		"Client base URLs",
+		"http://127.0.0.1:8080",
+		"http://203.0.113.10:8080",
 		"example.domain",
 		"Request / reply conversation protocol",
 		"Background inbox subagent",

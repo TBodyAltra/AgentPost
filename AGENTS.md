@@ -16,144 +16,97 @@ AgentPost is a single HTTP mail gateway. Agents:
 
 | Setting | Meaning | Example |
 |---------|---------|---------|
-| `AGENTPOST_PUBLIC_URL` / skill `server_url` | How agents **reach HTTP** | `http://203.0.113.10:8080` |
+| Client base URL / skill `server_url` | How agents **reach HTTP** (each client picks one it can reach) | `http://203.0.113.10:8080` |
 | `AGENTPOST_DOMAIN` / skill `domain` | Mailbox **@ suffix** | `example.domain` |
 
 They can differ (e.g. connect via IP, mailboxes still `@example.domain`).
 
-## Choose exactly one scenario
-
-| `AGENTPOST_SCENARIO` | When to use | `AGENTPOST_PUBLIC_URL` | Caddy | Token default |
-|----------------------|-------------|------------------------|-------|---------------|
-| `local` | Agent on same host | `http://127.0.0.1:8080` | no | no |
-| `lan` | Same private network | `http://<LAN_IP>:8080` | no | no |
-| `public-ip` | Internet, **no working domain** (未备案 / no DNS) | `http://<PUBLIC_IP>:8080` | no | **yes** |
-| `public-domain` | Internet, DNS + HTTPS | `https://<domain>` | **yes** | **yes** |
-
-Skill output uses **`AGENTPOST_PUBLIC_URL` from deploy time**, not the HTTP `Host` header. Always deploy with the correct scenario so `/api/v1/skill` matches what clients will use.
-
-## Non-interactive deploy (preferred for agents)
+## Deploy
 
 Prerequisites on the server: **Docker + Docker Compose**, or **Go 1.25+**.
 
 ```bash
 cd AgentPost
 chmod +x start.sh
+./start.sh --non-interactive up
 ```
 
-### Same machine
+Optional flags:
 
 ```bash
-./start.sh --non-interactive --scenario local
+./start.sh --non-interactive up --domain example.domain --caddy   # HTTPS + Caddy
+./start.sh --non-interactive up --lan-ip 192.168.1.50 --public-ip 203.0.113.10
+./start.sh --non-interactive up --no-token                        # disable gateway token (not recommended)
 ```
 
-### LAN
+After `./start.sh up`, the terminal prints an **Agent onboarding prompt** listing every client base URL (localhost, LAN, public IP, HTTPS domain when configured). Copy that prompt to client agents.
 
-```bash
-LAN_IP=$(hostname -I | awk '{print $1}')
-./start.sh --non-interactive --scenario lan --lan-ip "$LAN_IP" --domain agent.local
-```
-
-### Public internet via IP (domain blocked / 未备案)
-
-```bash
-PUBLIC_IP=$(curl -fsS --max-time 5 https://api.ipify.org)
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip "$PUBLIC_IP" \
- --domain example.domain \
-  --http-port 8080
-```
-
-Open cloud security group **TCP 8080**. Do **not** set `AGENTPOST_PUBLIC_URL` to an HTTPS domain agents cannot reach.
-
-Verify:
-
-```bash
-source .env
-curl -fsS "${AGENTPOST_PUBLIC_URL}/healthz"
-curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill" | head
-# server_url in JSON must equal AGENTPOST_PUBLIC_URL
-```
-
-### Public internet via HTTPS domain
-
-```bash
-./start.sh --non-interactive --scenario public-domain \
- --domain example.domain \
-  --smtp   # only if external SMTP inbound is required
-```
-
-Before starting:
-
-- DNS **A** `@` → server public IP
-- Firewall **80**, **443** (and **25** if `--smtp`)
-
-Reuse token across restarts:
+**Gateway token:** enabled by default. Token is printed once at startup (not written to `.env`). Reuse across restarts:
 
 ```bash
 export AGENTPOST_API_TOKEN=$(openssl rand -hex 32)
-./start.sh --non-interactive --scenario public-domain --domain example.domain
+./start.sh --non-interactive up
 ```
 
 ## Commands
 
 | Command | Action |
 |---------|--------|
-| `./start.sh configure --scenario …` | Write `.env`, `config.yaml`, optional `deploy/Caddyfile` only |
+| `./start.sh configure` | Write `.env`, `config.yaml`, optional `deploy/Caddyfile` only |
 | `./start.sh up` | Configure (if needed) + start |
 | `./start.sh status` | Health + printed endpoints |
 | `./start.sh stop` | `docker compose down` |
 
 ## Downstream agent environment
 
-After deploy, read `.env` and set on **client** agents:
-
-```text
-AGENTPOST_SERVER=<AGENTPOST_PUBLIC_URL from .env>
-AGENTPOST_EMAIL_SUFFIX=<AGENTPOST_DOMAIN from .env>
-AGENTPOST_API_TOKEN=<when AGENTPOST_REQUIRE_TOKEN=1; copy from onboarding prompt>
-```
-
-Or copy the full onboarding prompt / skill for clients (includes token when gateway auth is on):
+After deploy, read the onboarding prompt or:
 
 ```bash
-curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"
+curl -fsS "<base-url-your-client-can-reach>/api/v1/skill"
+```
+
+Set on **client** agents (pick one base URL from the skill / prompt):
+
+```text
+AGENTPOST_SERVER=<base URL from onboarding>
+AGENTPOST_EMAIL_SUFFIX=<AGENTPOST_DOMAIN from .env>
+AGENTPOST_API_TOKEN=<when AGENTPOST_REQUIRE_TOKEN=1; from onboarding prompt>
 ```
 
 Ops dashboard (`/dashboard/`): delivery policy and topology notes in [docs/dashboard.md](docs/dashboard.md). When `AGENTPOST_REQUIRE_TOKEN=0`, do not leave a stale `AGENTPOST_API_TOKEN` in the shell or Docker env or local deploys will incorrectly require auth.
 
 ## Common mistakes
 
-1. **Leaving `AGENTPOST_PUBLIC_URL=https://blocked.domain`** while users access via IP — skill and agents will point at the wrong URL. Use `--scenario public-ip`.
-2. **Starting Caddy for IP-only access** — unnecessary; use `public-ip` (Caddy profile off).
+1. **Forcing one URL for all clients** — LAN and public clients may need different base URLs; use the list in the onboarding prompt.
+2. **Starting Caddy without `--domain`** — `--caddy` requires a real HTTPS domain name.
 3. **Assuming `@domain` must resolve in DNS** — only required for external SMTP + MX; HTTP API delivery does not use MX.
 4. **Storing `AGENTPOST_API_TOKEN` in `.env` or skill** — forbidden; pass via secure channel.
-5. **Forgetting firewall** — `public-ip` needs **8080** open; `public-domain` needs **80/443**.
+5. **Forgetting firewall** — open the HTTP port (default **8080**); with Caddy also **80/443** (and **25** if `--smtp`).
 
 ## Files you may change
 
 | File | When |
 |------|------|
-| `.env` | Generated by `start.sh`; scenario + public URL |
+| `.env` | Generated by `start.sh` |
 | `config.yaml` | Generated; mailbox domain + SMTP |
-| `deploy/Caddyfile` | Generated for `public-domain` only |
+| `deploy/Caddyfile` | Generated when `--caddy` is used |
 
 ## Tests before claiming success
 
 ```bash
 go test ./...
 source .env
-curl -fsS "${AGENTPOST_PUBLIC_URL}/healthz"
-curl -fsS -H 'Accept: application/json' "${AGENTPOST_PUBLIC_URL}/api/v1/skill" | tee /tmp/skill.json
+curl -fsS "${AGENTPOST_CONNECT_LOCALHOST}/healthz"
+curl -fsS -H 'Accept: application/json' "${AGENTPOST_CONNECT_LOCALHOST}/api/v1/skill" | tee /tmp/skill.json
 python3 - <<'PY'
-import json, os
+import json
 from pathlib import Path
 env = dict(line.split("=", 1) for line in Path(".env").read_text().splitlines() if "=" in line and not line.startswith("#"))
 meta = json.load(open("/tmp/skill.json"))["meta"]
-assert meta["server_url"] == env["AGENTPOST_PUBLIC_URL"], (meta["server_url"], env["AGENTPOST_PUBLIC_URL"])
-assert meta.get("deployment_scenario") == env.get("AGENTPOST_SCENARIO")
-print("skill URLs match deployment .env")
+urls = meta.get("connection_urls") or {}
+assert urls.get("localhost") == env.get("AGENTPOST_CONNECT_LOCALHOST"), (urls, env)
+print("skill connection URLs match deployment .env")
 PY
 ```
 
-Human-oriented docs: [README.md](README.md) and [README.en.md](README.en.md). Example domain checklist: [deploy/public-domain.example.md](deploy/public-domain.example.md).
+Human-oriented docs: [README.md](README.md) and [README.en.md](README.en.md). HTTPS domain checklist: [deploy/https-domain.example.md](deploy/https-domain.example.md).

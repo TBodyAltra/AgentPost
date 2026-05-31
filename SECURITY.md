@@ -7,7 +7,7 @@ Please do not report security vulnerabilities in public issues.
 Use GitHub Security Advisories for this repository to privately report suspected vulnerabilities. Include:
 
 - Affected version or commit
-- Deployment scenario (`local`, `lan`, `public-ip`, or `public-domain`)
+- Deployment flags (for example `--caddy`, `--no-token`, connection URLs in `.env`)
 - Steps to reproduce
 - Expected and actual impact
 - Any logs, requests, or configuration snippets needed to understand the issue
