@@ -23,15 +23,16 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
   });
 
-  test("mailbox detail opens on selection and shows delivery sections", async ({ page }) => {
+  test("mailbox detail opens on selection and shows tabbed sections", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, 2);
-    await expect(page.locator(".mailbox-row").first()).toBeVisible();
+    await expect(page.locator(".mailbox-item").first()).toBeVisible();
 
-    await page.locator(".mailbox-row").first().click();
+    await page.locator(".mailbox-item").first().click();
     await expect(page.locator("#detail-panel")).toHaveClass(/open/);
-    await expect(page.locator("#detail-content")).toContainText("@");
-    await expect(page.locator(".delivery-block")).toHaveCount(2);
+    await expect(page.locator("#detail-hero")).toContainText("@");
+    await expect(page.locator("#detail-tabs button")).toHaveCount(4);
+    await expect(page.locator(".tab-pane.active")).toBeVisible();
 
     await page.locator("#detail-close").click();
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
@@ -49,12 +50,13 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator(".matrix-table td.cell-allowed")).toHaveCount(0);
   });
 
-  test("detail shows only allowed delivery peers", async ({ page }) => {
+  test("detail connections tab lists allowed peers only", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, 2);
-    await page.locator(".mailbox-row").first().click();
+    await page.locator(".mailbox-item").first().click();
     await expect(page.locator("#detail-panel")).toHaveClass(/open/);
-    await expect(page.locator(".status-pill")).toHaveCount(0);
+    await page.locator('#detail-tabs button[data-tab="connections"]').click();
+    await expect(page.locator('.tab-pane[data-pane="connections"].active')).toBeVisible();
     await expect(page.locator("#detail-content")).not.toContainText("Inbox Policy");
   });
 

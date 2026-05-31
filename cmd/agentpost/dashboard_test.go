@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -236,6 +237,64 @@ func registerDashboardUserWithGateway(t *testing.T, handler http.Handler, gatewa
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("register %s@%s status = %d, body = %s", username, domain, resp.Code, resp.Body.String())
+	}
+}
+
+func TestDashboardQueuePreviewsAndTotals(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubA, _, _ := ed25519.GenerateKey(crand.Reader)
+	pubB, _, _ := ed25519.GenerateKey(crand.Reader)
+	registerDashboardUser(t, handler, "alpha", "agent.test", pubA, nil)
+	registerDashboardUser(t, handler, "beta", "agent.test", pubB, nil)
+
+	now := app.now()
+	app.mu.Lock()
+	app.messages["alpha@agent.test"] = []Message{
+		{MessageID: "msg_1", From: "beta@agent.test", To: "alpha@agent.test", Subject: "Hello", BodyText: "body", ReceivedAt: now},
+		{MessageID: "msg_2", From: "human@example.com", To: "alpha@agent.test", Subject: strings.Repeat("x", 200), BodyText: "b", ReceivedAt: now},
+	}
+	app.mu.Unlock()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("dashboard status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+
+	var got dashboardResponse
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode dashboard: %v", err)
+	}
+	if got.Gateway.TotalQueuedMessages != 2 {
+		t.Fatalf("total_queued_messages = %d, want 2", got.Gateway.TotalQueuedMessages)
+	}
+	if got.Gateway.MailboxesWithQueue != 1 {
+		t.Fatalf("mailboxes_with_queue = %d, want 1", got.Gateway.MailboxesWithQueue)
+	}
+
+	var alpha *dashboardMailbox
+	for i := range got.Mailboxes {
+		if got.Mailboxes[i].Email == "alpha@agent.test" {
+			alpha = &got.Mailboxes[i]
+			break
+		}
+	}
+	if alpha == nil {
+		t.Fatal("alpha mailbox missing from snapshot")
+	}
+	if alpha.QueuedMessages != 2 || len(alpha.Queue) != 2 {
+		t.Fatalf("alpha queue = %d messages, previews %d, want 2/2", alpha.QueuedMessages, len(alpha.Queue))
+	}
+	if alpha.Queue[1].Subject != strings.Repeat("x", 157)+"..." {
+		t.Fatalf("subject truncate = %q", alpha.Queue[1].Subject)
 	}
 }
 
