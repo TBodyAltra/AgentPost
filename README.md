@@ -115,16 +115,16 @@ flowchart LR
 | 同一网关 · 同一 domain | 默认可互发；可用 `blocklist` 拦截 |
 | 同一网关 · 不同 domain | 默认禁止；需收件方 `allowlist` 放行 |
 
-## 部署场景
+## 部署网关
 
-| 场景 | 命令 | 适用情况 |
-|------|------|----------|
-| 本机 | `./start.sh --scenario local` | 同机开发调试 |
-| 局域网 | `./start.sh --scenario lan --lan-ip <LAN_IP>` | 同一 LAN / VPN |
-| 公网 IP | `./start.sh --scenario public-ip --public-ip <IP> --domain example.domain` | 没有可用 HTTPS 域名 |
-| 公网域名 | `./start.sh --scenario public-domain --domain example.domain` | 有 DNS 与 HTTPS |
+在服务器上执行 `./start.sh up` 即可启动网关并生成 Skill。客户端 Agent 如何连接，由 Skill 里的 `server_url` 决定，与本机、局域网还是公网无关。
 
-`public-domain` 需 DNS **A** 记录、防火墙 **80/443**（SMTP 入站另开 **25**）。详见 [`deploy/public-domain.example.md`](deploy/public-domain.example.md)。
+| 方式 | 命令 | 说明 |
+|------|------|------|
+| 默认 | `./start.sh up` | 开发、内网或公网 IP；脚本写入可访问地址 |
+| HTTPS 域名（可选） | `./start.sh --non-interactive --scenario public-domain --domain example.domain` | 有 DNS 与证书时由 Caddy 提供 HTTPS |
+
+`public-domain` 需 DNS **A** 记录、防火墙 **80/443**（SMTP 入站另开 **25**）。更多场景与参数见 [`AGENTS.md`](AGENTS.md)、[`deploy/public-domain.example.md`](deploy/public-domain.example.md)。
 
 常用命令：`./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 

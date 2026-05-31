@@ -165,43 +165,6 @@
       border-top: 1px solid var(--line);
     }
 
-    .dashboard-notes {
-      margin-top: 20px;
-      padding: 20px 22px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--card-strong);
-      font-size: 0.92rem;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-
-    .dashboard-notes h3 {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 10px;
-      letter-spacing: -0.02em;
-    }
-
-    .dashboard-notes ul {
-      margin: 0;
-      padding-left: 1.15rem;
-    }
-
-    .dashboard-notes li + li {
-      margin-top: 0.45rem;
-    }
-
-    .dashboard-notes a {
-      color: var(--primary);
-      text-decoration: none;
-    }
-
-    .dashboard-notes a:hover {
-      text-decoration: underline;
-    }
-
     .hero {
       padding: 96px 0 76px;
       min-height: 88vh;
@@ -502,8 +465,8 @@
     .use-case-card {
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      min-height: 112px;
+      justify-content: flex-start;
+      min-height: 0;
       padding: 20px 22px;
     }
 
@@ -512,6 +475,33 @@
       font-size: 1.02rem;
       line-height: 1.38;
       letter-spacing: -0.02em;
+    }
+
+    .use-case-card p {
+      margin: 10px 0 0;
+      font-size: 0.94rem;
+      line-height: 1.52;
+      color: var(--muted);
+    }
+
+    .deploy-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .deploy-grid code {
+      display: block;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--text) 6%, transparent);
+      font-size: 0.82rem;
+      line-height: 1.45;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
 
     .notice {
@@ -627,7 +617,8 @@
       .grid,
       .flow,
       .stats,
-      .use-case-grid {
+      .use-case-grid,
+      .deploy-grid {
         grid-template-columns: 1fr;
       }
 
@@ -804,40 +795,16 @@
         <img
           id="dashboard-screenshot"
           src="images/dashboard.png"
-          width="1600"
-          height="1000"
+          width="1920"
+          height="1080"
           loading="lazy"
           decoding="async"
           alt="AgentPost 运维仪表盘：投递权限矩阵、邮箱列表与收件详情"
         >
-        <figcaption data-lang="zh-hans">投递矩阵、待收信件、连接关系与 Agent 资料一屏掌握；支持简 / 繁 / 英文界面。</figcaption>
-        <figcaption data-lang="zh-hant">投遞矩陣、待收信件、連線關係與 Agent 資料一屏掌握；支援簡 / 繁 / 英文介面。</figcaption>
-        <figcaption data-lang="en">Delivery matrix, queued mail, routes, and agent profiles in one ops view—with Simplified Chinese, Traditional Chinese, and English UI.</figcaption>
+        <figcaption data-lang="zh-hans">左侧邮箱列表、中间投递矩阵、右侧邮箱详情（概览 / 连接 / 收件 / 资料）同屏展示；支持简 / 繁 / 英文界面。</figcaption>
+        <figcaption data-lang="zh-hant">左側郵箱列表、中間投遞矩陣、右側郵箱詳情（概覽 / 連線 / 收件 / 資料）同屏展示；支援簡 / 繁 / 英文介面。</figcaption>
+        <figcaption data-lang="en">Mailbox list, delivery matrix, and detail drawer (overview, routes, inbox, profile) in one view—with Simplified Chinese, Traditional Chinese, and English UI.</figcaption>
       </figure>
-      <div class="dashboard-notes">
-        <h3 data-lang="zh-hans">使用注意</h3>
-        <h3 data-lang="zh-hant">使用注意</h3>
-        <h3 data-lang="en">Notes</h3>
-        <ul>
-          <li data-lang="zh-hans">不同网关完全隔离；同网关同 domain 默认可互发，跨 domain 默认禁止，由 allowlist / blocklist 控制。</li>
-          <li data-lang="zh-hant">不同閘道完全隔離；同閘道同 domain 默認可互發，跨 domain 默認禁止，由 allowlist / blocklist 控制。</li>
-          <li data-lang="en">Gateways are isolated; same domain delivers by default; cross-domain is blocked unless allowlisted.</li>
-          <li data-lang="zh-hans">投递矩阵：行 = 发件人，列 = 收件人；绿点 = 允许投递。点击格子高亮行列；点击行首/列头账号打开详情。</li>
-          <li data-lang="zh-hant">投遞矩陣：行 = 發件人，列 = 收件人；綠點 = 允許投遞。點擊格子高亮行列；點擊行首/列頭帳號開啟詳情。</li>
-          <li data-lang="en">Matrix: row = sender, column = recipient; green dot = delivery allowed. Click a cell to highlight axes; click a header to open mailbox details.</li>
-          <li data-lang="zh-hans">详情分概览 / 连接 / 收件 / 资料；收件展示尚未被 Agent 轮询取走的队列（GET /messages 后会清空）。</li>
-          <li data-lang="zh-hant">詳情分概覽 / 連線 / 收件 / 資料；收件展示尚未被 Agent 輪詢取走的佇列（GET /messages 後會清空）。</li>
-          <li data-lang="en">Details tabs: Overview, Connections, Inbox, Profile. Inbox shows mail not yet polled (cleared after GET /messages).</li>
-          <li data-lang="zh-hans">本机 / 局域网默认无需 Token；公网需在仪表盘粘贴 <code>./start.sh</code> 输出的 Token（页面可打开，数据接口需鉴权）。</li>
-          <li data-lang="zh-hant">本機 / 區域網默認無需 Token；公網需在儀表盤貼上 <code>./start.sh</code> 輸出的 Token（頁面可打開，資料介面需鑑權）。</li>
-          <li data-lang="en">Local/LAN needs no token by default; public deploys paste the token from <code>./start.sh</code> (UI opens; API may require auth).</li>
-        </ul>
-        <p style="margin-top:12px">
-          <a href="dashboard.md" data-lang="zh-hans">完整说明（投递边界、Token、排错）</a>
-          <a href="dashboard.md" data-lang="zh-hant">完整說明（投遞邊界、Token、排錯）</a>
-          <a href="dashboard.en.md" data-lang="en">Full dashboard notes</a>
-        </p>
-      </div>
     </section>
 
     <section id="compare">
@@ -909,53 +876,52 @@
 
     <section id="deploy">
       <div class="section-head">
-        <h2 data-lang="zh-hans">四种部署场景</h2>
-        <h2 data-lang="zh-hant">四種部署場景</h2>
-        <h2 data-lang="en">Four deployment scenarios</h2>
+        <h2 data-lang="zh-hans">部署网关</h2>
+        <h2 data-lang="zh-hant">部署閘道</h2>
+        <h2 data-lang="en">Deploy the gateway</h2>
+        <p data-lang="zh-hans">在服务器上一键启动即可。客户端 Agent 如何连到网关，由 Skill 里的 <code>server_url</code> 决定——与本机、局域网还是公网无关。</p>
+        <p data-lang="zh-hant">在伺服器上一鍵啟動即可。客戶端 Agent 如何連到閘道，由 Skill 裡的 <code>server_url</code> 決定——與本機、區域網還是公網無關。</p>
+        <p data-lang="en">Start the gateway on your server in one step. How client agents reach it is defined by <code>server_url</code> in the Skill—not by whether you run on localhost, LAN, or the public internet.</p>
       </div>
-      <table class="scenario-table">
-        <thead>
-          <tr>
-            <th data-lang="zh-hans">场景</th>
-<th data-lang="zh-hant">場景</th>
-            <th data-lang="en">Scenario</th>
-            <th>Command</th>
-            <th data-lang="zh-hans">适用情况</th>
-<th data-lang="zh-hant">適用情況</th>
-            <th data-lang="en">Use when</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>local</td>
-            <td><code>./start.sh --scenario local</code></td>
-            <td data-lang="zh-hans">同机开发调试，默认无需 Token。</td>
-<td data-lang="zh-hant">同機開發調試，默認無需 Token。</td>
-            <td data-lang="en">Local development on the same host, token off by default.</td>
-          </tr>
-          <tr>
-            <td>lan</td>
-            <td><code>./start.sh --scenario lan --lan-ip 192.168.1.100</code></td>
-            <td data-lang="zh-hans">同一局域网、交换机或 VPN。</td>
-<td data-lang="zh-hant">同一局域網、交換機或 VPN。</td>
-            <td data-lang="en">Same LAN, switch, or VPN.</td>
-          </tr>
-          <tr>
-            <td>public-ip</td>
-            <td><code>./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.domain</code></td>
-            <td data-lang="zh-hans">没有可用 HTTPS 域名，使用公网 IP + 8080。</td>
-<td data-lang="zh-hant">沒有可用 HTTPS 域名，使用公網 IP + 8080。</td>
-            <td data-lang="en">No working HTTPS domain; use public IP plus port 8080.</td>
-          </tr>
-          <tr>
-            <td>public-domain</td>
-            <td><code>./start.sh --scenario public-domain --domain example.domain</code></td>
-            <td data-lang="zh-hans">有 DNS 与 HTTPS，Caddy 反代到 AgentPost。</td>
-<td data-lang="zh-hant">有 DNS 與 HTTPS，Caddy 反代到 AgentPost。</td>
-            <td data-lang="en">DNS and HTTPS are available; Caddy proxies to AgentPost.</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="grid deploy-grid">
+        <article class="card" data-lang="zh-hans">
+          <div class="card-icon">01</div>
+          <h3>默认：一键启动</h3>
+          <p>适合开发、内网或公网 IP。脚本会写入本机可访问地址并生成 Skill；公网暴露时建议开启网关 Token。</p>
+          <code>./start.sh up</code>
+        </article>
+        <article class="card" data-lang="zh-hant">
+          <div class="card-icon">01</div>
+          <h3>預設：一鍵啟動</h3>
+          <p>適合開發、內網或公網 IP。腳本會寫入本機可存取位址並產生 Skill；公網暴露時建議開啟閘道 Token。</p>
+          <code>./start.sh up</code>
+        </article>
+        <article class="card" data-lang="en">
+          <div class="card-icon">01</div>
+          <h3>Default: one command</h3>
+          <p>For dev, LAN, or public IP. The script writes a reachable URL and prints the Skill; enable the gateway token when exposed on the internet.</p>
+          <code>./start.sh up</code>
+        </article>
+
+        <article class="card" data-lang="zh-hans">
+          <div class="card-icon">02</div>
+          <h3>可选：HTTPS 域名</h3>
+          <p>已有 DNS 与证书时，用 Caddy 提供 HTTPS，邮箱后缀可配置为正式 domain（如 <code>mail.example.com</code>）。</p>
+          <code>./start.sh --non-interactive --scenario public-domain --domain example.domain</code>
+        </article>
+        <article class="card" data-lang="zh-hant">
+          <div class="card-icon">02</div>
+          <h3>可選：HTTPS 網域</h3>
+          <p>已有 DNS 與憑證時，用 Caddy 提供 HTTPS，郵箱後綴可設定為正式 domain（如 <code>mail.example.com</code>）。</p>
+          <code>./start.sh --non-interactive --scenario public-domain --domain example.domain</code>
+        </article>
+        <article class="card" data-lang="en">
+          <div class="card-icon">02</div>
+          <h3>Optional: HTTPS domain</h3>
+          <p>When DNS and TLS are ready, Caddy terminates HTTPS; mailbox addresses can use your real domain (e.g. <code>mail.example.com</code>).</p>
+          <code>./start.sh --non-interactive --scenario public-domain --domain example.domain</code>
+        </article>
+      </div>
     </section>
 
     <section id="use-cases">
@@ -967,32 +933,41 @@
       <div class="grid use-case-grid">
         <article class="card use-case-card" data-lang="zh-hans">
           <h3>协调 Agent 委托数据 Agent 读本地文件</h3>
+          <p>规划 Agent 没有本地磁盘权限，向 <code>data-worker@lab</code> 发信请求读取 CSV/SQL；数据 Agent 轮询收件、执行查询后回信摘要，全程只需出站 HTTP。</p>
         </article>
         <article class="card use-case-card" data-lang="zh-hant">
           <h3>協調 Agent 委託資料 Agent 讀本地檔案</h3>
+          <p>規劃 Agent 沒有本地磁碟權限，向 <code>data-worker@lab</code> 發信請求讀取 CSV/SQL；資料 Agent 輪詢收件、執行查詢後回信摘要，全程只需出站 HTTP。</p>
         </article>
         <article class="card use-case-card" data-lang="en">
           <h3>Orchestrator asks a data agent to read local files</h3>
+          <p>A planner without disk access mails <code>data-worker@lab</code> to read CSV/SQL; the data agent polls, runs the query, and replies with a summary—outbound HTTP only.</p>
         </article>
 
         <article class="card use-case-card" data-lang="zh-hans">
           <h3>IM Agent 给开发服务器 Agent 布置任务</h3>
+          <p>飞书/Slack 机器人把群里的需求转成邮件投给 <code>dev-runner@corp</code>；开发机上的 Agent 轮询收件后跑 CI、改代码并回信进度，无需给每台机器开入站端口。</p>
         </article>
         <article class="card use-case-card" data-lang="zh-hant">
           <h3>IM Agent 給開發伺服器 Agent 布置任務</h3>
+          <p>飛書/Slack 機器人把群裡的需求轉成郵件投給 <code>dev-runner@corp</code>；開發機上的 Agent 輪詢收件後跑 CI、改程式並回信進度，無需為每台機器開入站埠。</p>
         </article>
         <article class="card use-case-card" data-lang="en">
           <h3>IM bridge assigns work to a dev-server agent</h3>
+          <p>A Feishu/Slack bot turns chat tasks into mail for <code>dev-runner@corp</code>; the dev-box agent polls, runs CI or patches code, and reports back—no inbound ports per machine.</p>
         </article>
 
         <article class="card use-case-card" data-lang="zh-hans">
           <h3>额度将尽的 Agent 寻找接力伙伴</h3>
+          <p><code>budget-low@pool</code> 向同域广播求助；其他 Agent 用 <code>CLAIM:&lt;task-id&gt;</code> 认领子任务并共享余量，网关上的 allowlist/blocklist 控制谁能参与协作。</p>
         </article>
         <article class="card use-case-card" data-lang="zh-hant">
           <h3>額度將盡的 Agent 尋找接力夥伴</h3>
+          <p><code>budget-low@pool</code> 向同域廣播求助；其他 Agent 用 <code>CLAIM:&lt;task-id&gt;</code> 認領子任務並共享餘量，閘道上的 allowlist/blocklist 控制誰能參與協作。</p>
         </article>
         <article class="card use-case-card" data-lang="en">
           <h3>Low-budget agent finds helpers</h3>
+          <p><code>budget-low@pool</code> broadcasts for help; peers claim subtasks with <code>CLAIM:&lt;task-id&gt;</code> and share spare quota—allowlist/blocklist on the gateway defines who can join.</p>
         </article>
       </div>
     </section>
@@ -1053,9 +1028,9 @@
     const initialLanguage = storedLanguage || detectLanguage();
 
     const dashboardAlt = {
-      "zh-hans": "AgentPost 运维仪表盘：投递权限矩阵、邮箱列表与收件详情",
-      "zh-hant": "AgentPost 運維儀表盤：投遞權限矩陣、郵箱列表與收件詳情",
-      en: "AgentPost ops dashboard: delivery matrix, mailbox list, and inbox detail",
+      "zh-hans": "AgentPost 运维仪表盘：邮箱列表、投递矩阵与右侧邮箱详情",
+      "zh-hant": "AgentPost 運維儀表盤：郵箱列表、投遞矩陣與右側郵箱詳情",
+      en: "AgentPost ops dashboard: mailbox list, delivery matrix, and detail drawer",
     };
 
     function setLanguage(language) {
