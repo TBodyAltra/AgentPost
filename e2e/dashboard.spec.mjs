@@ -38,16 +38,31 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
   });
 
-  test("search narrows matrix without broken layout", async ({ page }) => {
+  test("search shows matched mailboxes and delivery peers in matrix", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, 2);
     await expect(page.locator(".matrix-table")).toBeVisible();
 
     const search = page.locator("#search-input");
     await search.fill("alpha");
-    await expect(page.locator(".matrix-table tbody tr")).toHaveCount(1, { timeout: 5000 });
-    await expect(page.locator("#filter-seg")).toHaveCount(0);
-    await expect(page.locator(".matrix-table td.cell-allowed")).toHaveCount(0);
+    await expect(page.locator(".matrix-table tbody tr")).toHaveCount(2, { timeout: 5000 });
+    await expect(page.locator(".matrix-table thead th.col-header")).toHaveCount(2);
+    await expect(page.locator(".matrix-table td.cell-allowed").first()).toBeVisible();
+  });
+
+  test("matrix highlights row and column for mailbox and cell selection", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, 2);
+    await expect(page.locator(".matrix-table")).toBeVisible();
+
+    await page.locator(".mailbox-item").first().click();
+    await expect(page.locator(".matrix-table th.axis-highlight")).toHaveCount(2);
+    await expect(page.locator(".matrix-table td.axis-highlight").first()).toBeVisible();
+
+    const cell = page.locator(".matrix-table td.cell-allowed").first();
+    await cell.click();
+    await expect(page.locator(".matrix-table td.cell-focus")).toHaveCount(1);
+    await expect(page.locator(".matrix-table th.axis-highlight")).toHaveCount(2);
   });
 
   test("detail connections tab lists allowed peers only", async ({ page }) => {
