@@ -890,14 +890,14 @@
         <article class="card" data-lang="zh-hant">
           <div class="card-icon">01</div>
           <h3>預設：一鍵啟動</h3>
-          <p>適合開發、內網或公網 IP。腳本會寫入本機可存取位址並產生 Skill；公網暴露時建議開啟閘道 Token。</p>
-          <code>./start.sh up</code>
+          <p>適合開發、內網或公網 IP。用 <code>--public-url</code> 指定寫入 Skill 的位址；公網暴露時建議 <code>--token</code>。</p>
+          <code>./start.sh up --public-url http://203.0.113.10:8080 --token</code>
         </article>
         <article class="card" data-lang="en">
           <div class="card-icon">01</div>
           <h3>Default: one command</h3>
-          <p>For dev, LAN, or public IP. The script writes a reachable URL and prints the Skill; enable the gateway token when exposed on the internet.</p>
-          <code>./start.sh up</code>
+          <p>For dev, LAN, or public IP. Set the skill URL with <code>--public-url</code>; use <code>--token</code> when exposed on the internet.</p>
+          <code>./start.sh up --public-url http://203.0.113.10:8080 --token</code>
         </article>
 
         <article class="card" data-lang="zh-hans">
