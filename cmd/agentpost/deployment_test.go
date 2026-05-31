@@ -10,31 +10,28 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestStartScriptConfigureScenarios(t *testing.T) {
+func TestStartScriptConfigureDefault(t *testing.T) {
 	tests := []struct {
 		name         string
 		args         []string
 		wantEnv      map[string]string
-		wantMissing  []string
+		wantAbsent   []string
 		wantConfig   Config
 		wantCaddy    bool
 		caddyContain []string
 	}{
 		{
-			name: "http default",
-			args: []string{"configure", "--non-interactive", "--lan-ip", "192.168.1.50", "--public-ip", "203.0.113.10"},
+			name: "default up requires token",
+			args: []string{"configure", "--non-interactive", "--http-port", "18080", "--no-lan-detect", "--no-public-detect"},
 			wantEnv: map[string]string{
-				"AGENTPOST_SCENARIO":          "http",
 				"AGENTPOST_DOMAIN":            "agent.local",
-				"AGENTPOST_HTTP_PORT":         "8080",
-				"AGENTPOST_CONNECT_LOCALHOST": "http://127.0.0.1:8080",
-				"AGENTPOST_CONNECT_LAN":       "http://192.168.1.50:8080",
-				"AGENTPOST_CONNECT_PUBLIC":    "http://203.0.113.10:8080",
+				"AGENTPOST_HTTP_PORT":         "18080",
+				"AGENTPOST_CONNECT_LOCALHOST": "http://127.0.0.1:18080",
 				"AGENTPOST_ENABLE_SMTP":       "0",
 				"AGENTPOST_ENABLE_CADDY":      "0",
-				"AGENTPOST_REQUIRE_TOKEN":     "0",
+				"AGENTPOST_REQUIRE_TOKEN":     "1",
 			},
-			wantMissing: []string{"AGENTPOST_PUBLIC_URL", "AGENTPOST_CONNECT_DOMAIN"},
+			wantAbsent: []string{"AGENTPOST_SCENARIO", "AGENTPOST_PUBLIC_URL"},
 			wantConfig: Config{
 				Domain:             "agent.local",
 				HTTPAddr:           ":8080",
@@ -44,17 +41,12 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "local",
-			args: []string{"configure", "--non-interactive", "--scenario", "local", "--http-port", "18080"},
+			name: "no token override",
+			args: []string{"configure", "--non-interactive", "--no-token", "--no-lan-detect", "--no-public-detect"},
 			wantEnv: map[string]string{
-				"AGENTPOST_SCENARIO":      "local",
-				"AGENTPOST_DOMAIN":        "agent.local",
-				"AGENTPOST_HTTP_PORT":     "18080",
-				"AGENTPOST_PUBLIC_URL":    "http://127.0.0.1:18080",
-				"AGENTPOST_ENABLE_SMTP":   "0",
-				"AGENTPOST_ENABLE_CADDY":  "0",
 				"AGENTPOST_REQUIRE_TOKEN": "0",
 			},
+			wantAbsent: []string{"AGENTPOST_SCENARIO"},
 			wantConfig: Config{
 				Domain:             "agent.local",
 				HTTPAddr:           ":8080",
@@ -64,17 +56,26 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "public IP with SMTP",
-			args: []string{"configure", "--non-interactive", "--scenario", "public-ip", "--public-ip", "203.0.113.10", "--domain", "example.domain", "--http-port", "18081", "--smtp"},
-			wantEnv: map[string]string{
-				"AGENTPOST_SCENARIO":      "public-ip",
-				"AGENTPOST_DOMAIN":        "example.domain",
-				"AGENTPOST_HTTP_PORT":     "18081",
-				"AGENTPOST_PUBLIC_URL":    "http://203.0.113.10:18081",
-				"AGENTPOST_ENABLE_SMTP":   "1",
-				"AGENTPOST_ENABLE_CADDY":  "0",
-				"AGENTPOST_REQUIRE_TOKEN": "1",
+			name: "connection URLs and SMTP",
+			args: []string{
+				"configure", "--non-interactive",
+				"--lan-ip", "192.168.1.50",
+				"--public-ip", "203.0.113.10",
+				"--domain", "example.domain",
+				"--http-port", "18081",
+				"--smtp",
 			},
+			wantEnv: map[string]string{
+				"AGENTPOST_DOMAIN":            "example.domain",
+				"AGENTPOST_HTTP_PORT":         "18081",
+				"AGENTPOST_CONNECT_LOCALHOST": "http://127.0.0.1:18081",
+				"AGENTPOST_CONNECT_LAN":       "http://192.168.1.50:18081",
+				"AGENTPOST_CONNECT_PUBLIC":    "http://203.0.113.10:18081",
+				"AGENTPOST_ENABLE_SMTP":       "1",
+				"AGENTPOST_ENABLE_CADDY":      "0",
+				"AGENTPOST_REQUIRE_TOKEN":     "1",
+			},
+			wantAbsent: []string{"AGENTPOST_SCENARIO", "AGENTPOST_PUBLIC_URL"},
 			wantConfig: Config{
 				Domain:             "example.domain",
 				HTTPAddr:           ":8080",
@@ -84,17 +85,16 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "public domain with Caddy",
-			args: []string{"configure", "--non-interactive", "--scenario", "public-domain", "--domain", "example.domain", "--smtp"},
+			name: "HTTPS domain with Caddy",
+			args: []string{"configure", "--non-interactive", "--domain", "example.domain", "--caddy", "--smtp", "--no-lan-detect", "--no-public-detect"},
 			wantEnv: map[string]string{
-				"AGENTPOST_SCENARIO":      "public-domain",
-				"AGENTPOST_DOMAIN":        "example.domain",
-				"AGENTPOST_HTTP_PORT":     "8080",
-				"AGENTPOST_PUBLIC_URL":    "https://example.domain",
-				"AGENTPOST_ENABLE_SMTP":   "1",
-				"AGENTPOST_ENABLE_CADDY":  "1",
-				"AGENTPOST_REQUIRE_TOKEN": "1",
+				"AGENTPOST_DOMAIN":         "example.domain",
+				"AGENTPOST_CONNECT_DOMAIN": "https://example.domain",
+				"AGENTPOST_ENABLE_SMTP":    "1",
+				"AGENTPOST_ENABLE_CADDY":   "1",
+				"AGENTPOST_REQUIRE_TOKEN":  "1",
 			},
+			wantAbsent: []string{"AGENTPOST_SCENARIO", "AGENTPOST_PUBLIC_URL"},
 			wantConfig: Config{
 				Domain:             "example.domain",
 				HTTPAddr:           ":8080",
@@ -139,9 +139,9 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 					t.Fatalf("%s = %q, want %q\nfull env: %#v", key, got, want, gotEnv)
 				}
 			}
-			for _, key := range tt.wantMissing {
-				if got, ok := gotEnv[key]; ok && got != "" {
-					t.Fatalf("%s should be absent or empty, got %q", key, got)
+			for _, key := range tt.wantAbsent {
+				if _, ok := gotEnv[key]; ok {
+					t.Fatalf("%s should not be written to .env", key)
 				}
 			}
 			if _, ok := gotEnv["AGENTPOST_API_TOKEN"]; ok {
@@ -177,6 +177,19 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestStartScriptRejectsLegacyScenarioFlag(t *testing.T) {
+	root := repoRoot(t)
+	cmd := exec.Command("bash", filepath.Join(root, "start.sh"), "configure", "--non-interactive", "--scenario", "local")
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir()}
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected failure for --scenario, got success:\n%s", output)
+	}
+	if !strings.Contains(string(output), "removed") {
+		t.Fatalf("unexpected error output:\n%s", output)
 	}
 }
 

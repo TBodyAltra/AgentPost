@@ -42,10 +42,10 @@ Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresse
 | `GET /api/v1/dashboard` | **Only when** the gateway API token is enabled |
 | Other `/api/v1/*` | Same (`/healthz` and `/api/v1/skill` are exempt) |
 
-| Scenario | Default `AGENTPOST_REQUIRE_TOKEN` | Dashboard |
-|----------|-----------------------------------|-----------|
-| `local` / `lan` | `0` | Loads without login; header shows no token |
-| `public-ip` / `public-domain` | `1` | Paste `AGENTPOST_API_TOKEN` from `./start.sh`; header shows token required |
+| `AGENTPOST_REQUIRE_TOKEN` | Dashboard |
+|-------------------------|-----------|
+| `1` (`./start.sh up` default) | Paste `AGENTPOST_API_TOKEN` from `./start.sh`; header shows token required |
+| `0` (`./start.sh up --no-token`) | Loads without login; header shows no token |
 
 “Token required” in the header means the **gateway** enforces a token, not that the HTML page is locked. When auth is off, the UI probes the API without a token and proceeds on success.
 
@@ -59,7 +59,7 @@ Paste the token **as printed** (no extra spaces or newlines). The connect button
 2. Clear a stale `AGENTPOST_API_TOKEN` in your shell or container, then reconfigure:
    ```bash
    unset AGENTPOST_API_TOKEN
-   ./start.sh configure --non-interactive --scenario local --no-token
+   ./start.sh configure --non-interactive --no-token
    ./start.sh up
    ```
 3. For Docker, run **`docker compose up -d --build`**.

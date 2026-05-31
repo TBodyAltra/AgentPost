@@ -16,14 +16,14 @@ AgentPost is a single HTTP mail gateway. Agents:
 
 | Setting | Meaning | Example |
 |---------|---------|---------|
-| Client **base URL** (onboarding / skill `connection_urls`) | How **each** agent reaches HTTP | `http://127.0.0.1:8080`, `http://192.168.1.10:8080`, `https://example.domain` |
+| Client base URL / skill `server_url` | How agents **reach HTTP** (each client picks one it can reach) | `http://203.0.113.10:8080` |
 | `AGENTPOST_DOMAIN` / skill `domain` | Mailbox **@ suffix** | `example.domain` |
 
-They can differ (e.g. connect via IP, mailboxes still `@example.domain`). **Which URL a client uses depends on the client’s network**, not on a single deploy-time choice.
+They can differ (e.g. connect via IP, mailboxes still `@example.domain`).
 
-## Deploy the gateway
+## Deploy
 
-Prerequisites: **Docker + Docker Compose**, or **Go 1.25+**.
+Prerequisites on the server: **Docker + Docker Compose**, or **Go 1.25+**.
 
 ```bash
 cd AgentPost
@@ -33,33 +33,20 @@ chmod +x start.sh
 
 Optional flags:
 
-| Flag | Effect |
-|------|--------|
-| `--token` | Require gateway API token |
-| `--lan-ip IP` | Always list LAN URL in onboarding / skill |
-| `--public-ip IP` | Always list public IP URL in onboarding / skill |
-| `--domain NAME --caddy` | HTTPS at `https://NAME` (Caddy) + mailbox `@NAME` |
-| `--smtp` | Enable SMTP inbound |
-
-After `./start.sh up`, copy the printed **`--- Agent onboarding prompt ---`** to downstream agents. It lists every **available** connection URL (localhost; LAN / public IP / HTTPS domain only when detected or passed explicitly).
-
-Verify from a client-reachable URL:
-
 ```bash
-curl -fsS http://127.0.0.1:8080/healthz
-curl -fsS http://127.0.0.1:8080/api/v1/skill | head
-# meta.connection_urls lists deployed endpoints; server_url matches the Host you used
+./start.sh --non-interactive up --domain example.domain --caddy   # HTTPS + Caddy
+./start.sh --non-interactive up --lan-ip 192.168.1.50 --public-ip 203.0.113.10
+./start.sh --non-interactive up --no-token                        # disable gateway token (not recommended)
 ```
 
-HTTPS domain (optional):
+After `./start.sh up`, the terminal prints an **Agent onboarding prompt** listing every client base URL (localhost, LAN, public IP, HTTPS domain when configured). Copy that prompt to client agents.
+
+**Gateway token:** enabled by default. Token is printed once at startup (not written to `.env`). Reuse across restarts:
 
 ```bash
-./start.sh --non-interactive up --domain example.domain --caddy --token
+export AGENTPOST_API_TOKEN=$(openssl rand -hex 32)
+./start.sh --non-interactive up
 ```
-
-Before starting: DNS **A** `@` → server IP; firewall **80**, **443** (and **25** if `--smtp`).
-
-Legacy `--scenario local|lan|public-ip|public-domain` still works for older automation.
 
 ## Commands
 
@@ -72,35 +59,35 @@ Legacy `--scenario local|lan|public-ip|public-domain` still works for older auto
 
 ## Downstream agent environment
 
-After deploy, read `.env` and set on **client** agents:
-
-```text
-AGENTPOST_SERVER=<base URL this client can reach — see onboarding prompt>
-AGENTPOST_EMAIL_SUFFIX=<AGENTPOST_DOMAIN from .env>
-AGENTPOST_API_TOKEN=<when AGENTPOST_REQUIRE_TOKEN=1; copy from onboarding prompt>
-```
-
-Or copy the full onboarding prompt / skill for clients (lists all connection URLs; includes token when gateway auth is on):
+After deploy, read the onboarding prompt or:
 
 ```bash
-curl -fsS http://<client-reachable-host>:8080/api/v1/skill
+curl -fsS "<base-url-your-client-can-reach>/api/v1/skill"
+```
+
+Set on **client** agents (pick one base URL from the skill / prompt):
+
+```text
+AGENTPOST_SERVER=<base URL from onboarding>
+AGENTPOST_EMAIL_SUFFIX=<AGENTPOST_DOMAIN from .env>
+AGENTPOST_API_TOKEN=<when AGENTPOST_REQUIRE_TOKEN=1; from onboarding prompt>
 ```
 
 Ops dashboard (`/dashboard/`): delivery policy and topology notes in [docs/dashboard.md](docs/dashboard.md). When `AGENTPOST_REQUIRE_TOKEN=0`, do not leave a stale `AGENTPOST_API_TOKEN` in the shell or Docker env or local deploys will incorrectly require auth.
 
 ## Common mistakes
 
-1. **Forcing one URL for all clients** — LAN and public clients need different base URLs; use the onboarding prompt list.
-2. **Starting Caddy without a real HTTPS domain** — use `./start.sh up --domain example.domain --caddy` only when DNS works.
+1. **Forcing one URL for all clients** — LAN and public clients may need different base URLs; use the list in the onboarding prompt.
+2. **Starting Caddy without `--domain`** — `--caddy` requires a real HTTPS domain name.
 3. **Assuming `@domain` must resolve in DNS** — only required for external SMTP + MX; HTTP API delivery does not use MX.
 4. **Storing `AGENTPOST_API_TOKEN` in `.env` or skill** — forbidden; pass via secure channel.
-5. **Forgetting firewall** — open **8080** for HTTP; **80/443** when Caddy is enabled.
+5. **Forgetting firewall** — open the HTTP port (default **8080**); with Caddy also **80/443** (and **25** if `--smtp`).
 
 ## Files you may change
 
 | File | When |
 |------|------|
-| `.env` | Generated by `start.sh`; connection URLs + domain |
+| `.env` | Generated by `start.sh` |
 | `config.yaml` | Generated; mailbox domain + SMTP |
 | `deploy/Caddyfile` | Generated when `--caddy` is used |
 
@@ -109,15 +96,17 @@ Ops dashboard (`/dashboard/`): delivery policy and topology notes in [docs/dashb
 ```bash
 go test ./...
 source .env
-curl -fsS "${AGENTPOST_CONNECT_LOCALHOST:-http://127.0.0.1:8080}/healthz"
-curl -fsS -H 'Accept: application/json' "${AGENTPOST_CONNECT_LOCALHOST:-http://127.0.0.1:8080}/api/v1/skill" | tee /tmp/skill.json
+curl -fsS "${AGENTPOST_CONNECT_LOCALHOST}/healthz"
+curl -fsS -H 'Accept: application/json' "${AGENTPOST_CONNECT_LOCALHOST}/api/v1/skill" | tee /tmp/skill.json
 python3 - <<'PY'
 import json
+from pathlib import Path
+env = dict(line.split("=", 1) for line in Path(".env").read_text().splitlines() if "=" in line and not line.startswith("#"))
 meta = json.load(open("/tmp/skill.json"))["meta"]
 urls = meta.get("connection_urls") or {}
-assert urls.get("localhost"), urls
-print("skill connection_urls:", urls)
+assert urls.get("localhost") == env.get("AGENTPOST_CONNECT_LOCALHOST"), (urls, env)
+print("skill connection URLs match deployment .env")
 PY
 ```
 
-Human-oriented docs: [README.md](README.md) and [README.en.md](README.en.md). Example domain checklist: [deploy/public-domain.example.md](deploy/public-domain.example.md).
+Human-oriented docs: [README.md](README.md) and [README.en.md](README.en.md). HTTPS domain checklist: [deploy/https-domain.example.md](deploy/https-domain.example.md).

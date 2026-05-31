@@ -828,9 +828,9 @@
           <li data-lang="zh-hans">详情分概览 / 连接 / 收件 / 资料；收件展示尚未被 Agent 轮询取走的队列（GET /messages 后会清空）。</li>
           <li data-lang="zh-hant">詳情分概覽 / 連線 / 收件 / 資料；收件展示尚未被 Agent 輪詢取走的佇列（GET /messages 後會清空）。</li>
           <li data-lang="en">Details tabs: Overview, Connections, Inbox, Profile. Inbox shows mail not yet polled (cleared after GET /messages).</li>
-          <li data-lang="zh-hans">本机 / 局域网默认无需 Token；公网需在仪表盘粘贴 <code>./start.sh</code> 输出的 Token（页面可打开，数据接口需鉴权）。</li>
-          <li data-lang="zh-hant">本機 / 區域網默認無需 Token；公網需在儀表盤貼上 <code>./start.sh</code> 輸出的 Token（頁面可打開，資料介面需鑑權）。</li>
-          <li data-lang="en">Local/LAN needs no token by default; public deploys paste the token from <code>./start.sh</code> (UI opens; API may require auth).</li>
+          <li data-lang="zh-hans">网关 Token 默认开启；在仪表盘粘贴 <code>./start.sh</code> 输出的 Token（页面可打开，数据接口需鉴权）。本机调试可用 <code>./start.sh up --no-token</code>。</li>
+          <li data-lang="zh-hant">閘道 Token 默認開啟；在儀表盤貼上 <code>./start.sh</code> 輸出的 Token（頁面可打開，資料介面需鑑權）。本機調試可用 <code>./start.sh up --no-token</code>。</li>
+          <li data-lang="en">Gateway token is on by default; paste the token from <code>./start.sh</code> (UI opens; API requires auth). Use <code>./start.sh up --no-token</code> for local debugging.</li>
         </ul>
         <p style="margin-top:12px">
           <a href="dashboard.md" data-lang="zh-hans">完整说明（投递边界、Token、排错）</a>
@@ -913,24 +913,24 @@
         <h2 data-lang="zh-hant">部署閘道</h2>
         <h2 data-lang="en">Deploy the gateway</h2>
       </div>
-      <div class="grid" style="max-width: 720px; margin: 0 auto">
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
         <article class="card">
-          <h3 data-lang="zh-hans">一键启动</h3>
-          <h3 data-lang="zh-hant">一鍵啟動</h3>
-          <h3 data-lang="en">One command</h3>
+          <h3 data-lang="zh-hans">默认</h3>
+          <h3 data-lang="zh-hant">默認</h3>
+          <h3 data-lang="en">Default</h3>
           <p><code>./start.sh up</code></p>
-          <p data-lang="zh-hans">成功后复制终端里的 onboarding prompt 给客户端 Agent。其中会列出本机、局域网、公网等<strong>当前可用</strong>的连接地址（检测不到的不写入）。</p>
-          <p data-lang="zh-hant">成功後複製終端裡的 onboarding prompt 給客戶端 Agent。其中會列出本機、區域網、公網等<strong>當前可用</strong>的連接地址（檢測不到的不寫入）。</p>
-          <p data-lang="en">Copy the printed onboarding prompt to client agents. It lists every <strong>available</strong> base URL (localhost, LAN, public IP—only when detected).</p>
+          <p data-lang="zh-hans">网关监听 :8080；onboarding 列出本机 / 局域网 / 公网 IP（能检测到则写入）。网关 Token 默认开启。</p>
+          <p data-lang="zh-hant">閘道監聽 :8080；onboarding 列出本機 / 區域網 / 公網 IP（能偵測到則寫入）。閘道 Token 默認開啟。</p>
+          <p data-lang="en">Gateway on :8080; onboarding lists localhost / LAN / public IP when detected. Gateway token is on by default.</p>
         </article>
         <article class="card">
-          <h3 data-lang="zh-hans">可选：HTTPS 域名</h3>
-          <h3 data-lang="zh-hant">可選：HTTPS 網域</h3>
-          <h3 data-lang="en">Optional: HTTPS domain</h3>
-          <p><code>./start.sh up --domain example.domain --caddy --token</code></p>
-          <p data-lang="zh-hans">需要 DNS 与 80/443。onboarding 中会额外写入 <code>https://example.domain</code> 供可通过域名访问的客户端使用。</p>
-          <p data-lang="zh-hant">需要 DNS 與 80/443。onboarding 中會額外寫入 <code>https://example.domain</code> 供可透過網域存取的客戶端使用。</p>
-          <p data-lang="en">Requires DNS and ports 80/443. The onboarding prompt adds <code>https://example.domain</code> for clients that reach the gateway by domain.</p>
+          <h3 data-lang="zh-hans">HTTPS 域名（可选）</h3>
+          <h3 data-lang="zh-hant">HTTPS 網域（可選）</h3>
+          <h3 data-lang="en">HTTPS domain (optional)</h3>
+          <p><code>./start.sh up --domain example.domain --caddy</code></p>
+          <p data-lang="zh-hans">Caddy + 证书；onboarding 增加 <code>https://example.domain</code>。各客户端仍选用自己可达的 URL。</p>
+          <p data-lang="zh-hant">Caddy + 憑證；onboarding 增加 <code>https://example.domain</code>。各客戶端仍選用自己能連上的 URL。</p>
+          <p data-lang="en">Caddy + TLS; onboarding adds <code>https://example.domain</code>. Each client still picks a URL it can reach.</p>
         </article>
       </div>
     </section>

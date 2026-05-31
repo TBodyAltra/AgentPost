@@ -42,10 +42,10 @@
 | `GET /api/v1/dashboard` | **仅当**网关启用了 API Token 时需要 |
 | 其它 `/api/v1/*` | 同上（`/healthz`、`/api/v1/skill` 除外） |
 
-| 部署场景 | 默认 `AGENTPOST_REQUIRE_TOKEN` | 仪表盘表现 |
-|----------|-------------------------------|------------|
-| `local` / `lan` | `0` | 打开即可加载数据，顶栏显示「无 Token」 |
-| `public-ip` / `public-domain` | `1` | 需粘贴 `./start.sh` 打印的 `AGENTPOST_API_TOKEN`，顶栏显示「需 Token」 |
+| `AGENTPOST_REQUIRE_TOKEN` | 仪表盘表现 |
+|-------------------------|------------|
+| `1`（`./start.sh up` 默认） | 需粘贴 `./start.sh` 打印的 `AGENTPOST_API_TOKEN`，顶栏显示「需 Token」 |
+| `0`（`./start.sh up --no-token`） | 打开即可加载数据，顶栏显示「无 Token」 |
 
 顶栏「需 Token」表示**这台网关启用了 API Token**，不是「页面被锁死」。未启用 Token 时，会先尝试不带 Token 请求 API，成功则直接进入。
 
@@ -53,13 +53,13 @@
 
 ## 常见问题
 
-### 本机 / 局域网部署却仍要求 Token
+### 部署后仍要求 Token（本机调试想关闭时）
 
-1. 确认 `.env` 中 `AGENTPOST_REQUIRE_TOKEN=0`（`local` / `lan` 场景默认如此）。
-2. 当前 shell 或 Docker 环境里若仍留着旧的 `AGENTPOST_API_TOKEN`，在未修复的版本里会误开鉴权。执行：
+1. 确认 `.env` 中 `AGENTPOST_REQUIRE_TOKEN=0`（需使用 `./start.sh up --no-token` 重新配置）。
+2. 当前 shell 或 Docker 环境里若仍留着旧的 `AGENTPOST_API_TOKEN`，会误开鉴权。执行：
    ```bash
    unset AGENTPOST_API_TOKEN
-   ./start.sh configure --non-interactive --scenario local --no-token
+   ./start.sh configure --non-interactive --no-token
    ./start.sh up
    ```
 3. Docker 部署后请 **`docker compose up -d --build`**，确保二进制与环境变量已更新。
