@@ -1213,7 +1213,7 @@
       if (matcher.kind === "none") {
         const emails = new Set(all);
         if (state.selected) emails.add(state.selected);
-        return [...emails].sort();
+        return sortEmailsForMatrix([...emails]);
       }
       const matched = all.filter((e) => mailboxMatchesSearch(e, emailDomain(e), matcher));
       const emails = new Set(matched);
