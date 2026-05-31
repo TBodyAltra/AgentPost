@@ -379,10 +379,6 @@
       background: color-mix(in srgb, var(--accent) 32%, var(--bg-elevated)) !important;
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
     }
-    .matrix-table th.domain-header.axis-highlight {
-      background: color-mix(in srgb, var(--accent) 22%, var(--bg-elevated)) !important;
-      color: var(--accent);
-    }
     .matrix-table td.cell-focus {
       background: color-mix(in srgb, var(--accent) 42%, var(--ok-soft)) !important;
       box-shadow: inset 0 0 0 2px var(--accent);
@@ -1021,12 +1017,6 @@
       return cls;
     }
 
-    function matrixDomainHeaderClasses(domain, axis) {
-      const axisEmail = axis === "row" ? state.matrixAxis.row : state.matrixAxis.col;
-      if (!axisEmail || emailDomain(axisEmail) !== domain) return "";
-      return " axis-highlight";
-    }
-
     function directedDeliveryStatus(from, to, links) {
       if (from === to) return "";
       const direct = links.find((l) => l.from === from && l.to === to);
@@ -1238,8 +1228,7 @@
       let table = '<table class="matrix-table"><thead>';
       table += '<tr class="matrix-domain-row"><th class="corner" rowspan="2" colspan="2" title="' + esc(t("matrixDomain")) + '"></th>';
       colGroups.forEach((g) => {
-        const dCls = "domain-header domain-col" + matrixDomainHeaderClasses(g.domain, "col");
-        table += `<th class="${dCls}" colspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
+        table += `<th class="domain-header domain-col" colspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
       });
       table += "</tr><tr>";
       emails.forEach((col) => {
@@ -1252,8 +1241,7 @@
         g.mailboxes.forEach((row, idx) => {
           table += "<tr>";
           if (idx === 0) {
-            const dCls = "domain-header domain-row" + matrixDomainHeaderClasses(g.domain, "row");
-            table += `<th class="${dCls}" rowspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
+            table += `<th class="domain-header domain-row" rowspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
           }
           const rowCls = "row-header" + matrixHeaderClasses(row, "row");
           table += `<th class="${rowCls}" data-email="${esc(row)}" title="${esc(row)}">${matrixUserLabel(row)}</th>`;

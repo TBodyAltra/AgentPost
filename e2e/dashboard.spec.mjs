@@ -75,6 +75,7 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator("#detail-panel")).toHaveClass(/open/);
     await expect(page.locator(".matrix-table th.row-header.axis-highlight")).toHaveCount(1);
     await expect(page.locator(".matrix-table th.col-header.axis-highlight")).toHaveCount(1);
+    await expect(page.locator(".matrix-table th.domain-header.axis-highlight")).toHaveCount(0);
 
     await page.locator("#detail-close").click();
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
@@ -82,7 +83,9 @@ test.describe("AgentPost dashboard", () => {
     const emptyCell = page.locator(".matrix-table td.cell-empty").first();
     await emptyCell.click();
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
-    await expect(page.locator(".matrix-table th.axis-highlight").first()).toBeVisible();
+    await expect(page.locator(".matrix-table th.row-header.axis-highlight")).toHaveCount(1);
+    await expect(page.locator(".matrix-table th.col-header.axis-highlight")).toHaveCount(1);
+    await expect(page.locator(".matrix-table th.domain-header.axis-highlight")).toHaveCount(0);
     await expect(page.locator(".matrix-table td.axis-highlight").first()).toBeVisible();
 
     const allowedCell = page.locator(".matrix-table td.cell-allowed").first();
