@@ -137,6 +137,23 @@ func TestDashboardJavaScriptSupportsRegexMailboxSearch(t *testing.T) {
 	}
 }
 
+func TestDashboardMatrixSortsByDomainBeforeUsername(t *testing.T) {
+	html := readEmbeddedDashboardHTML(t)
+	script, err := extractDashboardJavaScript(html)
+	if err != nil {
+		t.Fatalf("extract dashboard script: %v", err)
+	}
+	if !strings.Contains(script, "function sortEmailsForMatrix") {
+		t.Fatal("dashboard must define sortEmailsForMatrix")
+	}
+	if strings.Contains(script, "return [...emails].sort();") {
+		t.Fatal("matrix must not sort by full email string; use sortEmailsForMatrix so same-domain mailboxes stay adjacent")
+	}
+	if !strings.Contains(script, "return sortEmailsForMatrix([...emails]);") {
+		t.Fatal("emailsForMatrix must always use sortEmailsForMatrix")
+	}
+}
+
 func TestDashboardJavaScriptRejectsIllegalContinueInForEach(t *testing.T) {
 	html := readEmbeddedDashboardHTML(t)
 	script, err := extractDashboardJavaScript(html)
