@@ -879,16 +879,13 @@
         <h2 data-lang="zh-hans">部署网关</h2>
         <h2 data-lang="zh-hant">部署閘道</h2>
         <h2 data-lang="en">Deploy the gateway</h2>
-        <p data-lang="zh-hans">在服务器上一键启动即可。客户端 Agent 如何连到网关，由 Skill 里的 <code>server_url</code> 决定——与本机、局域网还是公网无关。</p>
-        <p data-lang="zh-hant">在伺服器上一鍵啟動即可。客戶端 Agent 如何連到閘道，由 Skill 裡的 <code>server_url</code> 決定——與本機、區域網還是公網無關。</p>
-        <p data-lang="en">Start the gateway on your server in one step. How client agents reach it is defined by <code>server_url</code> in the Skill—not by whether you run on localhost, LAN, or the public internet.</p>
       </div>
       <div class="grid deploy-grid">
         <article class="card" data-lang="zh-hans">
           <div class="card-icon">01</div>
           <h3>默认：一键启动</h3>
-          <p>适合开发、内网或公网 IP。脚本会写入本机可访问地址并生成 Skill；公网暴露时建议开启网关 Token。</p>
-          <code>./start.sh up</code>
+          <p>适合开发、内网或公网 IP。用 <code>--public-url</code> 指定写入 Skill 的地址；公网暴露时建议 <code>--token</code>。</p>
+          <code>./start.sh up --public-url http://203.0.113.10:8080 --token</code>
         </article>
         <article class="card" data-lang="zh-hant">
           <div class="card-icon">01</div>

@@ -33,13 +33,14 @@ git clone https://github.com/TBodyAltra/AgentPost.git
 cd AgentPost
 chmod +x start.sh
 
-# 本机试用
-./start.sh --non-interactive --scenario local
+# 本机试用（默认 http://127.0.0.1:8080）
+./start.sh --non-interactive
 
-# 公网 IP 部署
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 \
-  --domain example.domain
+# 局域网或公网：写入客户端应使用的 URL（与服务器监听端口一致）
+./start.sh --non-interactive \
+  --public-url http://203.0.113.10:8080 \
+  --domain example.domain \
+  --token
 ```
 
 `./start.sh` 会生成 `.env`、`config.yaml` 并启动服务。成功后终端会打印 `--- Agent onboarding prompt ---`（即当前网关的 Skill，含连接规则；公网启用 Token 时已包含 `AGENTPOST_API_TOKEN`）。
@@ -117,14 +118,12 @@ flowchart LR
 
 ## 部署网关
 
-在服务器上执行 `./start.sh up` 即可启动网关并生成 Skill。客户端 Agent 如何连接，由 Skill 里的 `server_url` 决定，与本机、局域网还是公网无关。
-
 | 方式 | 命令 | 说明 |
 |------|------|------|
-| 默认 | `./start.sh up` | 开发、内网或公网 IP；脚本写入可访问地址 |
+| HTTP（默认） | `./start.sh up` | 用 `--public-url` 指定写入 Skill 的地址（本机、局域网 IP、公网 IP 均可） |
 | HTTPS 域名（可选） | `./start.sh --non-interactive --scenario public-domain --domain example.domain` | 有 DNS 与证书时由 Caddy 提供 HTTPS |
 
-`public-domain` 需 DNS **A** 记录、防火墙 **80/443**（SMTP 入站另开 **25**）。更多场景与参数见 [`AGENTS.md`](AGENTS.md)、[`deploy/public-domain.example.md`](deploy/public-domain.example.md)。
+`public-domain` 需 DNS **A** 记录、防火墙 **80/443**（SMTP 入站另开 **25**）。`--scenario local|lan|public-ip` 仍可用（仅预设 `--public-url`）。详见 [`AGENTS.md`](AGENTS.md)、[`deploy/public-domain.example.md`](deploy/public-domain.example.md)。
 
 常用命令：`./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 

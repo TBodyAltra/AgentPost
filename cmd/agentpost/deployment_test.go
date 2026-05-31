@@ -23,7 +23,7 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 			name: "local",
 			args: []string{"configure", "--non-interactive", "--scenario", "local", "--http-port", "18080"},
 			wantEnv: map[string]string{
-				"AGENTPOST_SCENARIO":      "local",
+				"AGENTPOST_SCENARIO":      "http",
 				"AGENTPOST_DOMAIN":        "agent.local",
 				"AGENTPOST_HTTP_PORT":     "18080",
 				"AGENTPOST_PUBLIC_URL":    "http://127.0.0.1:18080",
@@ -43,7 +43,7 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 			name: "public IP with SMTP",
 			args: []string{"configure", "--non-interactive", "--scenario", "public-ip", "--public-ip", "203.0.113.10", "--domain", "example.domain", "--http-port", "18081", "--smtp"},
 			wantEnv: map[string]string{
-				"AGENTPOST_SCENARIO":      "public-ip",
+				"AGENTPOST_SCENARIO":      "http",
 				"AGENTPOST_DOMAIN":        "example.domain",
 				"AGENTPOST_HTTP_PORT":     "18081",
 				"AGENTPOST_PUBLIC_URL":    "http://203.0.113.10:18081",

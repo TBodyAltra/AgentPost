@@ -33,13 +33,14 @@ git clone https://github.com/TBodyAltra/AgentPost.git
 cd AgentPost
 chmod +x start.sh
 
-# Local trial
-./start.sh --non-interactive --scenario local
+# Local trial (default http://127.0.0.1:8080)
+./start.sh --non-interactive
 
-# Public IP deployment
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 \
-  --domain example.domain
+# LAN or public IP: set the URL clients should use
+./start.sh --non-interactive \
+  --public-url http://203.0.113.10:8080 \
+  --domain example.domain \
+  --token
 ```
 
 `./start.sh` writes `.env` and `config.yaml`, then starts the service. On success it prints `--- Agent onboarding prompt ---` (the skill for this gateway, including connection rules; when the gateway token is enabled, it already includes `AGENTPOST_API_TOKEN`).
@@ -117,14 +118,14 @@ The communication boundary is the **gateway instance**, not the `@domain` string
 
 ## Deploy the gateway
 
-Run `./start.sh up` on your server to start the gateway and print the Skill. How client agents connect is defined by `server_url` in the Skill—not by whether you use localhost, LAN, or the public internet.
-
 | Mode | Command | Notes |
 |------|---------|-------|
-| Default | `./start.sh up` | Dev, LAN, or public IP; script writes a reachable URL |
+| HTTP (default) | `./start.sh up` | Use `--public-url` for the address written into the skill (localhost, LAN IP, or public IP) |
 | HTTPS domain (optional) | `./start.sh --non-interactive --scenario public-domain --domain example.domain` | Caddy terminates TLS when DNS and certificates are ready |
 
-`public-domain` needs a DNS **A** record and firewall **80/443** (**25** if SMTP inbound is enabled). More scenarios and flags: [`AGENTS.md`](AGENTS.md), [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
+Whether clients use `127.0.0.1`, a LAN IP, or a public IP depends on **where the client runs relative to the server**, not on multiple deploy “scenarios”. Legacy `--scenario local|lan|public-ip` still works (they only preset `--public-url`).
+
+`public-domain` needs a DNS **A** record and firewall **80/443** (**25** if SMTP inbound is enabled). See [`AGENTS.md`](AGENTS.md), [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
 
 Common commands: `./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 

@@ -21,16 +21,16 @@ AgentPost is a single HTTP mail gateway. Agents:
 
 They can differ (e.g. connect via IP, mailboxes still `@example.domain`).
 
-## Choose exactly one scenario
+## Deployment modes
 
-| `AGENTPOST_SCENARIO` | When to use | `AGENTPOST_PUBLIC_URL` | Caddy | Token default |
-|----------------------|-------------|------------------------|-------|---------------|
-| `local` | Agent on same host | `http://127.0.0.1:8080` | no | no |
-| `lan` | Same private network | `http://<LAN_IP>:8080` | no | no |
-| `public-ip` | Internet, **no working domain** (未备案 / no DNS) | `http://<PUBLIC_IP>:8080` | no | **yes** |
-| `public-domain` | Internet, DNS + HTTPS | `https://<domain>` | **yes** | **yes** |
+| `AGENTPOST_SCENARIO` | What it does | Caddy | Token default |
+|----------------------|--------------|-------|---------------|
+| `http` (default) | Listens on `:8080`; **`AGENTPOST_PUBLIC_URL` is whatever clients should use** | no | off for loopback/private URLs; on for public IPs unless `--no-token` |
+| `public-domain` | HTTPS on a real domain | **yes** | **yes** |
 
-Skill output uses **`AGENTPOST_PUBLIC_URL` from deploy time**, not the HTTP `Host` header. Always deploy with the correct scenario so `/api/v1/skill` matches what clients will use.
+Skill output uses **`AGENTPOST_PUBLIC_URL` from deploy time**, not the HTTP `Host` header. Set `--public-url` to the address **clients** will call (same machine → `http://127.0.0.1:8080`; LAN client → `http://<LAN_IP>:8080`; internet → `http://<PUBLIC_IP>:8080`).
+
+**Legacy aliases** (still supported): `--scenario local|lan|public-ip` only preset `--public-url`; they are not separate server modes.
 
 ## Non-interactive deploy (preferred for agents)
 
@@ -41,30 +41,20 @@ cd AgentPost
 chmod +x start.sh
 ```
 
-### Same machine
+### HTTP gateway (default)
 
 ```bash
-./start.sh --non-interactive --scenario local
+# Same host as agents
+./start.sh --non-interactive
+
+# LAN or public IP — set the URL clients should use
+./start.sh --non-interactive \
+  --public-url http://203.0.113.10:8080 \
+  --domain example.domain \
+  --token
 ```
 
-### LAN
-
-```bash
-LAN_IP=$(hostname -I | awk '{print $1}')
-./start.sh --non-interactive --scenario lan --lan-ip "$LAN_IP" --domain agent.local
-```
-
-### Public internet via IP (domain blocked / 未备案)
-
-```bash
-PUBLIC_IP=$(curl -fsS --max-time 5 https://api.ipify.org)
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip "$PUBLIC_IP" \
- --domain example.domain \
-  --http-port 8080
-```
-
-Open cloud security group **TCP 8080**. Do **not** set `AGENTPOST_PUBLIC_URL` to an HTTPS domain agents cannot reach.
+Open cloud security group **TCP 8080** when exposing a public IP. Do **not** set `AGENTPOST_PUBLIC_URL` to an HTTPS domain agents cannot reach.
 
 Verify:
 
@@ -75,11 +65,11 @@ curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill" | head
 # server_url in JSON must equal AGENTPOST_PUBLIC_URL
 ```
 
-### Public internet via HTTPS domain
+### HTTPS domain
 
 ```bash
 ./start.sh --non-interactive --scenario public-domain \
- --domain example.domain \
+  --domain example.domain \
   --smtp   # only if external SMTP inbound is required
 ```
 
@@ -99,7 +89,7 @@ export AGENTPOST_API_TOKEN=$(openssl rand -hex 32)
 
 | Command | Action |
 |---------|--------|
-| `./start.sh configure --scenario …` | Write `.env`, `config.yaml`, optional `deploy/Caddyfile` only |
+| `./start.sh configure …` | Write `.env`, `config.yaml`, optional `deploy/Caddyfile` only |
 | `./start.sh up` | Configure (if needed) + start |
 | `./start.sh status` | Health + printed endpoints |
 | `./start.sh stop` | `docker compose down` |
@@ -124,11 +114,11 @@ Ops dashboard (`/dashboard/`): delivery policy and topology notes in [docs/dashb
 
 ## Common mistakes
 
-1. **Leaving `AGENTPOST_PUBLIC_URL=https://blocked.domain`** while users access via IP — skill and agents will point at the wrong URL. Use `--scenario public-ip`.
-2. **Starting Caddy for IP-only access** — unnecessary; use `public-ip` (Caddy profile off).
+1. **Wrong `AGENTPOST_PUBLIC_URL`** — skill points clients at an address they cannot reach. Set `--public-url` to what **clients** use, not an internal-only hostname.
+2. **Starting Caddy for IP-only access** — unnecessary; use `http` mode without `public-domain`.
 3. **Assuming `@domain` must resolve in DNS** — only required for external SMTP + MX; HTTP API delivery does not use MX.
 4. **Storing `AGENTPOST_API_TOKEN` in `.env` or skill** — forbidden; pass via secure channel.
-5. **Forgetting firewall** — `public-ip` needs **8080** open; `public-domain` needs **80/443**.
+5. **Forgetting firewall** — public HTTP needs **8080** open; `public-domain` needs **80/443**.
 
 ## Files you may change
 
