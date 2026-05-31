@@ -269,6 +269,11 @@
       cursor: pointer; display: none; align-items: center; justify-content: center;
     }
     .search-field.has-value .search-clear { display: flex; }
+    .search-hint {
+      margin: 0.35rem 0 0; padding: 0 0.15rem;
+      font-size: 0.72rem; line-height: 1.35; color: var(--text-3);
+    }
+    .search-hint.err { color: var(--danger, #ff453a); }
 
     #mailbox-list { flex: 1; overflow: auto; padding: 0 0.5rem 0.75rem; }
     .domain-group { margin-bottom: 0.65rem; }
@@ -521,6 +526,7 @@
             <input type="search" id="search-input" autocomplete="off">
             <button type="button" class="search-clear" id="search-clear" aria-label="Clear">×</button>
           </div>
+          <p class="search-hint" id="search-hint" hidden></p>
         </div>
         <div id="mailbox-list"></div>
       </aside>
@@ -577,7 +583,9 @@
         matrixNote: "绿点表示该行可向该列投递；点击行首或列头选中邮箱。",
         matrixTruncated: "仅显示前 {n} 个邮箱，请用搜索缩小范围。",
         detailTitle: "邮箱详情",
-        searchPlaceholder: "搜索邮箱或 domain",
+        searchPlaceholder: "搜索邮箱或 domain，/正则/",
+        searchRegexActive: "正则匹配（邮箱或 domain）",
+        searchRegexInvalid: "正则无效：{msg}",
         statMailboxes: "活跃邮箱",
         statDomains: "网域",
         statUnread: "待收信件",
@@ -636,7 +644,9 @@
         matrixNote: "綠點表示該列可向該欄投遞；點擊列首或欄頭選中郵箱。",
         matrixTruncated: "僅顯示前 {n} 個郵箱，請用搜尋縮小範圍。",
         detailTitle: "郵箱詳情",
-        searchPlaceholder: "搜尋郵箱或 domain",
+        searchPlaceholder: "搜尋郵箱或 domain，/正則/",
+        searchRegexActive: "正則匹配（郵箱或 domain）",
+        searchRegexInvalid: "正則無效：{msg}",
         statMailboxes: "活躍郵箱",
         statDomains: "網域",
         statUnread: "待收信件",
@@ -695,7 +705,9 @@
         matrixNote: "Green dot = row may deliver to column. Click row/column header to select a mailbox.",
         matrixTruncated: "Showing first {n} mailboxes; narrow with search.",
         detailTitle: "Mailbox",
-        searchPlaceholder: "Search mailboxes or domains",
+        searchPlaceholder: "Search mailboxes or /regex/",
+        searchRegexActive: "Regex match (mailbox or domain)",
+        searchRegexInvalid: "Invalid regex: {msg}",
         statMailboxes: "Active",
         statDomains: "Domains",
         statUnread: "Queued mail",
@@ -795,6 +807,7 @@
       $("detail-title").textContent = t("detailTitle");
       $("detail-close").setAttribute("aria-label", t("closeDetail"));
       $("search-input").placeholder = t("searchPlaceholder");
+      updateSearchHint();
       $("theme-auto-btn").textContent = t("themeAuto");
       $("lang-seg").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.lang === lang));
       const tabs = $("detail-tabs");
@@ -872,6 +885,65 @@
       return email.split("@")[0];
     }
 
+    function emailDomain(email) {
+      const at = email.indexOf("@");
+      return at >= 0 ? email.slice(at + 1) : "";
+    }
+
+  /** @returns {{ kind: string, test: (s: string) => boolean, needle?: string, re?: RegExp, error?: string }} */
+    function parseSearchQuery(raw) {
+      const trimmed = String(raw ?? "").trim();
+      if (!trimmed) return { kind: "none", test: () => true };
+
+      if (trimmed.startsWith("/")) {
+        const last = trimmed.lastIndexOf("/");
+        if (last > 0) {
+          const body = trimmed.slice(1, last);
+          const flags = trimmed.slice(last + 1);
+          if (!flags || /^[dgimsuvy]*$/i.test(flags)) {
+            try {
+              const re = new RegExp(body, flags || "i");
+              return { kind: "regex", re, test: (s) => re.test(s) };
+            } catch (e) {
+              return { kind: "invalid", error: e.message || String(e), test: () => false };
+            }
+          }
+        }
+      }
+
+      const needle = trimmed.toLowerCase();
+      return {
+        kind: "text",
+        needle,
+        test: (s) => String(s).toLowerCase().includes(needle),
+      };
+    }
+
+    function mailboxMatchesSearch(email, domain, matcher) {
+      if (!matcher || matcher.kind === "none") return true;
+      if (matcher.kind === "invalid") return false;
+      return matcher.test(email) || matcher.test(domain);
+    }
+
+    function updateSearchHint() {
+      const hint = $("search-hint");
+      const matcher = parseSearchQuery(state.search);
+      if (matcher.kind === "invalid") {
+        hint.textContent = t("searchRegexInvalid").replace("{msg}", matcher.error || "");
+        hint.className = "search-hint err";
+        hint.hidden = false;
+        return;
+      }
+      if (matcher.kind === "regex") {
+        hint.textContent = t("searchRegexActive");
+        hint.className = "search-hint";
+        hint.hidden = false;
+        return;
+      }
+      hint.hidden = true;
+      hint.textContent = "";
+    }
+
     function matrixAxisLabel(email) {
       const at = email.indexOf("@");
       if (at < 0) return esc(email);
@@ -889,11 +961,24 @@
       return "";
     }
 
-    function highlight(text, q) {
-      if (!q) return esc(text);
-      const i = text.toLowerCase().indexOf(q.toLowerCase());
-      if (i < 0) return esc(text);
-      return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
+    function highlight(text, matcher) {
+      if (!matcher || matcher.kind === "none") return esc(text);
+      if (matcher.kind === "text" && matcher.needle) {
+        const q = matcher.needle;
+        const i = text.toLowerCase().indexOf(q);
+        if (i < 0) return esc(text);
+        return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
+      }
+      if (matcher.kind === "regex" && matcher.re) {
+        const flags = matcher.re.flags.includes("g") ? matcher.re.flags : matcher.re.flags + "g";
+        const re = new RegExp(matcher.re.source, flags);
+        const m = re.exec(text);
+        if (!m || m.index === undefined) return esc(text);
+        const i = m.index;
+        const len = m[0].length;
+        return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + len)) + "</mark>" + esc(text.slice(i + len));
+      }
+      return esc(text);
     }
 
     function updateDigitText(el, nextText) {
@@ -981,15 +1066,12 @@
     }
 
     function renderMailboxList(data) {
-      const q = state.search.trim().toLowerCase();
+      const matcher = parseSearchQuery(state.search);
       let html = "";
       data.domains.forEach((d) => {
-        const visible = d.mailboxes.filter((email) => {
-          if (!q) return true;
-          return email.toLowerCase().includes(q) || d.domain.toLowerCase().includes(q);
-        });
+        const visible = d.mailboxes.filter((email) => mailboxMatchesSearch(email, d.domain, matcher));
         if (!visible.length) return;
-        html += `<div class="domain-group"><div class="domain-label">${highlight(d.domain, q)}${d.is_default ? `<span class="def">${t("defaultBadge")}</span>` : ""}</div>`;
+        html += `<div class="domain-group"><div class="domain-label">${highlight(d.domain, matcher)}${d.is_default ? `<span class="def">${t("defaultBadge")}</span>` : ""}</div>`;
         visible.forEach((email) => {
           const mb = data.mailboxes.find((m) => m.email === email);
           const qn = mb?.queued_messages ?? 0;
@@ -1000,7 +1082,7 @@
           html += `<div class="mailbox-item${sel}${unread}" data-email="${esc(email)}">
             <div class="mailbox-avatar">${esc(initials)}</div>
             <div class="mailbox-meta">
-              <div class="mailbox-name">${highlight(shortUser(email), q)}</div>
+              <div class="mailbox-name">${highlight(shortUser(email), matcher)}</div>
               <div class="mailbox-sub">${esc(display)}</div>
             </div>
             ${qn > 0 ? `<span class="unread-badge">${qn}</span>` : ""}
@@ -1024,13 +1106,13 @@
 
     function emailsForMatrix(data) {
       const all = allMailboxes(data);
-      const q = state.search.trim().toLowerCase();
-      if (!q) {
+      const matcher = parseSearchQuery(state.search);
+      if (matcher.kind === "none") {
         const emails = new Set(all);
         if (state.selected) emails.add(state.selected);
         return [...emails].sort();
       }
-      const matched = all.filter((e) => e.toLowerCase().includes(q));
+      const matched = all.filter((e) => mailboxMatchesSearch(e, emailDomain(e), matcher));
       const emails = new Set(matched);
       matched.forEach((email) => {
         const { outbound, inbound } = collectDeliveryPeers(data, email);
@@ -1381,12 +1463,14 @@
     searchInput.addEventListener("input", () => {
       state.search = searchInput.value;
       $("search-field").classList.toggle("has-value", !!searchInput.value);
+      updateSearchHint();
       if (state.data) { renderMailboxList(state.data); renderMatrix(state.data); }
     });
     $("search-clear").addEventListener("click", () => {
       searchInput.value = "";
       state.search = "";
       $("search-field").classList.remove("has-value");
+      updateSearchHint();
       searchInput.focus();
       if (state.data) { renderMailboxList(state.data); renderMatrix(state.data); }
     });

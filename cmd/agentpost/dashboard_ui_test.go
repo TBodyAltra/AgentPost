@@ -48,6 +48,9 @@ func TestDashboardEmbeddedHTMLHasCriticalUI(t *testing.T) {
 		`renderTabInbox`,
 		`directedDeliveryStatus`,
 		`matrixAxisLabel`,
+		`parseSearchQuery`,
+		`mailboxMatchesSearch`,
+		`id="search-hint"`,
 	}
 	for _, needle := range required {
 		if !strings.Contains(html, needle) {
@@ -111,6 +114,24 @@ func TestDashboardStatsUseDigitDiffNotFullCountAnimation(t *testing.T) {
 	}
 	if strings.Contains(script, "function animateCount") {
 		t.Fatal("dashboard must not use full-number animateCount on refresh")
+	}
+}
+
+func TestDashboardJavaScriptSupportsRegexMailboxSearch(t *testing.T) {
+	html := readEmbeddedDashboardHTML(t)
+	script, err := extractDashboardJavaScript(html)
+	if err != nil {
+		t.Fatalf("extract dashboard script: %v", err)
+	}
+	for _, needle := range []string{
+		"function parseSearchQuery",
+		"function mailboxMatchesSearch",
+		"function emailDomain",
+		`trimmed.startsWith("/")`,
+	} {
+		if !strings.Contains(script, needle) {
+			t.Fatalf("dashboard search missing %q", needle)
+		}
 	}
 }
 
