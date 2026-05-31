@@ -185,6 +185,10 @@ load_env_file() {
   else
     unset AGENTPOST_API_TOKEN
   fi
+  # Do not let a stale shell token override .env when this deployment disables gateway auth.
+  if [[ "${AGENTPOST_REQUIRE_TOKEN:-}" == "0" ]]; then
+    unset AGENTPOST_API_TOKEN
+  fi
 }
 
 apply_token_policy() {
@@ -611,6 +615,12 @@ export_runtime_env() {
   export AGENTPOST_REQUIRE_TOKEN="$REQUIRE_TOKEN"
   export AGENTPOST_SMTP_PORT="$SMTP_PORT"
   export AGENTPOST_SMTP_PUBLISH_PORT="${AGENTPOST_SMTP_PUBLISH_PORT:-25}"
+  if [[ "$REQUIRE_TOKEN" == "1" ]]; then
+    export AGENTPOST_API_TOKEN="${AGENTPOST_API_TOKEN:-}"
+  else
+    unset AGENTPOST_API_TOKEN
+    export AGENTPOST_API_TOKEN=""
+  fi
   if [[ "$ENABLE_SMTP" == "1" ]]; then
     export AGENTPOST_SMTP_ADDR=":2525"
   else

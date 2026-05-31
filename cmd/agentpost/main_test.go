@@ -619,6 +619,60 @@ max_message_bytes: 0
 	}
 }
 
+func TestLoadConfigClearsAPITokenWhenRequireTokenDisabled(t *testing.T) {
+	t.Setenv("AGENTPOST_API_TOKEN", "stale-shell-token")
+	t.Setenv("AGENTPOST_REQUIRE_TOKEN", "0")
+
+	configPath := t.TempDir() + "/config.yaml"
+	if err := os.WriteFile(configPath, []byte("domain: agent.local\nhttp_addr: :8080\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.APIToken != "" {
+		t.Fatalf("api token = %q, want empty when AGENTPOST_REQUIRE_TOKEN=0", cfg.APIToken)
+	}
+}
+
+func TestGatewayAuthAcceptsBearerCaseInsensitive(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		APIToken:        "secret-gateway-token",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	req.Header.Set("Authorization", "bearer secret-gateway-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("dashboard status = %d, want 200, body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGatewayAuthAcceptsXAgentPostTokenHeader(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		APIToken:        "secret-gateway-token",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	req.Header.Set("X-AgentPost-Token", "secret-gateway-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("dashboard status = %d, want 200, body = %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestRegisterNormalizesProfileAndInboxPolicy(t *testing.T) {
 	app := NewApp(Config{
 		Domain:          "agent.test",
