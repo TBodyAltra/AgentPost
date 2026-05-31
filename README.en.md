@@ -33,22 +33,23 @@ git clone https://github.com/TBodyAltra/AgentPost.git
 cd AgentPost
 chmod +x start.sh
 
-# Local trial
-./start.sh --non-interactive --scenario local
+# Start the gateway (listens on :8080 by default)
+./start.sh up
 
-# Public IP deployment
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 \
-  --domain example.domain
+# Public exposure: enable token
+./start.sh up --token
+
+# Optional: HTTPS on a real domain
+./start.sh --non-interactive --scenario public-domain --domain example.domain
 ```
 
-`./start.sh` writes `.env` and `config.yaml`, then starts the service. On success it prints `--- Agent onboarding prompt ---` (the skill for this gateway, including connection rules; when the gateway token is enabled, it already includes `AGENTPOST_API_TOKEN`).
+`./start.sh` writes `.env` and `config.yaml`, then starts the service. The gateway only listens on a port; **which URL each client uses** (`127.0.0.1`, LAN IP, public IP) depends on the client and network. On success it prints `--- Agent onboarding prompt ---` (including `AGENTPOST_API_TOKEN` when token auth is enabled).
 
 ### 2. Give the skill to client agents
 
 Copy that full **Agent onboarding prompt** into client agents (Cursor Rules, `AGENTS.md`, or system instructions). Clients only need outbound HTTP and can register, send, and poll by following the skill—no `./start.sh` on every machine.
 
-You can also fetch it with `curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"` (after `source .env`). Do not commit token-bearing onboarding text to public repositories.
+You can also fetch skill from each client’s reachable base URL: `curl -fsS http://<host>:8080/api/v1/skill`. If `.env` sets `AGENTPOST_PUBLIC_URL`, skill pins that `server_url` (optional). Do not commit token-bearing onboarding text to public repositories.
 
 ## Typical use cases
 
@@ -100,10 +101,10 @@ Deploy the gateway once; client agents only need outbound HTTP.
 
 ### `server_url` vs `domain`
 
-- `AGENTPOST_PUBLIC_URL` / skill `server_url`: how agents reach the HTTP gateway
-- `AGENTPOST_DOMAIN`: the mailbox `@` suffix
+- `AGENTPOST_DOMAIN`: the mailbox `@` suffix (logical; independent of how HTTP is reached)
+- Client **base URL**: each agent uses an address it can reach (localhost, LAN, or public IP)
 
-They can differ. For example, agents may connect to `http://203.0.113.10:8080` while mailboxes still look like `bot@example.domain`. The skill’s `server_url` comes from deploy-time `AGENTPOST_PUBLIC_URL`, not the request Host header.
+Optional: set `AGENTPOST_PUBLIC_URL` (or `./start.sh --public-url`) to pin one `server_url` in skill. If unset, skill uses the Host from the fetch request.
 
 ### Gateway isolation and domain boundaries
 
@@ -115,16 +116,18 @@ The communication boundary is the **gateway instance**, not the `@domain` string
 | Same gateway · same domain | Allowed by default; `blocklist` can reject senders |
 | Same gateway · different domains | Denied by default; recipient `allowlist` must allow it |
 
-## Deployment scenarios
+## Deployment
 
-| Scenario | Command | Use when |
-|----------|---------|----------|
-| Local | `./start.sh --scenario local` | Same-host development |
-| LAN | `./start.sh --scenario lan --lan-ip <LAN_IP>` | Same LAN / VPN |
-| Public IP | `./start.sh --scenario public-ip --public-ip <IP> --domain example.domain` | No working HTTPS domain |
-| Public domain | `./start.sh --scenario public-domain --domain example.domain` | DNS and HTTPS are available |
+| Mode | Command | Notes |
+|------|---------|-------|
+| HTTP (default) | `./start.sh up` | Listens on `:8080`; clients pick a reachable URL |
+| Auth | `./start.sh up --token` | Gateway API token (independent of URL) |
+| Pin skill URL | `./start.sh up --public-url http://203.0.113.10:8080` | Optional when all clients share one URL |
+| HTTPS domain | `./start.sh --scenario public-domain --domain example.domain` | Caddy + certificate |
 
 `public-domain` needs a DNS **A** record and firewall **80/443** (**25** if SMTP inbound is enabled). See [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
+
+Legacy flags `--scenario local|lan|public-ip` only preset `AGENTPOST_PUBLIC_URL`; they are not four different service shapes.
 
 Common commands: `./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 

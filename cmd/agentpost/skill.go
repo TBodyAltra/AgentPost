@@ -147,9 +147,9 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 		fmt.Fprintf(&b, "部署场景：**`%s`**（安装时通过 `./start.sh` 设定）。\n\n", meta.DeploymentScenario)
 	}
 	if meta.PublicURLSource == "deployment_env" {
-		fmt.Fprintf(&b, "> 下文 `AGENTPOST_SERVER` 来自部署时的 **`AGENTPOST_PUBLIC_URL`**，请原样使用，不要替换为其他 Host（例如未备案域名或错误 IP）。\n\n")
+		fmt.Fprintf(&b, "> 下文 `AGENTPOST_SERVER` 来自部署时可选设置的 **`AGENTPOST_PUBLIC_URL`**（固定 Skill 中的 server_url）。若你的客户端用其他地址能连到同一网关（例如局域网 IP 与公网 IP），以**你实际能访问的 base URL** 为准。\n\n")
 	} else if meta.PublicURLSource == "request_host" {
-		fmt.Fprintf(&b, "> 因未设置 `AGENTPOST_PUBLIC_URL`，`AGENTPOST_SERVER` 由本次 HTTP 请求推断。生产环境请用 `./start.sh --scenario ...` 重新部署，以保证 Skill URL 稳定。\n\n")
+		fmt.Fprintf(&b, "> 未设置 `AGENTPOST_PUBLIC_URL`，`AGENTPOST_SERVER` 由**本次请求**的 Host 推断。不同客户端（本机、局域网、公网）应各自用能连上网关的 base URL 拉取 Skill：`curl <你的BASE_URL>/api/v1/skill`。\n\n")
 	}
 
 	fmt.Fprintf(&b, "## 连接信息\n\n")
@@ -159,6 +159,8 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 	fmt.Fprintf(&b, "注册时可选择**任意合法 mailbox domain**；完整地址 `user@domain` 在本网关上必须唯一。\n\n")
 
 	switch meta.DeploymentScenario {
+	case "http":
+		fmt.Fprintf(&b, "本部署为 **HTTP 端口** 模式：网关监听固定端口，各客户端使用**自己能连上的 base URL**（本机 / 局域网 / 公网 IP 均可）。请开放防火墙 **TCP %s**（若需外网访问）。\n\n", portFromURL(meta.ServerURL))
 	case "public-ip":
 		fmt.Fprintf(&b, "本部署使用**公网 IP + 端口**（无 HTTPS 域名），常见于域名未备案场景。请开放防火墙端口 **%s**。\n\n", portFromURL(meta.ServerURL))
 	case "lan":
@@ -380,9 +382,9 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 		fmt.Fprintf(&b, "Deployment scenario: **`%s`** (set by `./start.sh` during deployment).\n\n", meta.DeploymentScenario)
 	}
 	if meta.PublicURLSource == "deployment_env" {
-		fmt.Fprintf(&b, "> `AGENTPOST_SERVER` below comes from the deployed **`AGENTPOST_PUBLIC_URL`**. Use it exactly as shown; do not replace it with another host, blocked domain, or guessed IP.\n\n")
+		fmt.Fprintf(&b, "> `AGENTPOST_SERVER` comes from optional deploy-time **`AGENTPOST_PUBLIC_URL`** (pins server_url in Skill). If your client reaches this gateway via another URL (LAN vs public IP), use the **base URL that works for you**.\n\n")
 	} else if meta.PublicURLSource == "request_host" {
-		fmt.Fprintf(&b, "> `AGENTPOST_PUBLIC_URL` is not set, so `AGENTPOST_SERVER` was inferred from this HTTP request. For production, redeploy with `./start.sh --scenario ...` so the Skill URL stays stable.\n\n")
+		fmt.Fprintf(&b, "> `AGENTPOST_PUBLIC_URL` is not set; `AGENTPOST_SERVER` is inferred from **this request** Host. Each client (localhost, LAN, internet) should fetch Skill with its own reachable base URL: `curl <YOUR_BASE_URL>/api/v1/skill`.\n\n")
 	}
 
 	fmt.Fprintf(&b, "## Connection information\n\n")
@@ -392,6 +394,8 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 	fmt.Fprintf(&b, "Agents may register any valid mailbox domain. The full address `user@domain` must be unique on this gateway.\n\n")
 
 	switch meta.DeploymentScenario {
+	case "http":
+		fmt.Fprintf(&b, "This deployment uses **HTTP on a host port**. Each client uses the **base URL it can reach** (localhost, LAN IP, or public IP). Open firewall **TCP %s** if clients connect from outside.\n\n", portFromURL(meta.ServerURL))
 	case "public-ip":
 		fmt.Fprintf(&b, "This deployment uses a **public IP + port** without an HTTPS domain. Open firewall port **%s**.\n\n", portFromURL(meta.ServerURL))
 	case "lan":

@@ -20,10 +20,30 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 		caddyContain []string
 	}{
 		{
-			name: "local",
+			name: "default http",
+			args: []string{"configure", "--non-interactive", "--http-port", "18080"},
+			wantEnv: map[string]string{
+				"AGENTPOST_SCENARIO":      "http",
+				"AGENTPOST_DOMAIN":        "agent.local",
+				"AGENTPOST_HTTP_PORT":     "18080",
+				"AGENTPOST_PUBLIC_URL":    "",
+				"AGENTPOST_ENABLE_SMTP":   "0",
+				"AGENTPOST_ENABLE_CADDY":  "0",
+				"AGENTPOST_REQUIRE_TOKEN": "0",
+			},
+			wantConfig: Config{
+				Domain:             "agent.local",
+				HTTPAddr:           ":8080",
+				SMTPAddr:           "",
+				AllowExternalRelay: false,
+				MaxMessageBytes:    defaultMaxMessageBytes,
+			},
+		},
+		{
+			name: "legacy local pins 127.0.0.1 in skill",
 			args: []string{"configure", "--non-interactive", "--scenario", "local", "--http-port", "18080"},
 			wantEnv: map[string]string{
-				"AGENTPOST_SCENARIO":      "local",
+				"AGENTPOST_SCENARIO":      "http",
 				"AGENTPOST_DOMAIN":        "agent.local",
 				"AGENTPOST_HTTP_PORT":     "18080",
 				"AGENTPOST_PUBLIC_URL":    "http://127.0.0.1:18080",
@@ -43,7 +63,7 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 			name: "public IP with SMTP",
 			args: []string{"configure", "--non-interactive", "--scenario", "public-ip", "--public-ip", "203.0.113.10", "--domain", "example.domain", "--http-port", "18081", "--smtp"},
 			wantEnv: map[string]string{
-				"AGENTPOST_SCENARIO":      "public-ip",
+				"AGENTPOST_SCENARIO":      "http",
 				"AGENTPOST_DOMAIN":        "example.domain",
 				"AGENTPOST_HTTP_PORT":     "18081",
 				"AGENTPOST_PUBLIC_URL":    "http://203.0.113.10:18081",

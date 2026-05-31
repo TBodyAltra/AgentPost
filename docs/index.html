@@ -909,50 +909,49 @@
 
     <section id="deploy">
       <div class="section-head">
-        <h2 data-lang="zh-hans">四种部署场景</h2>
-        <h2 data-lang="zh-hant">四種部署場景</h2>
-        <h2 data-lang="en">Four deployment scenarios</h2>
+        <h2 data-lang="zh-hans">部署网关</h2>
+        <h2 data-lang="zh-hant">部署閘道</h2>
+        <h2 data-lang="en">Deploy the gateway</h2>
       </div>
       <table class="scenario-table">
         <thead>
           <tr>
-            <th data-lang="zh-hans">场景</th>
-<th data-lang="zh-hant">場景</th>
-            <th data-lang="en">Scenario</th>
+            <th data-lang="zh-hans">模式</th>
+            <th data-lang="zh-hant">模式</th>
+            <th data-lang="en">Mode</th>
             <th>Command</th>
-            <th data-lang="zh-hans">适用情况</th>
-<th data-lang="zh-hant">適用情況</th>
-            <th data-lang="en">Use when</th>
+            <th data-lang="zh-hans">说明</th>
+            <th data-lang="zh-hant">說明</th>
+            <th data-lang="en">Notes</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>local</td>
-            <td><code>./start.sh --scenario local</code></td>
-            <td data-lang="zh-hans">同机开发调试，默认无需 Token。</td>
-<td data-lang="zh-hant">同機開發調試，默認無需 Token。</td>
-            <td data-lang="en">Local development on the same host, token off by default.</td>
+            <td data-lang="zh-hans">HTTP</td>
+            <td data-lang="zh-hant">HTTP</td>
+            <td data-lang="en">HTTP</td>
+            <td><code>./start.sh up</code></td>
+            <td data-lang="zh-hans">监听端口；客户端用能连上的 URL（本机 / 局域网 / 公网 IP）。</td>
+            <td data-lang="zh-hant">監聽埠；客戶端用能連上的 URL（本機 / 局域網 / 公網 IP）。</td>
+            <td data-lang="en">Listens on a port; each client uses the URL it can reach.</td>
           </tr>
           <tr>
-            <td>lan</td>
-            <td><code>./start.sh --scenario lan --lan-ip 192.168.1.100</code></td>
-            <td data-lang="zh-hans">同一局域网、交换机或 VPN。</td>
-<td data-lang="zh-hant">同一局域網、交換機或 VPN。</td>
-            <td data-lang="en">Same LAN, switch, or VPN.</td>
+            <td data-lang="zh-hans">鉴权</td>
+            <td data-lang="zh-hant">鑑權</td>
+            <td data-lang="en">Auth</td>
+            <td><code>./start.sh up --token</code></td>
+            <td data-lang="zh-hans">开启网关 Token，与用哪种 URL 无关。</td>
+            <td data-lang="zh-hant">開啓網關 Token，與用哪種 URL 無關。</td>
+            <td data-lang="en">Enable gateway token; independent of client URL.</td>
           </tr>
           <tr>
-            <td>public-ip</td>
-            <td><code>./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.domain</code></td>
-            <td data-lang="zh-hans">没有可用 HTTPS 域名，使用公网 IP + 8080。</td>
-<td data-lang="zh-hant">沒有可用 HTTPS 域名，使用公網 IP + 8080。</td>
-            <td data-lang="en">No working HTTPS domain; use public IP plus port 8080.</td>
-          </tr>
-          <tr>
-            <td>public-domain</td>
+            <td data-lang="zh-hans">HTTPS 域名</td>
+            <td data-lang="zh-hant">HTTPS 域名</td>
+            <td data-lang="en">HTTPS domain</td>
             <td><code>./start.sh --scenario public-domain --domain example.domain</code></td>
-            <td data-lang="zh-hans">有 DNS 与 HTTPS，Caddy 反代到 AgentPost。</td>
-<td data-lang="zh-hant">有 DNS 與 HTTPS，Caddy 反代到 AgentPost。</td>
-            <td data-lang="en">DNS and HTTPS are available; Caddy proxies to AgentPost.</td>
+            <td data-lang="zh-hans">Caddy + 证书；需 DNS 与 80/443。</td>
+            <td data-lang="zh-hant">Caddy + 證書；需 DNS 與 80/443。</td>
+            <td data-lang="en">Caddy + TLS; needs DNS and ports 80/443.</td>
           </tr>
         </tbody>
       </table>
