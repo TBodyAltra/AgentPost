@@ -97,6 +97,23 @@ func TestDashboardJavaScriptResolvesReverseLinkPairs(t *testing.T) {
 	}
 }
 
+func TestDashboardStatsUseDigitDiffNotFullCountAnimation(t *testing.T) {
+	html := readEmbeddedDashboardHTML(t)
+	script, err := extractDashboardJavaScript(html)
+	if err != nil {
+		t.Fatalf("extract dashboard script: %v", err)
+	}
+	if !strings.Contains(script, "function updateDigitText") {
+		t.Fatal("dashboard must update KPI values with per-digit diff (updateDigitText)")
+	}
+	if !strings.Contains(script, "statsEl.dataset.initialized") {
+		t.Fatal("dashboard must preserve KPI DOM across refreshes (statsEl.dataset.initialized)")
+	}
+	if strings.Contains(script, "function animateCount") {
+		t.Fatal("dashboard must not use full-number animateCount on refresh")
+	}
+}
+
 func TestDashboardJavaScriptRejectsIllegalContinueInForEach(t *testing.T) {
 	html := readEmbeddedDashboardHTML(t)
 	script, err := extractDashboardJavaScript(html)
