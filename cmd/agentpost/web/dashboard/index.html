@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>AgentPost Dashboard</title>
   <style>
     :root {
@@ -80,7 +81,12 @@
       display: flex; align-items: center; justify-content: center; padding: 1.5rem;
       transition: opacity 0.35s var(--spring);
     }
-    .login-overlay.hidden { opacity: 0; pointer-events: none; }
+    .login-overlay.hidden {
+      display: none !important;
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+    }
     .login-card {
       background: var(--surface-solid); border: 1px solid var(--hairline); border-radius: var(--radius-lg);
       padding: 2.5rem 2.25rem; width: min(400px, 100%); box-shadow: var(--shadow-lg); text-align: center;
@@ -234,7 +240,7 @@
     .graph-empty, .graph-hint {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
       color: var(--text-3); font-size: 0.9rem; flex-direction: column; gap: 0.5rem; text-align: center;
-      padding: 1.5rem; line-height: 1.45;
+      padding: 1.5rem; line-height: 1.45; pointer-events: none;
     }
     .graph-hint strong { color: var(--text-2); font-weight: 600; }
     #graph-matrix { display: none; width: 100%; max-height: 480px; overflow: auto; }
@@ -346,7 +352,7 @@
   </style>
 </head>
 <body>
-  <div id="login" class="login-overlay hidden">
+  <div id="login" class="login-overlay hidden" aria-hidden="true">
     <div class="login-card">
       <div class="login-logo">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 6 9-6"/></svg>
@@ -950,6 +956,17 @@
       return data.domains.flatMap((d) => d.mailboxes);
     }
 
+    function ensureSelection(data) {
+      const emails = allMailboxes(data);
+      if (!emails.length) {
+        state.selected = null;
+        return;
+      }
+      if (!state.selected || !emails.includes(state.selected)) {
+        state.selected = emails[0];
+      }
+    }
+
     function mailboxDomain(data, email) {
       for (const d of data.domains) {
         if (d.mailboxes.includes(email)) return d.domain;
@@ -1030,16 +1047,89 @@
       renderFocusGraph(data);
     }
 
+    function graphThemeColors() {
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
+        (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      return {
+        isDark,
+        accent: isDark ? "#0a84ff" : "#0071e3",
+        textColor: isDark ? "#f5f5f7" : "#1d1d1f",
+        labelColor: isDark ? "#aeaeb2" : "#6e6e73",
+        nodeFill: isDark ? "#2c2c2e" : "#ffffff",
+      };
+    }
+
+    function renderOverviewGraph(data) {
+      const svg = $("graph-svg");
+      const wrap = $("graph-wrap");
+      const nodes = mailboxesMatchingSearch(allMailboxes(data));
+      if (!nodes.length) {
+        svg.innerHTML = "";
+        const e = document.createElement("div");
+        e.className = "graph-empty";
+        e.innerHTML = `<div>${esc(t("graphEmpty"))}</div>`;
+        wrap.appendChild(e);
+        return;
+      }
+
+      const W = Math.max(wrap.clientWidth, 520);
+      const H = Math.max(440, 320);
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      const cx = W / 2, cy = H / 2;
+      const ringR = Math.min(W, H) * (nodes.length <= 4 ? 0.28 : 0.34);
+      const positions = {};
+      nodes.forEach((email, i) => {
+        const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+        positions[email] = { x: cx + ringR * Math.cos(angle), y: cy + ringR * Math.sin(angle) };
+      });
+
+      const { isDark, accent, textColor, nodeFill } = graphThemeColors();
+      const links = filteredLinks(data);
+      const edgeParts = [];
+      const arrowFill = STATUS_COLORS.allowed;
+      let html = `<defs><marker id="arrow-allowed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <path d="M 0 1 L 9 5 L 0 9 z" fill="${arrowFill}"/>
+      </marker></defs>`;
+
+      links.forEach((l) => {
+        if (!nodes.includes(l.from) || !nodes.includes(l.to)) return;
+        const a = positions[l.from], b = positions[l.to];
+        if (!a || !b) return;
+        const fwdOK = deliveryPermits(l.forward_status);
+        const revOK = deliveryPermits(l.reverse_status);
+        if (!fwdOK && !revOK) return;
+        if (fwdOK && revOK) {
+          const pad = 22;
+          const seg = shortenSegment(a.x, a.y, b.x, b.y, pad);
+          const color = edgeColor(l.forward_status === "allowlisted" || l.reverse_status === "allowlisted" ? "allowlisted" : "allowed");
+          html += `<path d="${curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, 0)}" fill="none" stroke="${color}" stroke-width="2.2" opacity="0.88" stroke-linecap="round"/>`;
+          return;
+        }
+        if (fwdOK) appendAllowedEdge(edgeParts, a, b, l.forward_status, 1, null, true);
+        if (revOK) appendAllowedEdge(edgeParts, b, a, l.reverse_status, -1, null, true);
+      });
+      html += edgeParts.join("");
+
+      nodes.forEach((email) => {
+        const p = positions[email];
+        const r = 22;
+        html += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${nodeFill}" stroke="${accent}" stroke-width="2" data-email="${esc(email)}" style="cursor:pointer"/>`;
+        html += `<text class="node-label" x="${p.x}" y="${p.y + 4}" text-anchor="middle" fill="${textColor}">${esc(shortUser(email).slice(0, 12))}</text>`;
+        html += `<text class="node-domain" x="${p.x}" y="${p.y + r + 14}" text-anchor="middle">${esc(mailboxDomain(data, email))}</text>`;
+      });
+
+      svg.innerHTML = html;
+      svg.querySelectorAll("circle[data-email]").forEach((c) => {
+        c.addEventListener("click", () => selectMailbox(c.getAttribute("data-email")));
+      });
+    }
+
     function renderFocusGraph(data) {
       const svg = $("graph-svg");
       const wrap = $("graph-wrap");
       const center = state.selected;
       if (!center) {
-        svg.innerHTML = "";
-        const hint = document.createElement("div");
-        hint.className = "graph-hint";
-        hint.innerHTML = `<strong>${esc(t("graphHintTitle"))}</strong><div>${esc(t("graphHintBody"))}</div>`;
-        wrap.appendChild(hint);
+        renderOverviewGraph(data);
         return;
       }
 
@@ -1058,11 +1148,7 @@
         positions[email] = { x: cx + ringR * Math.cos(angle), y: cy + ringR * Math.sin(angle) };
       });
 
-      const isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
-        (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      const accent = isDark ? "#0a84ff" : "#0071e3";
-      const textColor = isDark ? "#f5f5f7" : "#1d1d1f";
-      const labelColor = isDark ? "#aeaeb2" : "#6e6e73";
+      const { isDark, accent, textColor, labelColor } = graphThemeColors();
       const links = filteredLinks(data);
       const edgeParts = [];
       const arrowFill = STATUS_COLORS.allowed;
@@ -1138,7 +1224,7 @@
         emails.forEach((col) => {
           if (row === col) {
             table += '<td class="cell-self"></td>';
-            continue;
+            return;
           }
           const ok = deliveryAllowed(row, col, links);
           table += ok ? '<td class="cell-allowed"><span class="matrix-dot" aria-label="allowed"></span></td>' : '<td class="cell-empty"></td>';
@@ -1190,6 +1276,7 @@
       try {
         const data = prefetched || await fetchDashboard();
         state.data = data;
+        ensureSelection(data);
         if (!state.graphViewTouched && allMailboxes(data).length > 8) {
           state.graphView = "matrix";
           $("view-seg").querySelectorAll("button").forEach((x) => {
@@ -1212,8 +1299,19 @@
       setTimeout(() => btn.classList.remove("spinning"), 600);
     }
 
-    function showLogin() { $("login").classList.remove("hidden"); $("logout-btn").style.display = "none"; setTimeout(() => $("token-input").focus(), 100); }
-    function hideLogin() { $("login").classList.add("hidden"); $("logout-btn").style.display = state.token ? "inline-flex" : "none"; }
+    function showLogin() {
+      const el = $("login");
+      el.classList.remove("hidden");
+      el.setAttribute("aria-hidden", "false");
+      $("logout-btn").style.display = "none";
+      setTimeout(() => $("token-input").focus(), 100);
+    }
+    function hideLogin() {
+      const el = $("login");
+      el.classList.add("hidden");
+      el.setAttribute("aria-hidden", "true");
+      $("logout-btn").style.display = state.token ? "inline-flex" : "none";
+    }
 
     async function tryLogin(token) {
       const normalized = normalizeToken(token);
@@ -1222,7 +1320,7 @@
       $("login-error").textContent = "";
       if (!normalized) {
         $("login-error").textContent = t("tokenEmpty");
-        return;
+        return false;
       }
       btn.disabled = true;
       btn.textContent = t("connecting");
@@ -1234,10 +1332,12 @@
         if (refreshTimer) clearInterval(refreshTimer);
         await load(false, data);
         refreshTimer = setInterval(() => load(false), 10000);
+        return true;
       } catch (e) {
         state.token = "";
         sessionStorage.removeItem(TOKEN_KEY);
         $("login-error").textContent = e.message || t("connectFailed");
+        return false;
       } finally {
         btn.disabled = false;
         btn.textContent = prevLabel;
@@ -1290,7 +1390,8 @@
     (async function init() {
       const saved = sessionStorage.getItem(TOKEN_KEY);
       if (saved) {
-        await tryLogin(saved);
+        const ok = await tryLogin(saved);
+        if (!ok) showLogin();
         return;
       }
       try {

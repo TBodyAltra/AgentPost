@@ -220,5 +220,9 @@ func (a *App) dashboardHandler() http.Handler {
 	if err != nil {
 		panic(err)
 	}
-	return http.StripPrefix("/dashboard/", http.FileServer(http.FS(sub)))
+	files := http.StripPrefix("/dashboard/", http.FileServer(http.FS(sub)))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		files.ServeHTTP(w, r)
+	})
 }
