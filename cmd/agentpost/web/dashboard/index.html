@@ -1204,7 +1204,7 @@
       const axis = state.matrixAxis;
       const hlRow = axis.row && row === axis.row;
       const hlCol = axis.col && col === axis.col;
-      const focus = hlRow && hlCol && row !== col;
+      const focus = hlRow && hlCol;
       let cls = "";
       if (hlRow || hlCol) cls += " axis-highlight";
       if (focus) cls += " cell-focus";
@@ -1231,7 +1231,6 @@
       }
 
       const links = data.links;
-      const axis = state.matrixAxis;
       const colGroups = groupEmailsByDomain(emails);
       const rowGroups = colGroups;
 
@@ -1259,10 +1258,8 @@
           table += `<th class="${rowCls}" data-email="${esc(row)}" title="${esc(row)}">${matrixUserLabel(row)}</th>`;
           emails.forEach((col) => {
             if (row === col) {
-              const selfCls = axis.row === row && axis.col === col
-                ? "cell-self cell-data axis-highlight cell-focus"
-                : "cell-self cell-data";
-              table += `<td class="${selfCls}" data-row="${esc(row)}" data-col="${esc(col)}" title="${esc(row)}">·</td>`;
+              const axisCls = matrixAxisClasses(row, col);
+              table += `<td class="cell-self cell-data${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}" title="${esc(row)}">·</td>`;
               return;
             }
             const ok = deliveryAllowed(row, col, links);
@@ -1289,8 +1286,7 @@
           ev.stopPropagation();
           const row = td.getAttribute("data-row");
           const col = td.getAttribute("data-col");
-          if (row === col) selectMailbox(row);
-          else selectMatrixCell(row, col);
+          selectMatrixCell(row, col);
         });
       });
     }
