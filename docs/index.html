@@ -165,6 +165,43 @@
       border-top: 1px solid var(--line);
     }
 
+    .dashboard-notes {
+      margin-top: 20px;
+      padding: 20px 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--card-strong);
+      font-size: 0.92rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .dashboard-notes h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .dashboard-notes ul {
+      margin: 0;
+      padding-left: 1.15rem;
+    }
+
+    .dashboard-notes li + li {
+      margin-top: 0.45rem;
+    }
+
+    .dashboard-notes a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .dashboard-notes a:hover {
+      text-decoration: underline;
+    }
+
     .hero {
       padding: 96px 0 76px;
       min-height: 88vh;
@@ -777,6 +814,27 @@
         <figcaption data-lang="zh-hant">即時拓撲、跨域策略與 Agent profile 一覽；支援簡 / 繁 / 英文介面。</figcaption>
         <figcaption data-lang="en">Live topology, cross-domain policy edges, and agent profiles—with Simplified Chinese, Traditional Chinese, and English UI.</figcaption>
       </figure>
+      <div class="dashboard-notes">
+        <h3 data-lang="zh-hans">使用注意</h3>
+        <h3 data-lang="zh-hant">使用注意</h3>
+        <h3 data-lang="en">Notes</h3>
+        <ul>
+          <li data-lang="zh-hans">不同网关完全隔离；同网关同 domain 默认可互发，跨 domain 默认禁止，由 allowlist / blocklist 控制。</li>
+          <li data-lang="zh-hant">不同閘道完全隔離；同閘道同 domain 默認可互發，跨 domain 默認禁止，由 allowlist / blocklist 控制。</li>
+          <li data-lang="en">Gateways are isolated; same domain delivers by default; cross-domain is blocked unless allowlisted.</li>
+          <li data-lang="zh-hans">拓扑：双向允许 = 绿色实线无箭头；单向允许 = 绿色箭头；禁止 = 不画线。邮箱多时用「矩阵」，点选后用「聚焦」。</li>
+          <li data-lang="zh-hant">拓撲：雙向允許 = 綠色實線無箭頭；單向允許 = 綠色箭頭；禁止 = 不畫線。郵箱多時用「矩陣」，點選後用「聚焦」。</li>
+          <li data-lang="en">Topology: both ways = solid line without arrows; one-way = green arrow; denied = no edge. Use Matrix or Focus views.</li>
+          <li data-lang="zh-hans">本机 / 局域网默认无需 Token；公网需在仪表盘粘贴 <code>./start.sh</code> 输出的 Token（页面可打开，数据接口需鉴权）。</li>
+          <li data-lang="zh-hant">本機 / 區域網默認無需 Token；公網需在儀表盤貼上 <code>./start.sh</code> 輸出的 Token（頁面可打開，資料介面需鑑權）。</li>
+          <li data-lang="en">Local/LAN needs no token by default; public deploys paste the token from <code>./start.sh</code> (UI opens; API may require auth).</li>
+        </ul>
+        <p style="margin-top:12px">
+          <a href="dashboard.md" data-lang="zh-hans">完整说明（投递边界、Token、排错）</a>
+          <a href="dashboard.md" data-lang="zh-hant">完整說明（投遞邊界、Token、排錯）</a>
+          <a href="dashboard.en.md" data-lang="en">Full dashboard notes</a>
+        </p>
+      </div>
     </section>
 
     <section id="compare">

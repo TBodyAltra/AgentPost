@@ -120,6 +120,8 @@ Or copy the full onboarding prompt / skill for clients (includes token when gate
 curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"
 ```
 
+Ops dashboard (`/dashboard/`): delivery policy and topology notes in [docs/dashboard.md](docs/dashboard.md). When `AGENTPOST_REQUIRE_TOKEN=0`, do not leave a stale `AGENTPOST_API_TOKEN` in the shell or Docker env or local deploys will incorrectly require auth.
+
 ## Common mistakes
 
 1. **Leaving `AGENTPOST_PUBLIC_URL=https://blocked.domain`** while users access via IP — skill and agents will point at the wrong URL. Use `--scenario public-ip`.
