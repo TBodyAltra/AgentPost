@@ -37,6 +37,27 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
   });
 
+  test("search narrows matrix without broken layout", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, 2);
+    await expect(page.locator(".matrix-table")).toBeVisible();
+
+    const search = page.locator("#search-input");
+    await search.fill("alpha");
+    await expect(page.locator(".matrix-table tbody tr")).toHaveCount(1, { timeout: 5000 });
+    await expect(page.locator("#filter-seg")).toHaveCount(0);
+    await expect(page.locator(".matrix-table td.cell-allowed")).toHaveCount(0);
+  });
+
+  test("detail shows only allowed delivery peers", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, 2);
+    await page.locator(".mailbox-row").first().click();
+    await expect(page.locator("#detail-panel")).toHaveClass(/open/);
+    await expect(page.locator(".status-pill")).toHaveCount(0);
+    await expect(page.locator("#detail-content")).not.toContainText("Inbox Policy");
+  });
+
   test("language and refresh controls respond", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, 2);

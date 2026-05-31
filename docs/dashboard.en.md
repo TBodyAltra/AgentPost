@@ -18,12 +18,12 @@ Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresse
 
 ## How to read the delivery matrix
 
-- The **delivery matrix** is shown by default: row → column; a green dot means the row mailbox may deliver to the column.
-- Use the top **search** bar to filter mailboxes or domains. Click a row header, column header, or cell to select a mailbox.
+- The **delivery matrix** is shown by default: **row = sender, column = recipient**; a green dot means delivery is allowed (denied directions are omitted).
+- Use the top **search** bar to narrow the matrix; the table auto-sizes columns, scrolls horizontally, and row/column headers can be resized by dragging.
 - **Mailbox details** stay hidden until you select a mailbox (from the matrix or the list below). Close the panel with ×.
-- Under **Delivery**, the detail panel splits relationships into:
-  - **Can send to** (this mailbox → peer): outbound delivery allowed or denied.
-  - **Can receive from** (peer → this mailbox): inbound delivery allowed or denied.
+- Under **Delivery**, only **allowed** directions are listed:
+  - **Can send to** (this mailbox → peer)
+  - **Can receive from** (peer → this mailbox)
 
 ## Gateway token and login
 

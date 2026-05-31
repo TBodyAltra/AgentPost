@@ -155,7 +155,6 @@
       display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem;
       line-height: 1.1; white-space: nowrap; transition: color 0.2s; z-index: 1;
     }
-    #filter-seg button { font-size: 0.72rem; padding: 0.35rem 0.55rem; }
     .segmented button.active { color: var(--text); background: var(--surface-solid); box-shadow: var(--shadow-sm); font-weight: 600; }
     .segmented button svg { width: 14px; height: 14px; }
 
@@ -246,26 +245,39 @@
       padding: 1.5rem; line-height: 1.45; pointer-events: none;
     }
     .graph-hint strong { color: var(--text-2); font-weight: 600; }
-    #graph-matrix { display: block; width: 100%; max-height: min(62vh, 560px); overflow: auto; }
+    #graph-matrix {
+      display: block; width: 100%; max-height: min(62vh, 560px); overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
     #graph-svg { display: none !important; }
-    .matrix-table { border-collapse: separate; border-spacing: 0; font-size: 0.72rem; width: max-content; min-width: 100%; }
+    .matrix-table {
+      border-collapse: separate; border-spacing: 0; font-size: 0.72rem;
+      width: max-content; table-layout: auto; margin: 0 auto;
+    }
     .matrix-table th, .matrix-table td {
-      border: 1px solid var(--hairline); padding: 0; text-align: center; vertical-align: middle;
+      border: 1px solid var(--hairline); text-align: center; vertical-align: middle;
       background: var(--surface-solid);
     }
-    .matrix-table thead th {
-      position: sticky; top: 0; z-index: 2; font-weight: 600; color: var(--text-2);
-      padding: 0.35rem 0.25rem; min-width: 2rem; max-width: 4.5rem;
-      font-family: var(--mono); font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    .matrix-table thead th.corner {
+      position: sticky; top: 0; left: 0; z-index: 3; min-width: 2.75rem; width: 2.75rem;
+      background: var(--surface-solid);
     }
-    .matrix-table tbody th {
+    .matrix-table thead th.col-header {
+      position: sticky; top: 0; z-index: 2; font-weight: 600; color: var(--text-2);
+      padding: 0.4rem 0.5rem; font-family: var(--mono); font-size: 0.68rem;
+      white-space: nowrap; cursor: pointer; resize: horizontal; overflow: auto;
+      min-width: 2.25rem; max-width: 14rem;
+    }
+    .matrix-table tbody th.row-header {
       position: sticky; left: 0; z-index: 1; text-align: left; font-weight: 600;
-      padding: 0.35rem 0.55rem; min-width: 5.5rem; max-width: 9rem;
-      font-family: var(--mono); font-size: 0.68rem; cursor: pointer;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      padding: 0.4rem 0.65rem; font-family: var(--mono); font-size: 0.68rem; cursor: pointer;
+      white-space: nowrap; resize: horizontal; overflow: auto;
+      min-width: 4rem; max-width: 16rem;
     }
     .matrix-table tbody th.selected, .matrix-table thead th.selected-col { background: var(--accent-soft); color: var(--accent); }
-    .matrix-table td { width: 2rem; height: 2rem; cursor: default; }
+    .matrix-table td {
+      width: 1.75rem; min-width: 1.75rem; height: 1.75rem; padding: 0; cursor: default;
+    }
     .matrix-table td.cell-allowed { background: rgba(52, 199, 89, 0.22); }
     :root[data-theme="dark"] .matrix-table td.cell-allowed { background: rgba(48, 209, 88, 0.28); }
     .matrix-table td.cell-self { background: var(--surface-2); }
@@ -425,11 +437,6 @@
           <span class="panel-title" id="topology-title">投递矩阵</span>
           <span class="spacer"></span>
           <span class="refresh-note" id="refresh-note"><span class="live-dot"></span>实时 · 10s</span>
-          <div class="segmented" id="filter-seg">
-            <button data-filter="all" class="active" id="filter-all">全部</button>
-            <button data-filter="cross" id="filter-cross">仅跨域</button>
-            <button data-filter="blocked" id="filter-blocked">仅阻断</button>
-          </div>
         </div>
         <div class="legend" id="legend">
           <span class="legend-item">
@@ -476,17 +483,8 @@
         themeDark: "深色",
         topology: "投递矩阵",
         live: "实时 · 10s",
-        filterAll: "全部",
-        filterCross: "仅跨域",
-        filterBlocked: "仅禁止",
-        viewFocus: "聚焦",
-        viewMatrix: "矩阵",
-        legendAllowed: "允许投递",
-        legendMutual: "双向允许（无箭头）",
-        legendMatrix: "行 → 列：允许投递",
-        graphHintTitle: "选择邮箱查看投递关系",
-        graphHintBody: "在下方列表或搜索后点击邮箱，此处显示以该邮箱为中心的投递图（仅相关节点与连线）。",
-        matrixNote: "绿点表示该行邮箱可向列邮箱投递；行首点击可选中邮箱。",
+        legendMatrix: "行 = 发件人，列 = 收件人；绿点 = 允许投递",
+        matrixNote: "绿点表示该行邮箱可向列邮箱投递；点击行首或列头可选中邮箱。",
         matrixTruncated: "邮箱较多，仅显示前 {n} 个；请用搜索缩小范围。",
         detailTitle: "邮箱详情",
         detailEmpty: "点击邮箱或拓扑节点查看详情",
@@ -512,15 +510,12 @@
         name: "名称",
         responsibilities: "职责",
         capabilities: "能力",
-        defaultPolicy: "默认策略（同域允许投递，跨域默认禁止）",
         peers: "投递关系",
         none: "无",
         tokenInvalid: "Token 无效或未配置",
         requestFailed: "请求失败",
         refreshed: "已刷新",
         connectFailed: "连接失败",
-        statusAllowed: "允许投递",
-        statusDenied: "禁止投递",
         deliveryOut: "发出",
         deliveryIn: "接收",
         deliveryOutboundTitle: "可发出至",
@@ -542,17 +537,8 @@
         themeDark: "深色",
         topology: "投遞矩陣",
         live: "即時 · 10s",
-        filterAll: "全部",
-        filterCross: "僅跨域",
-        filterBlocked: "僅禁止",
-        viewFocus: "聚焦",
-        viewMatrix: "矩陣",
-        legendAllowed: "允許投遞",
-        legendMutual: "雙向允許（無箭頭）",
-        legendMatrix: "列 → 欄：允許投遞",
-        graphHintTitle: "選擇郵箱查看投遞關係",
-        graphHintBody: "在下方列表或搜尋後點擊郵箱，此處顯示以該郵箱為中心的投遞圖（僅相關節點與連線）。",
-        matrixNote: "綠點表示該列郵箱可向該欄郵箱投遞；列首點擊可選中郵箱。",
+        legendMatrix: "列 = 寄件人，欄 = 收件人；綠點 = 允許投遞",
+        matrixNote: "綠點表示該列郵箱可向該欄郵箱投遞；點擊列首或欄頭可選中郵箱。",
         matrixTruncated: "郵箱較多，僅顯示前 {n} 個；請用搜尋縮小範圍。",
         detailTitle: "郵箱詳情",
         detailEmpty: "點擊郵箱或拓撲節點查看詳情",
@@ -578,15 +564,12 @@
         name: "名稱",
         responsibilities: "職責",
         capabilities: "能力",
-        defaultPolicy: "預設策略（同域允許投遞，跨域預設禁止）",
         peers: "投遞關係",
         none: "無",
         tokenInvalid: "Token 無效或未設定",
         requestFailed: "請求失敗",
         refreshed: "已重新整理",
         connectFailed: "連線失敗",
-        statusAllowed: "允許投遞",
-        statusDenied: "禁止投遞",
         deliveryOut: "發出",
         deliveryIn: "接收",
         deliveryOutboundTitle: "可發出至",
@@ -608,17 +591,8 @@
         themeDark: "Dark",
         topology: "Delivery matrix",
         live: "Live · 10s",
-        filterAll: "All",
-        filterCross: "Cross-domain",
-        filterBlocked: "Denied only",
-        viewFocus: "Focus",
-        viewMatrix: "Matrix",
-        legendAllowed: "Allowed delivery",
-        legendMutual: "Both ways (no arrow)",
-        legendMatrix: "Row → column: allowed",
-        graphHintTitle: "Select a mailbox",
-        graphHintBody: "Click a mailbox in the list below to see its delivery graph—only related nodes and allowed edges.",
-        matrixNote: "Green dot = row can deliver to column. Click a row label to select that mailbox.",
+        legendMatrix: "Row = sender, column = recipient; green dot = allowed",
+        matrixNote: "Green dot = row mailbox can deliver to column mailbox. Click row or column header to select.",
         matrixTruncated: "Showing first {n} mailboxes only; use search to narrow the list.",
         detailTitle: "Mailbox details",
         detailEmpty: "Select a mailbox or graph node",
@@ -644,15 +618,12 @@
         name: "Name",
         responsibilities: "Responsibilities",
         capabilities: "Capabilities",
-        defaultPolicy: "Default (same-domain allowed; cross-domain denied)",
         peers: "Delivery",
         none: "None",
         tokenInvalid: "Invalid or missing token",
         requestFailed: "Request failed",
         refreshed: "Refreshed",
         connectFailed: "Connection failed",
-        statusAllowed: "Allowed",
-        statusDenied: "Denied",
         deliveryOut: "Outbound",
         deliveryIn: "Inbound",
         deliveryOutboundTitle: "Can send to",
@@ -664,7 +635,7 @@
     };
 
     let lang = "zh-hans";
-    let state = { data: null, selected: null, token: "", filter: "all", search: "", prevStats: {} };
+    let state = { data: null, selected: null, token: "", search: "", prevStats: {} };
     const MATRIX_CAP = 20;
     let refreshTimer = null;
 
@@ -673,14 +644,6 @@
     function t(key) {
       const pack = I18N[lang] || I18N["zh-hans"];
       return pack[key] ?? I18N["zh-hans"][key] ?? key;
-    }
-
-    function statusLabel(status) {
-      return deliveryPermits(status) ? t("statusAllowed") : t("statusDenied");
-    }
-
-    function statusClass(status) {
-      return deliveryPermits(status) ? "allowed" : "blocked";
     }
 
     function deliveryPermits(status) {
@@ -724,9 +687,6 @@
       dot.className = "live-dot";
       dot.setAttribute("aria-hidden", "true");
       note.append(dot, document.createTextNode(t("live")));
-      $("filter-all").textContent = t("filterAll");
-      $("filter-cross").textContent = t("filterCross");
-      $("filter-blocked").textContent = t("filterBlocked");
       $("legend-matrix").textContent = t("legendMatrix");
       $("detail-close").setAttribute("aria-label", t("closeDetail"));
       $("detail-title").textContent = t("detailTitle");
@@ -878,15 +838,10 @@
       const outbound = [];
       const inbound = [];
       data.links.forEach((l) => {
-        if (l.from === email) outbound.push({ peer: l.to, status: l.forward_status });
-        if (l.to === email) inbound.push({ peer: l.from, status: l.reverse_status });
+        if (l.from === email && deliveryPermits(l.forward_status)) outbound.push({ peer: l.to });
+        if (l.to === email && deliveryPermits(l.reverse_status)) inbound.push({ peer: l.from });
       });
-      const sortPeers = (list) => list.sort((a, b) => {
-        const ao = deliveryPermits(a.status) ? 0 : 1;
-        const bo = deliveryPermits(b.status) ? 0 : 1;
-        if (ao !== bo) return ao - bo;
-        return a.peer.localeCompare(b.peer);
-      });
+      const sortPeers = (list) => list.sort((a, b) => a.peer.localeCompare(b.peer));
       return { outbound: sortPeers(outbound), inbound: sortPeers(inbound) };
     }
 
@@ -917,12 +872,6 @@
           ${p.notes ? `<div class="detail-kv" style="margin-top:0.5rem;color:var(--text-2)">${esc(p.notes)}</div>` : ""}
         </div></div>` : ""}
         <div class="detail-section">
-          <h3 data-sec>Inbox Policy <span class="chev">⌄</span></h3><div class="sec-body">
-          ${renderTags("Blocklist", mb.inbox_policy?.blocklist || [])}
-          ${renderTags("Allowlist", mb.inbox_policy?.allowlist || [])}
-          ${!(mb.inbox_policy?.blocklist?.length || mb.inbox_policy?.allowlist?.length) ? `<div class="detail-kv" style="color:var(--text-3)">${esc(t("defaultPolicy"))}</div>` : ""}
-        </div></div>
-        <div class="detail-section">
           <h3 data-sec>${t("peers")} <span class="chev">⌄</span></h3>
           <div class="sec-body">
             ${renderDeliveryBlock(t("deliveryOutboundTitle"), t("deliveryOutboundHint"), outbound, "out")}
@@ -950,7 +899,7 @@
 
     function peerRow(l, arrow) {
       return `<div class="link-row" data-peer="${esc(l.peer)}">
-        <span class="status-pill status-${statusClass(l.status)}">${esc(statusLabel(l.status))}</span>
+        <span class="matrix-dot" aria-hidden="true"></span>
         <span class="dir">${arrow} ${esc(l.peer)}</span>
       </div>`;
     }
@@ -984,16 +933,6 @@
         renderDetail(state.data, email, changed);
         renderGraph(state.data);
       }
-    }
-
-    function filteredLinks(data) {
-      return data.links.filter((l) => {
-        if (state.filter === "cross") return !l.same_domain;
-        if (state.filter === "blocked") {
-          return !deliveryPermits(l.forward_status) || !deliveryPermits(l.reverse_status);
-        }
-        return true;
-      });
     }
 
     function allMailboxes(data) {
@@ -1031,18 +970,11 @@
     }
 
     function emailsForMatrix(data) {
-      const links = filteredLinks(data);
-      let emails;
-      if (state.filter === "all") emails = allMailboxes(data);
-      else {
-        emails = [];
-        const seen = new Set();
-        links.forEach((l) => {
-          [l.from, l.to].forEach((e) => { if (!seen.has(e)) { seen.add(e); emails.push(e); } });
-        });
+      let emails = mailboxesMatchingSearch(allMailboxes(data));
+      if (state.selected && !emails.includes(state.selected)) {
+        emails = [state.selected, ...emails];
       }
-      emails = mailboxesMatchingSearch(emails).sort();
-      return emails;
+      return emails.sort();
     }
 
     function deliveryAllowed(from, to, links) {
@@ -1082,16 +1014,16 @@
         return;
       }
 
-      const links = filteredLinks(data);
+      const links = data.links;
       const sel = state.selected;
-      let table = '<table class="matrix-table"><thead><tr><th></th>';
+      let table = '<table class="matrix-table"><thead><tr><th class="corner" aria-hidden="true"></th>';
       emails.forEach((col) => {
-        const cls = col === sel ? "selected-col" : "";
-        table += `<th class="${cls}" data-email="${esc(col)}" title="${esc(col)}" style="cursor:pointer">${esc(shortUser(col))}</th>`;
+        const cls = col === sel ? "selected-col col-header" : "col-header";
+        table += `<th class="${cls}" data-email="${esc(col)}" title="${esc(col)}">${esc(shortUser(col))}</th>`;
       });
       table += "</tr></thead><tbody>";
       emails.forEach((row) => {
-        const rowCls = row === sel ? "selected" : "";
+        const rowCls = row === sel ? "selected row-header" : "row-header";
         table += `<tr><th class="${rowCls}" data-email="${esc(row)}" title="${esc(row)}">${esc(shortUser(row))}</th>`;
         emails.forEach((col) => {
           if (row === col) {
@@ -1100,7 +1032,7 @@
           }
           const ok = deliveryAllowed(row, col, links);
           table += ok
-            ? `<td class="cell-allowed" data-row="${esc(row)}" title="${esc(row)} → ${esc(col)}"><span class="matrix-dot" aria-label="allowed"></span></td>`
+            ? `<td class="cell-allowed" data-row="${esc(row)}" data-col="${esc(col)}" title="${esc(row)} → ${esc(col)}"><span class="matrix-dot" aria-label="allowed"></span></td>`
             : `<td class="cell-empty" data-row="${esc(row)}"></td>`;
         });
         table += "</tr>";
@@ -1108,6 +1040,7 @@
       table += "</tbody></table>";
       const note = `<div class="matrix-note">${esc(t("matrixNote"))}${truncated ? " " + esc(t("matrixTruncated").replace("{n}", String(MATRIX_CAP))) : ""}</div>`;
       matrixEl.innerHTML = table + note;
+      fitMatrixColumns(matrixEl);
       matrixEl.querySelectorAll("tbody th[data-email]").forEach((th) => {
         th.addEventListener("click", () => selectMailbox(th.getAttribute("data-email")));
       });
@@ -1116,6 +1049,38 @@
       });
       matrixEl.querySelectorAll("td[data-row]").forEach((td) => {
         td.addEventListener("click", () => selectMailbox(td.getAttribute("data-row")));
+      });
+    }
+
+    function fitMatrixColumns(matrixEl) {
+      const table = matrixEl.querySelector(".matrix-table");
+      if (!table) return;
+      const measure = document.createElement("span");
+      measure.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:600 0.68rem var(--mono);padding:0 0.65rem";
+      document.body.appendChild(measure);
+      const colHeaders = table.querySelectorAll("thead th.col-header");
+      colHeaders.forEach((th) => {
+        measure.textContent = th.textContent;
+        const w = Math.ceil(measure.getBoundingClientRect().width + 14);
+        th.style.width = Math.min(180, Math.max(36, w)) + "px";
+      });
+      const rowHeaders = table.querySelectorAll("tbody th.row-header");
+      rowHeaders.forEach((th) => {
+        measure.textContent = th.textContent;
+        const w = Math.ceil(measure.getBoundingClientRect().width + 18);
+        th.style.width = Math.min(220, Math.max(64, w)) + "px";
+      });
+      measure.remove();
+      colHeaders.forEach((th, i) => {
+        const w = th.style.width;
+        if (!w) return;
+        table.querySelectorAll("tbody tr").forEach((tr) => {
+          const cell = tr.children[i + 1];
+          if (cell && cell.tagName === "TD") {
+            cell.style.width = w;
+            cell.style.minWidth = w;
+          }
+        });
       });
     }
 
@@ -1201,12 +1166,6 @@
     $("refresh-btn").addEventListener("click", doRefresh);
 
     $("detail-close").addEventListener("click", clearMailboxSelection);
-
-    $("filter-seg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-      state.filter = b.dataset.filter;
-      $("filter-seg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
-      if (state.data) renderGraph(state.data);
-    }));
 
     const searchInput = $("search-input");
     searchInput.addEventListener("input", () => {
