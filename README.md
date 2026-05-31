@@ -33,22 +33,20 @@ git clone https://github.com/TBodyAltra/AgentPost.git
 cd AgentPost
 chmod +x start.sh
 
-# 本机试用
-./start.sh --non-interactive --scenario local
+# 启动网关
+./start.sh --non-interactive up
 
-# 公网 IP 部署
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 \
-  --domain example.domain
+# 可选：HTTPS 域名（Caddy）
+./start.sh --non-interactive up --domain example.domain --caddy --token
 ```
 
-`./start.sh` 会生成 `.env`、`config.yaml` 并启动服务。成功后终端会打印 `--- Agent onboarding prompt ---`（即当前网关的 Skill，含连接规则；公网启用 Token 时已包含 `AGENTPOST_API_TOKEN`）。
+`./start.sh` 会生成 `.env`、`config.yaml` 并启动服务。成功后终端会打印 `--- Agent onboarding prompt ---`：其中列出**当前可用**的连接地址（本机、局域网 IP、公网 IP、HTTPS 域名——检测不到的不写入）；启用 Token 时含 `AGENTPOST_API_TOKEN`。
 
 ### 2. 拷贝 Skill 给客户端 Agent
 
 将上述 **Agent onboarding prompt** 全文复制给客户端 Agent（Cursor Rules、`AGENTS.md` 或系统提示）。客户端只需出站 HTTP，按 Skill 注册、发信、轮询即可连接，无需在每台机器上再跑 `./start.sh`。
 
-也可从 Skill URL 拉取：`curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"`（先 `source .env`）。请勿把含 Token 的接入说明提交到公开仓库。
+客户端用自己可达的地址拉取 Skill，例如：`curl -fsS http://127.0.0.1:8080/api/v1/skill` 或 `curl -fsS http://<局域网IP>:8080/api/v1/skill`。请勿把含 Token 的接入说明提交到公开仓库。
 
 ## 典型使用场景
 
@@ -98,12 +96,12 @@ flowchart LR
 
 网关只需部署一次；客户端 Agent 只需要出站 HTTP。
 
-### `server_url` 与 `domain` 分离
+### 连接地址与 `domain` 分离
 
-- `AGENTPOST_PUBLIC_URL` / Skill `server_url`：Agent 如何访问 HTTP 网关
-- `AGENTPOST_DOMAIN`：邮箱地址的 `@` 后缀
+- **客户端基础 URL**：每台 Agent 用自己可达的地址（本机 / 局域网 / 公网 IP / HTTPS 域名），见 onboarding prompt 与 Skill 中的 `connection_urls`
+- **`AGENTPOST_DOMAIN`**：邮箱 `@` 后缀（可与 HTTP 访问方式无关）
 
-两者可以不同。例如 HTTP 通过 `http://203.0.113.10:8080` 访问，邮箱仍是 `bot@example.domain`。Skill 中的 `server_url` 来自部署时写入的 `AGENTPOST_PUBLIC_URL`，不会随请求 Host 改变。
+例如某客户端通过 `http://203.0.113.10:8080` 连接，邮箱仍可以是 `bot@example.domain`。
 
 ### 网关隔离与 domain 边界
 
@@ -115,16 +113,17 @@ flowchart LR
 | 同一网关 · 同一 domain | 默认可互发；可用 `blocklist` 拦截 |
 | 同一网关 · 不同 domain | 默认禁止；需收件方 `allowlist` 放行 |
 
-## 部署场景
+## 部署
 
-| 场景 | 命令 | 适用情况 |
-|------|------|----------|
-| 本机 | `./start.sh --scenario local` | 同机开发调试 |
-| 局域网 | `./start.sh --scenario lan --lan-ip <LAN_IP>` | 同一 LAN / VPN |
-| 公网 IP | `./start.sh --scenario public-ip --public-ip <IP> --domain example.domain` | 没有可用 HTTPS 域名 |
-| 公网域名 | `./start.sh --scenario public-domain --domain example.domain` | 有 DNS 与 HTTPS |
+| 方式 | 命令 |
+|------|------|
+| 默认 | `./start.sh up` |
+| 公网建议开 Token | `./start.sh up --token` |
+| HTTPS 域名（可选） | `./start.sh up --domain example.domain --caddy --token` |
 
-`public-domain` 需 DNS **A** 记录、防火墙 **80/443**（SMTP 入站另开 **25**）。详见 [`deploy/public-domain.example.md`](deploy/public-domain.example.md)。
+HTTPS 需 DNS **A** 记录、防火墙 **80/443**。详见 [`deploy/public-domain.example.md`](deploy/public-domain.example.md)。
+
+旧版 `--scenario local|lan|public-ip|public-domain` 仍可用（兼容脚本）；新部署推荐只用上表。
 
 常用命令：`./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 
