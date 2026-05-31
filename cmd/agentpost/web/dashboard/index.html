@@ -184,6 +184,26 @@
     }
     .kpi .value.small { font-size: 0.95rem; font-weight: 600; }
     .kpi.highlight .value { color: var(--ok); }
+    .kpi .value.digit-value {
+      display: inline-flex;
+      align-items: baseline;
+      flex-wrap: nowrap;
+    }
+    .digit-cell {
+      display: inline-block;
+      min-width: 0.52em;
+      text-align: center;
+    }
+    .digit-cell.digit-changed {
+      animation: digit-tick 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    @keyframes digit-tick {
+      from { opacity: 0.35; transform: translateY(0.42em); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .digit-cell.digit-changed { animation: none; }
+    }
 
     .workspace {
       flex: 1; display: grid;
@@ -876,17 +896,39 @@
       return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
     }
 
-    function animateCount(el, to) {
-      const from = Number(el.dataset.v || 0);
-      if (from === to) { el.textContent = to; el.dataset.v = to; return; }
-      const dur = 500, start = performance.now();
-      function step(now) {
-        const p = Math.min((now - start) / dur, 1);
-        el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3)));
-        if (p < 1) requestAnimationFrame(step);
-        else { el.dataset.v = to; el.textContent = to; }
+    function updateDigitText(el, nextText) {
+      const prev = el.dataset.text ?? el.textContent ?? "";
+      if (prev === nextText) return;
+      if (!el.dataset.text) {
+        el.textContent = nextText;
+        el.classList.add("digit-value");
+        el.dataset.text = nextText;
+        return;
       }
-      requestAnimationFrame(step);
+      const prevChars = [...prev];
+      const nextChars = [...nextText];
+      el.textContent = "";
+      el.classList.add("digit-value");
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      nextChars.forEach((ch, i) => {
+        const span = document.createElement("span");
+        span.className = "digit-cell";
+        span.textContent = ch;
+        const oldCh = i < prevChars.length ? prevChars[i] : null;
+        if (!reduced && oldCh !== null && oldCh !== ch) {
+          span.classList.add("digit-changed");
+          span.addEventListener("animationend", () => span.classList.remove("digit-changed"), { once: true });
+        }
+        el.appendChild(span);
+      });
+      el.dataset.text = nextText;
+    }
+
+    function updateStatNumber(el, value) {
+      if (!el) return;
+      const nextText = String(value);
+      updateDigitText(el, nextText);
+      el.dataset.v = nextText;
     }
 
     function renderStats(data) {
@@ -904,14 +946,26 @@
         ["unread", t("statUnread"), g.total_queued_messages ?? 0, "highlight"],
         ["lk", t("statPairs"), countAllowedEdges(data.links), ""],
       ];
-      $("stats").innerHTML = items.map(([k, l, , cls]) =>
-        `<div class="kpi ${cls}"><div class="label">${l}</div><div class="value" id="stat-${k}" data-v="0">0</div></div>`
-      ).join("") + `<div class="kpi"><div class="label">${t("statUpdated")}</div><div class="value small">${new Date(data.generated_at).toLocaleTimeString()}</div></div>`;
+      const statsEl = $("stats");
+      if (!statsEl.dataset.initialized) {
+        statsEl.innerHTML = items.map(([k, l, , cls]) =>
+          `<div class="kpi ${cls}" data-stat-k="${k}"><div class="label">${l}</div><div class="value digit-value" id="stat-${k}"></div></div>`
+        ).join("") + `<div class="kpi" data-stat-k="updated"><div class="label">${t("statUpdated")}</div><div class="value small digit-value" id="stat-updated"></div></div>`;
+        statsEl.dataset.initialized = "1";
+      } else {
+        items.forEach(([k, l, , cls]) => {
+          const card = statsEl.querySelector(`[data-stat-k="${k}"]`);
+          if (!card) return;
+          card.className = `kpi ${cls}`.trim();
+          const label = card.querySelector(".label");
+          if (label) label.textContent = l;
+        });
+        const updatedCard = statsEl.querySelector('[data-stat-k="updated"] .label');
+        if (updatedCard) updatedCard.textContent = t("statUpdated");
+      }
 
-      items.forEach(([k, , v]) => {
-        const el = $("stat-" + k);
-        if (el) animateCount(el, v);
-      });
+      items.forEach(([k, , v]) => updateStatNumber($("stat-" + k), v));
+      updateDigitText($("stat-updated"), new Date(data.generated_at).toLocaleTimeString());
     }
 
     function collectDeliveryPeers(data, email) {
