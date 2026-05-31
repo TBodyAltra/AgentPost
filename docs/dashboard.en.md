@@ -14,17 +14,16 @@ The isolation boundary is the **gateway instance**, not the `@domain` suffix. In
 | **Recipient `allowlist`** | Permit listed sender domains | Green arrow or mutual line for that direction only |
 | **Recipient `blocklist`** | Deny listed senders | **No line** for blocked directions |
 
-Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresses or `@domain` suffixes). The detail panel lists `→` / `←` peers as “allowed” or “denied” delivery.
+Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresses or `@domain` suffixes).
 
-## How to read the topology
+## How to read the delivery matrix
 
-- **Focus**: select a mailbox in the list below; only its neighbors are drawn.
-- **Matrix**: row → column; a green dot means the row mailbox may deliver to the column. Switches automatically when there are more than eight mailboxes.
-- **Allowed delivery**: green arrow along the permitted direction.
-- **Both ways allowed**: green solid line **without** arrows (merged when A↔B are both allowed).
-- **Denied delivery**: **no edge** (denied paths are not drawn).
-
-The legend only shows “allowed →” and “both ways (no arrow)”.
+- The **delivery matrix** is shown by default: row → column; a green dot means the row mailbox may deliver to the column.
+- Use the top **search** bar to filter mailboxes or domains. Click a row header, column header, or cell to select a mailbox.
+- **Mailbox details** stay hidden until you select a mailbox (from the matrix or the list below). Close the panel with ×.
+- Under **Delivery**, the detail panel splits relationships into:
+  - **Can send to** (this mailbox → peer): outbound delivery allowed or denied.
+  - **Can receive from** (peer → this mailbox): inbound delivery allowed or denied.
 
 ## Gateway token and login
 
@@ -64,7 +63,7 @@ Paste the token **as printed** (no extra spaces or newlines). The connect button
 
 ### UI looks like the old “interconnection” layout
 
-Rebuild, redeploy, and hard-refresh. The current UI uses “Delivery topology” with Focus / Matrix views.
+Rebuild, redeploy, and hard-refresh. The current UI uses “Delivery matrix” by default; details open on selection.
 
 ## See also
 

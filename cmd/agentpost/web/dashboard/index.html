@@ -201,8 +201,11 @@
     .toast.ok .tdot { background: var(--ok); }
 
     /* ---------- Layout ---------- */
-    .layout { display: grid; grid-template-columns: 1fr 360px; gap: 1.25rem; padding: 1.1rem 1.5rem 2rem; align-items: start; }
-    @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+    .layout { display: grid; grid-template-columns: 1fr; gap: 1.25rem; padding: 1.1rem 1.5rem 2rem; align-items: start; }
+    .layout.has-detail { grid-template-columns: 1fr min(360px, 38vw); }
+    @media (max-width: 1000px) {
+      .layout.has-detail { grid-template-columns: 1fr; }
+    }
     .card { background: var(--surface-solid); border: 1px solid var(--hairline); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
 
     .panel-head {
@@ -243,9 +246,8 @@
       padding: 1.5rem; line-height: 1.45; pointer-events: none;
     }
     .graph-hint strong { color: var(--text-2); font-weight: 600; }
-    #graph-matrix { display: none; width: 100%; max-height: 480px; overflow: auto; }
-    #graph-matrix.active { display: block; }
-    #graph-svg.hidden { display: none; }
+    #graph-matrix { display: block; width: 100%; max-height: min(62vh, 560px); overflow: auto; }
+    #graph-svg { display: none !important; }
     .matrix-table { border-collapse: separate; border-spacing: 0; font-size: 0.72rem; width: max-content; min-width: 100%; }
     .matrix-table th, .matrix-table td {
       border: 1px solid var(--hairline); padding: 0; text-align: center; vertical-align: middle;
@@ -272,6 +274,7 @@
     .matrix-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
 
     /* Search */
+    .search-toolbar { padding: 0.35rem 1.5rem 0.15rem; max-width: 520px; }
     .search-bar { padding: 1.1rem 0 0; }
     .search-field { position: relative; }
     .search-field svg { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-3); pointer-events: none; }
@@ -315,7 +318,19 @@
     .queue-badge.has-msg { background: rgba(52,199,89,0.16); color: var(--ok); font-weight: 600; }
 
     /* Detail */
-    .detail-panel { position: sticky; top: 58px; overflow: hidden; }
+    .detail-panel { display: none; position: sticky; top: 58px; overflow: hidden; }
+    .detail-panel.open { display: block; }
+    .detail-close {
+      margin-left: auto; width: 30px; height: 30px; border: none; border-radius: 8px;
+      background: var(--surface-2); color: var(--text-2); cursor: pointer; font-size: 1.1rem; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .detail-close:hover { background: var(--hairline-strong); color: var(--text); }
+    .delivery-block { margin-bottom: 1rem; }
+    .delivery-block:last-child { margin-bottom: 0; }
+    .delivery-block h4 { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.45rem; font-weight: 600; }
+    .delivery-block .hint { font-size: 0.76rem; color: var(--text-3); margin-bottom: 0.5rem; }
+    .delivery-list { max-height: 200px; overflow: auto; }
     .detail-body { padding: 1.25rem 1.3rem; max-height: calc(100vh - 150px); overflow: auto; }
     .detail-body.swap { animation: detailSwap 0.32s var(--spring); }
     @keyframes detailSwap { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
@@ -395,17 +410,21 @@
 
   <div class="stats" id="stats"></div>
 
-  <div class="layout">
+  <div class="search-toolbar">
+    <div class="search-field" id="search-field">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" id="search-input" placeholder="Search mailboxes or domains" autocomplete="off">
+      <button type="button" class="search-clear" id="search-clear" aria-label="清除">✕</button>
+    </div>
+  </div>
+
+  <div class="layout" id="main-layout">
     <div>
       <section class="card">
         <div class="panel-head">
-          <span class="panel-title" id="topology-title">投递拓扑</span>
+          <span class="panel-title" id="topology-title">投递矩阵</span>
           <span class="spacer"></span>
           <span class="refresh-note" id="refresh-note"><span class="live-dot"></span>实时 · 10s</span>
-          <div class="segmented" id="view-seg" role="tablist" aria-label="Graph view">
-            <button type="button" data-view="focus" class="active" id="view-focus">聚焦</button>
-            <button type="button" data-view="matrix" id="view-matrix">矩阵</button>
-          </div>
           <div class="segmented" id="filter-seg">
             <button data-filter="all" class="active" id="filter-all">全部</button>
             <button data-filter="cross" id="filter-cross">仅跨域</button>
@@ -413,41 +432,26 @@
           </div>
         </div>
         <div class="legend" id="legend">
-          <span class="legend-item" id="legend-focus-items">
-            <span class="dot" style="background:var(--ok)"></span><span id="legend-allowed">允许投递</span><span style="color:var(--text-3);margin-left:0.15rem">→</span>
-          </span>
-          <span class="legend-item" id="legend-mutual-item">
-            <span style="display:inline-block;width:22px;height:0;border-top:2px solid var(--ok);vertical-align:middle;margin-right:0.35rem"></span><span id="legend-mutual">双向允许（无箭头）</span>
-          </span>
-          <span class="legend-item hidden" id="legend-matrix-item">
+          <span class="legend-item">
             <span class="matrix-dot" style="vertical-align:middle;margin-right:0.35rem"></span><span id="legend-matrix">行 → 列：允许投递</span>
           </span>
         </div>
         <div class="graph-wrap" id="graph-wrap">
-          <svg id="graph-svg" aria-label="Delivery topology"></svg>
+          <svg id="graph-svg" aria-hidden="true"></svg>
           <div id="graph-matrix" aria-label="Delivery matrix"></div>
         </div>
       </section>
 
-      <div class="search-bar">
-        <div class="search-field" id="search-field">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="search" id="search-input" placeholder="Search mailboxes or domains" autocomplete="off">
-          <button type="button" class="search-clear" id="search-clear" aria-label="清除">✕</button>
-        </div>
-      </div>
       <div class="domain-grid" id="domain-grid"></div>
     </div>
 
-    <aside class="card detail-panel">
-      <div class="panel-head"><span class="panel-title" id="detail-title">邮箱详情</span></div>
+    <aside class="card detail-panel" id="detail-panel">
+      <div class="panel-head">
+        <span class="panel-title" id="detail-title">邮箱详情</span>
+        <button type="button" class="detail-close" id="detail-close" aria-label="Close">×</button>
+      </div>
       <div class="detail-body" id="detail-body">
-        <div id="detail-content">
-          <div class="detail-empty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 6 9-6"/></svg>
-            <div id="detail-empty-text">点击邮箱或拓扑节点查看详情</div>
-          </div>
-        </div>
+        <div id="detail-content"></div>
       </div>
     </aside>
   </div>
@@ -470,7 +474,7 @@
         themeAutoBtn: "自动",
         themeLight: "浅色",
         themeDark: "深色",
-        topology: "投递拓扑",
+        topology: "投递矩阵",
         live: "实时 · 10s",
         filterAll: "全部",
         filterCross: "仅跨域",
@@ -519,6 +523,11 @@
         statusDenied: "禁止投递",
         deliveryOut: "发出",
         deliveryIn: "接收",
+        deliveryOutboundTitle: "可发出至",
+        deliveryInboundTitle: "可接收自",
+        deliveryOutboundHint: "本账号 → 对方邮箱",
+        deliveryInboundHint: "对方邮箱 → 本账号",
+        closeDetail: "关闭详情",
       },
       "zh-hant": {
         loginDesc: "輸入閘道 API Token 查看註冊域、郵箱投遞策略與帳戶詳情。",
@@ -531,7 +540,7 @@
         themeAutoBtn: "自動",
         themeLight: "淺色",
         themeDark: "深色",
-        topology: "投遞拓撲",
+        topology: "投遞矩陣",
         live: "即時 · 10s",
         filterAll: "全部",
         filterCross: "僅跨域",
@@ -580,6 +589,11 @@
         statusDenied: "禁止投遞",
         deliveryOut: "發出",
         deliveryIn: "接收",
+        deliveryOutboundTitle: "可發出至",
+        deliveryInboundTitle: "可接收自",
+        deliveryOutboundHint: "本帳號 → 對方郵箱",
+        deliveryInboundHint: "對方郵箱 → 本帳號",
+        closeDetail: "關閉詳情",
       },
       en: {
         loginDesc: "Enter the gateway API token to inspect domains, delivery policy, and account details.",
@@ -592,7 +606,7 @@
         themeAutoBtn: "Auto",
         themeLight: "Light",
         themeDark: "Dark",
-        topology: "Delivery topology",
+        topology: "Delivery matrix",
         live: "Live · 10s",
         filterAll: "All",
         filterCross: "Cross-domain",
@@ -641,11 +655,16 @@
         statusDenied: "Denied",
         deliveryOut: "Outbound",
         deliveryIn: "Inbound",
+        deliveryOutboundTitle: "Can send to",
+        deliveryInboundTitle: "Can receive from",
+        deliveryOutboundHint: "This mailbox → peer",
+        deliveryInboundHint: "Peer → this mailbox",
+        closeDetail: "Close details",
       },
     };
 
     let lang = "zh-hans";
-    let state = { data: null, selected: null, token: "", filter: "all", search: "", graphView: "focus", prevStats: {} };
+    let state = { data: null, selected: null, token: "", filter: "all", search: "", prevStats: {} };
     const MATRIX_CAP = 20;
     let refreshTimer = null;
 
@@ -705,17 +724,12 @@
       dot.className = "live-dot";
       dot.setAttribute("aria-hidden", "true");
       note.append(dot, document.createTextNode(t("live")));
-      $("view-focus").textContent = t("viewFocus");
-      $("view-matrix").textContent = t("viewMatrix");
       $("filter-all").textContent = t("filterAll");
       $("filter-cross").textContent = t("filterCross");
       $("filter-blocked").textContent = t("filterBlocked");
-      $("legend-allowed").textContent = t("legendAllowed");
-      $("legend-mutual").textContent = t("legendMutual");
       $("legend-matrix").textContent = t("legendMatrix");
-      updateLegendForView();
+      $("detail-close").setAttribute("aria-label", t("closeDetail"));
       $("detail-title").textContent = t("detailTitle");
-      $("detail-empty-text").textContent = t("detailEmpty");
       $("search-input").placeholder = t("searchPlaceholder");
       const themeSeg = $("theme-seg");
       const autoThemeBtn = themeSeg.querySelector('[data-theme="auto"]');
@@ -860,20 +874,28 @@
       document.querySelectorAll(".mailbox-row").forEach((el) => el.addEventListener("click", () => selectMailbox(el.dataset.email)));
     }
 
+    function collectDeliveryPeers(data, email) {
+      const outbound = [];
+      const inbound = [];
+      data.links.forEach((l) => {
+        if (l.from === email) outbound.push({ peer: l.to, status: l.forward_status });
+        if (l.to === email) inbound.push({ peer: l.from, status: l.reverse_status });
+      });
+      const sortPeers = (list) => list.sort((a, b) => {
+        const ao = deliveryPermits(a.status) ? 0 : 1;
+        const bo = deliveryPermits(b.status) ? 0 : 1;
+        if (ao !== bo) return ao - bo;
+        return a.peer.localeCompare(b.peer);
+      });
+      return { outbound: sortPeers(outbound), inbound: sortPeers(inbound) };
+    }
+
     function renderDetail(data, email, animate) {
       const mb = data.mailboxes.find((m) => m.email === email);
       const body = $("detail-body");
       if (animate) { body.classList.remove("swap"); void body.offsetWidth; body.classList.add("swap"); }
       if (!mb) { $("detail-content").innerHTML = `<div class="detail-empty">${esc(t("detailMissing"))}</div>`; return; }
-      const peerDirs = [];
-      data.links.forEach((l) => {
-        if (l.from === email) {
-          peerDirs.push({ peer: l.to, dir: "out", status: l.forward_status });
-        } else if (l.to === email) {
-          peerDirs.push({ peer: l.from, dir: "in", status: l.reverse_status });
-        }
-      });
-      peerDirs.sort((a, b) => a.peer.localeCompare(b.peer) || a.dir.localeCompare(b.dir));
+      const { outbound, inbound } = collectDeliveryPeers(data, email);
       const p = mb.profile || {};
 
       $("detail-content").innerHTML = `
@@ -901,8 +923,11 @@
           ${!(mb.inbox_policy?.blocklist?.length || mb.inbox_policy?.allowlist?.length) ? `<div class="detail-kv" style="color:var(--text-3)">${esc(t("defaultPolicy"))}</div>` : ""}
         </div></div>
         <div class="detail-section">
-          <h3 data-sec>${t("peers")} · ${peerDirs.length} <span class="chev">⌄</span></h3>
-          <div class="sec-body link-list">${peerDirs.slice(0, 60).map(peerRow).join("") || `<div class="detail-kv" style="color:var(--text-3)">${t("none")}</div>`}</div>
+          <h3 data-sec>${t("peers")} <span class="chev">⌄</span></h3>
+          <div class="sec-body">
+            ${renderDeliveryBlock(t("deliveryOutboundTitle"), t("deliveryOutboundHint"), outbound, "out")}
+            ${renderDeliveryBlock(t("deliveryInboundTitle"), t("deliveryInboundHint"), inbound, "in")}
+          </div>
         </div>`;
 
       $("detail-content").querySelectorAll("h3[data-sec]").forEach((h) => {
@@ -913,12 +938,20 @@
       });
     }
 
-    function peerRow(l) {
-      const arrow = l.dir === "out" ? "→" : "←";
-      const label = l.dir === "out" ? t("deliveryOut") : t("deliveryIn");
+    function renderDeliveryBlock(title, hint, peers, dir) {
+      const arrow = dir === "out" ? "→" : "←";
+      const rows = peers.slice(0, 60).map((l) => peerRow(l, arrow)).join("");
+      return `<div class="delivery-block">
+        <h4>${esc(title)}</h4>
+        <div class="hint">${esc(hint)}</div>
+        <div class="delivery-list link-list">${rows || `<div class="detail-kv" style="color:var(--text-3)">${t("none")}</div>`}</div>
+      </div>`;
+    }
+
+    function peerRow(l, arrow) {
       return `<div class="link-row" data-peer="${esc(l.peer)}">
         <span class="status-pill status-${statusClass(l.status)}">${esc(statusLabel(l.status))}</span>
-        <span class="dir">${arrow} ${esc(l.peer)} <span style="color:var(--text-3)">(${label})</span></span>
+        <span class="dir">${arrow} ${esc(l.peer)}</span>
       </div>`;
     }
 
@@ -927,10 +960,30 @@
       return `<div class="detail-kv"><strong>${label}</strong></div><div class="tag-list">${items.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>`;
     }
 
+    function updateDetailPanel() {
+      const open = !!state.selected;
+      $("detail-panel").classList.toggle("open", open);
+      $("main-layout").classList.toggle("has-detail", open);
+    }
+
+    function clearMailboxSelection() {
+      state.selected = null;
+      updateDetailPanel();
+      if (state.data) {
+        renderDomains(state.data);
+        renderGraph(state.data);
+      }
+    }
+
     function selectMailbox(email) {
       const changed = state.selected !== email;
       state.selected = email;
-      if (state.data) { renderDomains(state.data); renderDetail(state.data, email, changed); renderGraph(state.data); }
+      updateDetailPanel();
+      if (state.data) {
+        renderDomains(state.data);
+        renderDetail(state.data, email, changed);
+        renderGraph(state.data);
+      }
     }
 
     function filteredLinks(data) {
@@ -943,15 +996,6 @@
       });
     }
 
-    function updateLegendForView() {
-      const matrix = state.graphView === "matrix";
-      $("legend-focus-items").classList.toggle("hidden", matrix);
-      $("legend-mutual-item").classList.toggle("hidden", matrix);
-      $("legend-matrix-item").classList.toggle("hidden", !matrix);
-      $("graph-svg").classList.toggle("hidden", matrix);
-      $("graph-matrix").classList.toggle("active", matrix);
-    }
-
     function allMailboxes(data) {
       return data.domains.flatMap((d) => d.mailboxes);
     }
@@ -960,10 +1004,12 @@
       const emails = allMailboxes(data);
       if (!emails.length) {
         state.selected = null;
+        updateDetailPanel();
         return;
       }
-      if (!state.selected || !emails.includes(state.selected)) {
-        state.selected = emails[0];
+      if (state.selected && !emails.includes(state.selected)) {
+        state.selected = null;
+        updateDetailPanel();
       }
     }
 
@@ -1004,201 +1050,27 @@
       return link && deliveryPermits(link.forward_status);
     }
 
-    function focusPeers(center, data) {
-      const peers = new Set();
-      filteredLinks(data).forEach((l) => {
-        if (l.from !== center && l.to !== center) return;
-        const other = l.from === center ? l.to : l.from;
-        if (state.filter === "blocked") {
-          if (!deliveryPermits(l.forward_status) || !deliveryPermits(l.reverse_status)) peers.add(other);
-          return;
-        }
-        const outOK = l.from === center && deliveryPermits(l.forward_status);
-        const inOK = l.to === center && deliveryPermits(l.reverse_status);
-        if (outOK || inOK) peers.add(other);
-      });
-      return [...peers];
-    }
-
     function clearGraphOverlays(wrap) {
       wrap.querySelector(".graph-empty")?.remove();
       wrap.querySelector(".graph-hint")?.remove();
     }
 
     function renderGraph(data) {
-      updateLegendForView();
       const wrap = $("graph-wrap");
       clearGraphOverlays(wrap);
       $("graph-matrix").innerHTML = "";
       if (!data.domains.length) {
-        $("graph-svg").innerHTML = "";
         const e = document.createElement("div");
         e.className = "graph-empty";
         e.innerHTML = `<div>${esc(t("graphEmpty"))}</div>`;
         wrap.appendChild(e);
         return;
       }
-      if (state.graphView === "matrix") {
-        $("graph-svg").innerHTML = "";
-        renderMatrix(data);
-        return;
-      }
-      $("graph-matrix").classList.remove("active");
-      renderFocusGraph(data);
-    }
-
-    function graphThemeColors() {
-      const isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
-        (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      return {
-        isDark,
-        accent: isDark ? "#0a84ff" : "#0071e3",
-        textColor: isDark ? "#f5f5f7" : "#1d1d1f",
-        labelColor: isDark ? "#aeaeb2" : "#6e6e73",
-        nodeFill: isDark ? "#2c2c2e" : "#ffffff",
-      };
-    }
-
-    function renderOverviewGraph(data) {
-      const svg = $("graph-svg");
-      const wrap = $("graph-wrap");
-      const nodes = mailboxesMatchingSearch(allMailboxes(data));
-      if (!nodes.length) {
-        svg.innerHTML = "";
-        const e = document.createElement("div");
-        e.className = "graph-empty";
-        e.innerHTML = `<div>${esc(t("graphEmpty"))}</div>`;
-        wrap.appendChild(e);
-        return;
-      }
-
-      const W = Math.max(wrap.clientWidth, 520);
-      const H = Math.max(440, 320);
-      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-      const cx = W / 2, cy = H / 2;
-      const ringR = Math.min(W, H) * (nodes.length <= 4 ? 0.28 : 0.34);
-      const positions = {};
-      nodes.forEach((email, i) => {
-        const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
-        positions[email] = { x: cx + ringR * Math.cos(angle), y: cy + ringR * Math.sin(angle) };
-      });
-
-      const { isDark, accent, textColor, nodeFill } = graphThemeColors();
-      const links = filteredLinks(data);
-      const edgeParts = [];
-      const arrowFill = STATUS_COLORS.allowed;
-      let html = `<defs><marker id="arrow-allowed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
-        <path d="M 0 1 L 9 5 L 0 9 z" fill="${arrowFill}"/>
-      </marker></defs>`;
-
-      links.forEach((l) => {
-        if (!nodes.includes(l.from) || !nodes.includes(l.to)) return;
-        const a = positions[l.from], b = positions[l.to];
-        if (!a || !b) return;
-        const fwdOK = deliveryPermits(l.forward_status);
-        const revOK = deliveryPermits(l.reverse_status);
-        if (!fwdOK && !revOK) return;
-        if (fwdOK && revOK) {
-          const pad = 22;
-          const seg = shortenSegment(a.x, a.y, b.x, b.y, pad);
-          const color = edgeColor(l.forward_status === "allowlisted" || l.reverse_status === "allowlisted" ? "allowlisted" : "allowed");
-          html += `<path d="${curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, 0)}" fill="none" stroke="${color}" stroke-width="2.2" opacity="0.88" stroke-linecap="round"/>`;
-          return;
-        }
-        if (fwdOK) appendAllowedEdge(edgeParts, a, b, l.forward_status, 1, null, true);
-        if (revOK) appendAllowedEdge(edgeParts, b, a, l.reverse_status, -1, null, true);
-      });
-      html += edgeParts.join("");
-
-      nodes.forEach((email) => {
-        const p = positions[email];
-        const r = 22;
-        html += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${nodeFill}" stroke="${accent}" stroke-width="2" data-email="${esc(email)}" style="cursor:pointer"/>`;
-        html += `<text class="node-label" x="${p.x}" y="${p.y + 4}" text-anchor="middle" fill="${textColor}">${esc(shortUser(email).slice(0, 12))}</text>`;
-        html += `<text class="node-domain" x="${p.x}" y="${p.y + r + 14}" text-anchor="middle">${esc(mailboxDomain(data, email))}</text>`;
-      });
-
-      svg.innerHTML = html;
-      svg.querySelectorAll("circle[data-email]").forEach((c) => {
-        c.addEventListener("click", () => selectMailbox(c.getAttribute("data-email")));
-      });
-    }
-
-    function renderFocusGraph(data) {
-      const svg = $("graph-svg");
-      const wrap = $("graph-wrap");
-      const center = state.selected;
-      if (!center) {
-        renderOverviewGraph(data);
-        return;
-      }
-
-      const peers = focusPeers(center, data);
-      const nodes = [center, ...peers];
-      const W = Math.max(wrap.clientWidth, 520);
-      const H = Math.max(440, 320);
-      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-
-      const cx = W / 2, cy = H / 2;
-      const positions = {};
-      positions[center] = { x: cx, y: cy };
-      const ringR = Math.min(W, H) * 0.34;
-      peers.forEach((email, i) => {
-        const angle = peers.length ? (2 * Math.PI * i) / peers.length - Math.PI / 2 : 0;
-        positions[email] = { x: cx + ringR * Math.cos(angle), y: cy + ringR * Math.sin(angle) };
-      });
-
-      const { isDark, accent, textColor, labelColor } = graphThemeColors();
-      const links = filteredLinks(data);
-      const edgeParts = [];
-      const arrowFill = STATUS_COLORS.allowed;
-
-      let html = `<defs><marker id="arrow-allowed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
-        <path d="M 0 1 L 9 5 L 0 9 z" fill="${arrowFill}"/>
-      </marker></defs>`;
-
-      links.forEach((l) => {
-        if (!nodes.includes(l.from) || !nodes.includes(l.to)) return;
-        const a = positions[l.from], b = positions[l.to];
-        if (!a || !b) return;
-        const fwdOK = deliveryPermits(l.forward_status);
-        const revOK = deliveryPermits(l.reverse_status);
-        if (!fwdOK && !revOK) return;
-
-        if (fwdOK && revOK) {
-          const pad = 26;
-          const seg = shortenSegment(a.x, a.y, b.x, b.y, pad);
-          const color = edgeColor(l.forward_status === "allowlisted" || l.reverse_status === "allowlisted" ? "allowlisted" : "allowed");
-          const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, 0);
-          html += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.4" opacity="0.88" stroke-linecap="round"/>`;
-          return;
-        }
-        if (fwdOK) appendAllowedEdge(edgeParts, a, b, l.forward_status, 1, null, true);
-        if (revOK) appendAllowedEdge(edgeParts, b, a, l.reverse_status, -1, null, true);
-      });
-      html += edgeParts.join("");
-
-      nodes.forEach((email) => {
-        const p = positions[email], on = email === center;
-        const r = on ? 28 : 22;
-        html += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${on ? accent : (isDark ? "#2c2c2e" : "#ffffff")}" stroke="${accent}" stroke-width="${on ? 3 : 2}" data-email="${esc(email)}" style="cursor:pointer"/>`;
-        html += `<text class="node-label" x="${p.x}" y="${p.y + 4}" text-anchor="middle" fill="${on ? "#fff" : textColor}">${esc(shortUser(email).slice(0, 12))}</text>`;
-        html += `<text class="node-domain" x="${p.x}" y="${p.y + r + 14}" text-anchor="middle">${esc(mailboxDomain(data, email))}</text>`;
-      });
-
-      if (!peers.length) {
-        html += `<text x="${cx}" y="${cy + 52}" text-anchor="middle" fill="${labelColor}" font-size="12">${esc(t("none"))}</text>`;
-      }
-
-      svg.innerHTML = html;
-      svg.querySelectorAll("circle[data-email]").forEach((c) => {
-        c.addEventListener("click", () => selectMailbox(c.getAttribute("data-email")));
-      });
+      renderMatrix(data);
     }
 
     function renderMatrix(data) {
       const matrixEl = $("graph-matrix");
-      matrixEl.classList.add("active");
       let emails = emailsForMatrix(data);
       let truncated = false;
       if (emails.length > MATRIX_CAP) {
@@ -1215,7 +1087,7 @@
       let table = '<table class="matrix-table"><thead><tr><th></th>';
       emails.forEach((col) => {
         const cls = col === sel ? "selected-col" : "";
-        table += `<th class="${cls}" title="${esc(col)}">${esc(shortUser(col))}</th>`;
+        table += `<th class="${cls}" data-email="${esc(col)}" title="${esc(col)}" style="cursor:pointer">${esc(shortUser(col))}</th>`;
       });
       table += "</tr></thead><tbody>";
       emails.forEach((row) => {
@@ -1227,7 +1099,9 @@
             return;
           }
           const ok = deliveryAllowed(row, col, links);
-          table += ok ? '<td class="cell-allowed"><span class="matrix-dot" aria-label="allowed"></span></td>' : '<td class="cell-empty"></td>';
+          table += ok
+            ? `<td class="cell-allowed" data-row="${esc(row)}" title="${esc(row)} → ${esc(col)}"><span class="matrix-dot" aria-label="allowed"></span></td>`
+            : `<td class="cell-empty" data-row="${esc(row)}"></td>`;
         });
         table += "</tr>";
       });
@@ -1237,36 +1111,12 @@
       matrixEl.querySelectorAll("tbody th[data-email]").forEach((th) => {
         th.addEventListener("click", () => selectMailbox(th.getAttribute("data-email")));
       });
-    }
-
-    function shortenSegment(ax, ay, bx, by, pad) {
-      const dx = bx - ax, dy = by - ay;
-      const len = Math.hypot(dx, dy) || 1;
-      return {
-        x1: ax + (dx / len) * pad,
-        y1: ay + (dy / len) * pad,
-        x2: bx - (dx / len) * pad,
-        y2: by - (dy / len) * pad,
-      };
-    }
-
-    function curvedPath(x1, y1, x2, y2, offset) {
-      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-      const dx = x2 - x1, dy = y2 - y1;
-      const len = Math.hypot(dx, dy) || 1;
-      const nx = (-dy / len) * offset * 10;
-      const ny = (dx / len) * offset * 10;
-      return `M ${x1} ${y1} Q ${mx + nx} ${my + ny} ${x2} ${y2}`;
-    }
-
-    function appendAllowedEdge(htmlParts, from, to, status, offset, sel, related) {
-      const pad = 22;
-      const seg = shortenSegment(from.x, from.y, to.x, to.y, pad);
-      const color = edgeColor(status);
-      const opacity = sel ? (related ? 0.92 : 0.1) : 0.78;
-      const width = related && sel ? 2.5 : 1.85;
-      const path = curvedPath(seg.x1, seg.y1, seg.x2, seg.y2, offset);
-      htmlParts.push(`<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round" marker-end="url(#arrow-allowed)"/>`);
+      matrixEl.querySelectorAll("thead th[data-email]").forEach((th) => {
+        th.addEventListener("click", () => selectMailbox(th.getAttribute("data-email")));
+      });
+      matrixEl.querySelectorAll("td[data-row]").forEach((td) => {
+        td.addEventListener("click", () => selectMailbox(td.getAttribute("data-row")));
+      });
     }
 
     function esc(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); }
@@ -1277,12 +1127,7 @@
         const data = prefetched || await fetchDashboard();
         state.data = data;
         ensureSelection(data);
-        if (!state.graphViewTouched && allMailboxes(data).length > 8) {
-          state.graphView = "matrix";
-          $("view-seg").querySelectorAll("button").forEach((x) => {
-            x.classList.toggle("active", x.dataset.view === state.graphView);
-          });
-        }
+        updateDetailPanel();
         renderStats(data); renderDomains(data); renderGraph(data);
         if (state.selected) renderDetail(data, state.selected, false);
         if (manual) showToast(t("refreshed"), "ok");
@@ -1349,17 +1194,13 @@
     $("logout-btn").addEventListener("click", () => {
       sessionStorage.removeItem(TOKEN_KEY);
       state.token = ""; state.data = null; state.selected = null;
+      updateDetailPanel();
       if (refreshTimer) clearInterval(refreshTimer);
       showLogin();
     });
     $("refresh-btn").addEventListener("click", doRefresh);
 
-    $("view-seg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-      state.graphView = b.dataset.view;
-      state.graphViewTouched = true;
-      $("view-seg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
-      if (state.data) renderGraph(state.data);
-    }));
+    $("detail-close").addEventListener("click", clearMailboxSelection);
 
     $("filter-seg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
       state.filter = b.dataset.filter;
@@ -1382,7 +1223,10 @@
 
     document.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); searchInput.focus(); }
-      if (e.key === "Escape" && document.activeElement === searchInput) { searchInput.value = ""; state.search = ""; $("search-field").classList.remove("has-value"); if (state.data) renderDomains(state.data); }
+      if (e.key === "Escape" && document.activeElement === searchInput) {
+        searchInput.value = ""; state.search = ""; $("search-field").classList.remove("has-value");
+        if (state.data) { renderDomains(state.data); renderGraph(state.data); }
+      }
     });
 
     window.addEventListener("resize", () => state.data && renderGraph(state.data));
