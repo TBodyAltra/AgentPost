@@ -636,8 +636,9 @@
         matrixTruncated: "仅显示前 {n} 个邮箱，请用搜索缩小范围。",
         detailTitle: "邮箱详情",
         searchPlaceholder: "搜索邮箱或 domain，/正则/",
-        searchRegexActive: "正则匹配（邮箱或 domain）",
+        searchRegexActive: "正则匹配（邮箱、用户名或 domain）",
         searchRegexInvalid: "正则无效：{msg}",
+        searchRegexIncomplete: "正则未闭合，请写成 /pattern/ 或 /pattern/i",
         statMailboxes: "活跃邮箱",
         statDomains: "网域",
         statUnread: "待收信件",
@@ -698,8 +699,9 @@
         matrixTruncated: "僅顯示前 {n} 個郵箱，請用搜尋縮小範圍。",
         detailTitle: "郵箱詳情",
         searchPlaceholder: "搜尋郵箱或 domain，/正則/",
-        searchRegexActive: "正則匹配（郵箱或 domain）",
+        searchRegexActive: "正則匹配（郵箱、使用者名稱或 domain）",
         searchRegexInvalid: "正則無效：{msg}",
+        searchRegexIncomplete: "正則未閉合，請寫成 /pattern/ 或 /pattern/i",
         statMailboxes: "活躍郵箱",
         statDomains: "網域",
         statUnread: "待收信件",
@@ -760,8 +762,9 @@
         matrixTruncated: "Showing first {n} mailboxes; narrow with search.",
         detailTitle: "Mailbox",
         searchPlaceholder: "Search mailboxes or /regex/",
-        searchRegexActive: "Regex match (mailbox or domain)",
+        searchRegexActive: "Regex match (mailbox, username, or domain)",
         searchRegexInvalid: "Invalid regex: {msg}",
+        searchRegexIncomplete: "Unclosed regex; use /pattern/ or /pattern/i",
         statMailboxes: "Active",
         statDomains: "Domains",
         statUnread: "Queued mail",
@@ -944,25 +947,61 @@
       return at >= 0 ? email.slice(at + 1) : "";
     }
 
+    function regexTestFlags(flags) {
+      return String(flags || "i").replace(/[gy]/g, "");
+    }
+
+    function makeRegexTester(source, flags) {
+      const safeFlags = regexTestFlags(flags);
+      return (s) => {
+        if (s == null || s === "") return false;
+        return new RegExp(source, safeFlags).test(String(s));
+      };
+    }
+
+    /** Parse `/body/flags` with escaped slashes in body. */
+    function parseSlashRegex(trimmed) {
+      let i = 1;
+      while (i < trimmed.length) {
+        const ch = trimmed[i];
+        if (ch === "\\") {
+          i += 2;
+          continue;
+        }
+        if (ch === "/") {
+          const body = trimmed.slice(1, i);
+          const flags = trimmed.slice(i + 1);
+          if (flags && !/^[dgimsuvy]*$/i.test(flags)) {
+            return { kind: "invalid", error: `invalid flags: ${flags}`, test: () => false };
+          }
+          try {
+            const safeFlags = regexTestFlags(flags);
+            const re = new RegExp(body, safeFlags || "i");
+            return {
+              kind: "regex",
+              re,
+              test: makeRegexTester(re.source, re.flags),
+            };
+          } catch (e) {
+            return { kind: "invalid", error: e.message || String(e), test: () => false };
+          }
+        }
+        i += 1;
+      }
+      return {
+        kind: "incomplete",
+        error: "missing closing /",
+        test: () => false,
+      };
+    }
+
   /** @returns {{ kind: string, test: (s: string) => boolean, needle?: string, re?: RegExp, error?: string }} */
     function parseSearchQuery(raw) {
       const trimmed = String(raw ?? "").trim();
       if (!trimmed) return { kind: "none", test: () => true };
 
       if (trimmed.startsWith("/")) {
-        const last = trimmed.lastIndexOf("/");
-        if (last > 0) {
-          const body = trimmed.slice(1, last);
-          const flags = trimmed.slice(last + 1);
-          if (!flags || /^[dgimsuvy]*$/i.test(flags)) {
-            try {
-              const re = new RegExp(body, flags || "i");
-              return { kind: "regex", re, test: (s) => re.test(s) };
-            } catch (e) {
-              return { kind: "invalid", error: e.message || String(e), test: () => false };
-            }
-          }
-        }
+        return parseSlashRegex(trimmed);
       }
 
       const needle = trimmed.toLowerCase();
@@ -973,10 +1012,26 @@
       };
     }
 
-    function mailboxMatchesSearch(email, domain, matcher) {
+    function mailboxLocalPart(email) {
+      const at = email.indexOf("@");
+      return at >= 0 ? email.slice(0, at) : email;
+    }
+
+    function mailboxMatchesSearch(email, domain, matcher, profile) {
       if (!matcher || matcher.kind === "none") return true;
-      if (matcher.kind === "invalid") return false;
-      return matcher.test(email) || matcher.test(domain);
+      if (matcher.kind === "invalid" || matcher.kind === "incomplete") return false;
+      if (matcher.test(email) || matcher.test(domain) || matcher.test(mailboxLocalPart(email))) {
+        return true;
+      }
+      if (!profile) return false;
+      if (profile.display_name && matcher.test(profile.display_name)) return true;
+      if (profile.host && matcher.test(profile.host)) return true;
+      if (profile.responsibilities && matcher.test(profile.responsibilities)) return true;
+      if (profile.notes && matcher.test(profile.notes)) return true;
+      for (const list of [profile.skills, profile.capabilities, profile.mcp_services]) {
+        if (list?.some((item) => matcher.test(item))) return true;
+      }
+      return false;
     }
 
     function updateSearchHint() {
@@ -984,6 +1039,12 @@
       const matcher = parseSearchQuery(state.search);
       if (matcher.kind === "invalid") {
         hint.textContent = t("searchRegexInvalid").replace("{msg}", matcher.error || "");
+        hint.className = "search-hint err";
+        hint.hidden = false;
+        return;
+      }
+      if (matcher.kind === "incomplete") {
+        hint.textContent = t("searchRegexIncomplete");
         hint.className = "search-hint err";
         hint.hidden = false;
         return;
@@ -1072,8 +1133,7 @@
         return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
       }
       if (matcher.kind === "regex" && matcher.re) {
-        const flags = matcher.re.flags.includes("g") ? matcher.re.flags : matcher.re.flags + "g";
-        const re = new RegExp(matcher.re.source, flags);
+        const re = new RegExp(matcher.re.source, regexTestFlags(matcher.re.flags));
         const m = re.exec(text);
         if (!m || m.index === undefined) return esc(text);
         const i = m.index;
@@ -1172,7 +1232,10 @@
       const matcher = parseSearchQuery(state.search);
       let html = "";
       data.domains.forEach((d) => {
-        const visible = d.mailboxes.filter((email) => mailboxMatchesSearch(email, d.domain, matcher));
+        const visible = d.mailboxes.filter((email) => {
+          const mb = data.mailboxes.find((m) => m.email === email);
+          return mailboxMatchesSearch(email, d.domain, matcher, mb?.profile);
+        });
         if (!visible.length) return;
         html += `<div class="domain-group"><div class="domain-label">${highlight(d.domain, matcher)}${d.is_default ? `<span class="def">${t("defaultBadge")}</span>` : ""}</div>`;
         visible.forEach((email) => {
@@ -1215,7 +1278,10 @@
         if (state.selected) emails.add(state.selected);
         return sortEmailsForMatrix([...emails]);
       }
-      const matched = all.filter((e) => mailboxMatchesSearch(e, emailDomain(e), matcher));
+      const matched = all.filter((e) => {
+        const mb = data.mailboxes.find((m) => m.email === e);
+        return mailboxMatchesSearch(e, emailDomain(e), matcher, mb?.profile);
+      });
       const emails = new Set(matched);
       matched.forEach((email) => {
         const { outbound, inbound } = collectDeliveryPeers(data, email);

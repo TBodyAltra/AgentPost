@@ -54,6 +54,14 @@ test.describe("AgentPost dashboard", () => {
     await search.fill("/[/");
     await expect(page.locator("#search-hint")).toHaveClass(/err/);
     await expect(page.locator(".mailbox-item")).toHaveCount(0);
+
+    await search.fill("/policy_bl");
+    await expect(page.locator("#search-hint")).toHaveClass(/err/);
+    await expect(page.locator(".mailbox-item")).toHaveCount(0);
+
+    await search.fill("/^gamma@agent\\.test$/");
+    await expect(page.locator("#search-hint")).not.toHaveClass(/err/);
+    await expect(page.locator(".mailbox-item")).toHaveCount(1);
   });
 
   test("search shows matched mailboxes and delivery peers in matrix", async ({ page }) => {
