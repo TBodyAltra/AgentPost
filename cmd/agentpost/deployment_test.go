@@ -15,10 +15,34 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 		name         string
 		args         []string
 		wantEnv      map[string]string
+		wantMissing  []string
 		wantConfig   Config
 		wantCaddy    bool
 		caddyContain []string
 	}{
+		{
+			name: "http default",
+			args: []string{"configure", "--non-interactive", "--lan-ip", "192.168.1.50", "--public-ip", "203.0.113.10"},
+			wantEnv: map[string]string{
+				"AGENTPOST_SCENARIO":           "http",
+				"AGENTPOST_DOMAIN":             "agent.local",
+				"AGENTPOST_HTTP_PORT":          "8080",
+				"AGENTPOST_CONNECT_LOCALHOST":  "http://127.0.0.1:8080",
+				"AGENTPOST_CONNECT_LAN":        "http://192.168.1.50:8080",
+				"AGENTPOST_CONNECT_PUBLIC":     "http://203.0.113.10:8080",
+				"AGENTPOST_ENABLE_SMTP":          "0",
+				"AGENTPOST_ENABLE_CADDY":       "0",
+				"AGENTPOST_REQUIRE_TOKEN":      "0",
+			},
+			wantMissing: []string{"AGENTPOST_PUBLIC_URL", "AGENTPOST_CONNECT_DOMAIN"},
+			wantConfig: Config{
+				Domain:             "agent.local",
+				HTTPAddr:           ":8080",
+				SMTPAddr:           "",
+				AllowExternalRelay: false,
+				MaxMessageBytes:    defaultMaxMessageBytes,
+			},
+		},
 		{
 			name: "local",
 			args: []string{"configure", "--non-interactive", "--scenario", "local", "--http-port", "18080"},
@@ -113,6 +137,11 @@ func TestStartScriptConfigureScenarios(t *testing.T) {
 			for key, want := range tt.wantEnv {
 				if got := gotEnv[key]; got != want {
 					t.Fatalf("%s = %q, want %q\nfull env: %#v", key, got, want, gotEnv)
+				}
+			}
+			for _, key := range tt.wantMissing {
+				if got, ok := gotEnv[key]; ok && got != "" {
+					t.Fatalf("%s should be absent or empty, got %q", key, got)
 				}
 			}
 			if _, ok := gotEnv["AGENTPOST_API_TOKEN"]; ok {

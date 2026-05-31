@@ -22,6 +22,10 @@ CONFIGURE_ONLY=0
 TOKEN_GENERATED=0
 LAN_IP=""
 PUBLIC_IP=""
+CONNECT_LOCALHOST=""
+CONNECT_LAN=""
+CONNECT_PUBLIC=""
+CONNECT_DOMAIN=""
 TOKEN_POLICY="auto" # auto | yes | no
 SMTP_FLAG_SET=0
 
@@ -37,18 +41,19 @@ Commands:
   logs        Follow Docker logs (docker mode only)
   help        Show this help
 
-Deployment scenarios (--scenario):
-  local          Same machine; agents use http://127.0.0.1:PORT
-  lan            Same LAN; agents use http://LAN_IP:PORT
-  public-ip      Public internet via IP:PORT (no domain / 未备案)
-  public-domain  Public internet via HTTPS domain (Caddy + Let's Encrypt)
+Deployment:
+  Default: ./start.sh up — gateway on :8080; onboarding lists every reachable URL
+  (localhost, optional LAN / public IP, optional HTTPS domain).
+
+Legacy scenarios (--scenario, optional):
+  local | lan | public-ip | public-domain — presets for AGENTPOST_PUBLIC_URL
 
 Options:
-  --scenario NAME       Deployment scenario (see above)
-  --domain NAME         Mailbox @ suffix (e.g. agent.local, example.domain)
-  --public-url URL      Override AGENTPOST_PUBLIC_URL written to .env
-  --lan-ip IP           LAN IP for scenario=lan
-  --public-ip IP        Public IP for scenario=public-ip
+  --scenario NAME       Legacy scenario preset (default: http)
+  --domain NAME         Mailbox @ suffix; with --caddy, also HTTPS site name
+  --public-url URL      Optional single AGENTPOST_PUBLIC_URL in .env (legacy)
+  --lan-ip IP           Include LAN URL in onboarding / skill (auto-detect if omitted)
+  --public-ip IP        Include public IP URL in onboarding / skill (auto-detect if omitted)
   --http-port PORT      Host HTTP port (default: 8080)
   --smtp                Enable SMTP inbound
   --no-smtp             Disable SMTP inbound
@@ -67,13 +72,12 @@ Environment:
   See .env.example and AGENTS.md.
 
 Examples:
-  ./start.sh                                    # interactive scenario, then start
-  ./start.sh configure                          # interactive, write .env only
-  ./start.sh --scenario local
-  ./start.sh --scenario lan --lan-ip 192.168.1.100 --no-token
-  ./start.sh --scenario public-ip --public-ip 203.0.113.10 --domain example.domain
-  ./start.sh --scenario public-domain --domain example.domain --smtp
-  AGENTPOST_API_TOKEN=$(openssl rand -hex 32) ./start.sh --scenario public-domain --domain example.domain
+  ./start.sh up                                 # start gateway (recommended)
+  ./start.sh up --token                         # require gateway token
+  ./start.sh up --domain example.domain --caddy # HTTPS + mailbox @example.domain
+  ./start.sh up --lan-ip 192.168.1.100 --public-ip 203.0.113.10
+  ./start.sh configure                          # write .env only
+  # legacy: ./start.sh --scenario public-domain --domain example.domain --smtp
 EOF
 }
 
@@ -152,12 +156,62 @@ normalize_bool() {
 
 scenario_label() {
   case "$1" in
+    http) printf 'http (gateway on :PORT)' ;;
     local) printf 'local (same machine)' ;;
     lan) printf 'lan (private network IP)' ;;
     public-ip) printf 'public-ip (internet via IP:port)' ;;
     public-domain) printf 'public-domain (internet via HTTPS domain)' ;;
     *) printf '%s' "$1" ;;
   esac
+}
+
+resolve_connection_endpoints() {
+  CONNECT_LOCALHOST="http://127.0.0.1:${HTTP_PORT}"
+  CONNECT_LAN=""
+  CONNECT_PUBLIC=""
+  CONNECT_DOMAIN=""
+
+  if [[ -z "$LAN_IP" ]]; then
+    LAN_IP="$(detect_lan_ip 2>/dev/null || true)"
+  fi
+  if [[ -n "$LAN_IP" ]]; then
+    CONNECT_LAN="http://${LAN_IP}:${HTTP_PORT}"
+  fi
+
+  if [[ -z "$PUBLIC_IP" ]]; then
+    PUBLIC_IP="$(detect_public_ip 2>/dev/null || true)"
+  fi
+  if [[ -n "$PUBLIC_IP" ]]; then
+    CONNECT_PUBLIC="http://${PUBLIC_IP}:${HTTP_PORT}"
+  fi
+
+  if [[ "$ENABLE_CADDY" == "1" && -n "$DOMAIN" ]]; then
+    CONNECT_DOMAIN="https://${DOMAIN}"
+  fi
+}
+
+append_connection_urls_to_prompt() {
+  cat <<EOF
+
+Client base URLs (each agent uses the one it can reach):
+  ${label_local}:  ${CONNECT_LOCALHOST}
+EOF
+  if [[ -n "$CONNECT_LAN" ]]; then
+    printf '  %s:        %s\n' "$label_lan" "$CONNECT_LAN"
+  fi
+  if [[ -n "$CONNECT_PUBLIC" ]]; then
+    printf '  %s:    %s\n' "$label_public" "$CONNECT_PUBLIC"
+  fi
+  if [[ -n "$CONNECT_DOMAIN" ]]; then
+    printf '  %s:  %s\n' "$label_domain" "$CONNECT_DOMAIN"
+  fi
+  cat <<'EOF'
+
+Pick one base URL for your client, then fetch skill from it:
+  curl -fsS <base-url>/api/v1/skill
+
+Set AGENTPOST_SERVER to that same base URL (do not substitute another host).
+EOF
 }
 
 load_env_file() {
@@ -200,7 +254,7 @@ apply_token_policy() {
         REQUIRE_TOKEN="$(normalize_bool "$REQUIRE_TOKEN")"
       else
         case "$SCENARIO" in
-          local|lan) REQUIRE_TOKEN=0 ;;
+          http|local|lan) REQUIRE_TOKEN=0 ;;
           public-ip|public-domain) REQUIRE_TOKEN=1 ;;
           *) REQUIRE_TOKEN=0 ;;
         esac
@@ -214,6 +268,17 @@ apply_token_policy() {
 
 apply_scenario_defaults() {
   case "$SCENARIO" in
+    http)
+      DOMAIN="${DOMAIN:-agent.local}"
+      if [[ -n "${PUBLIC_URL_OVERRIDE:-}" ]]; then
+        PUBLIC_URL="$PUBLIC_URL_OVERRIDE"
+      fi
+      ENABLE_CADDY="$(normalize_bool "${ENABLE_CADDY:-0}")"
+      if [[ "$ENABLE_CADDY" == "1" ]]; then
+        [[ -n "$DOMAIN" && "$DOMAIN" != "agent.local" ]] || die "http + --caddy requires --domain (HTTPS site name)"
+        PUBLIC_URL="https://${DOMAIN}"
+      fi
+      ;;
     local)
       DOMAIN="${DOMAIN:-agent.local}"
       PUBLIC_URL="http://127.0.0.1:${HTTP_PORT}"
@@ -273,7 +338,7 @@ apply_scenario_defaults() {
       ENABLE_CADDY=1
       ;;
     *)
-      die "unknown scenario: ${SCENARIO:-<empty>}. Use local | lan | public-ip | public-domain"
+      die "unknown scenario: ${SCENARIO:-<empty>}. Use http or legacy local | lan | public-ip | public-domain"
       ;;
   esac
 
@@ -286,72 +351,45 @@ apply_scenario_defaults() {
 
   if [[ "$SMTP_FLAG_SET" != "1" ]]; then
     case "$SCENARIO" in
-      local|lan|public-ip) ENABLE_SMTP=0 ;;
+      http|local|lan|public-ip) ENABLE_SMTP=0 ;;
     esac
   fi
 
   apply_token_policy
+  resolve_connection_endpoints
 }
 
-choose_scenario_interactive() {
-  cat >&2 <<'EOF'
-
-Select deployment scenario:
-  1) local          Agents on the same machine (127.0.0.1)
-  2) lan            Agents on the same LAN (private IP:8080)
-  3) public-ip      Public internet via IP:port (domain not required / 未备案)
-  4) public-domain  Public internet via HTTPS domain (Caddy + certificate)
-
-EOF
-  local choice
-  choice="$(prompt "Choice" "1")"
-  case "$choice" in
-    1|local) SCENARIO=local ;;
-    2|lan) SCENARIO=lan ;;
-    3|public-ip|publicip|public_ip) SCENARIO=public-ip ;;
-    4|public-domain|publicdomain|public_domain) SCENARIO=public-domain ;;
-    *) die "invalid scenario choice: $choice" ;;
-  esac
-
-  case "$SCENARIO" in
-    lan)
-      LAN_IP="$(prompt "LAN IP for agents" "$(detect_lan_ip)")"
-      [[ -n "$LAN_IP" ]] || die "LAN IP is required"
-      if prompt_yes_no "Require gateway API token?" "n"; then
-        TOKEN_POLICY=yes
-      else
-        TOKEN_POLICY=no
-      fi
-      ;;
-    public-ip)
-      PUBLIC_IP="$(prompt "Public IP for agents" "$(detect_public_ip)")"
-      [[ -n "$PUBLIC_IP" ]] || die "public IP is required"
-      DOMAIN="$(prompt "Mailbox suffix (@domain)" "agent.local")"
-      TOKEN_POLICY=yes
-      if prompt_yes_no "Enable SMTP inbound (port 25)?" "n"; then
-        ENABLE_SMTP=1
-      fi
-      ;;
-    public-domain)
-      DOMAIN="$(prompt "Public domain (HTTPS)" "")"
-      [[ -n "$DOMAIN" ]] || die "domain is required"
-      TOKEN_POLICY=yes
-      if prompt_yes_no "Enable SMTP inbound (port 25)?" "n"; then
-        ENABLE_SMTP=1
-      fi
-      ;;
-    local)
-      TOKEN_POLICY=no
-      ;;
-  esac
+choose_http_deployment_interactive() {
+  DOMAIN="$(prompt "Mailbox suffix (@domain)" "agent.local")"
+  LAN_IP="$(detect_lan_ip 2>/dev/null || true)"
+  if [[ -n "$LAN_IP" ]]; then
+    log "Detected LAN IP: ${LAN_IP} (will list in onboarding prompt if reachable)"
+  fi
+  PUBLIC_IP="$(detect_public_ip 2>/dev/null || true)"
+  if [[ -n "$PUBLIC_IP" ]]; then
+    log "Detected public IP: ${PUBLIC_IP} (will list in onboarding prompt if reachable)"
+  fi
+  if prompt_yes_no "Enable HTTPS with a public domain (Caddy)?" "n"; then
+    DOMAIN="$(prompt "HTTPS domain (DNS A record required)" "$DOMAIN")"
+    [[ -n "$DOMAIN" ]] || die "domain is required for HTTPS"
+    ENABLE_CADDY=1
+    TOKEN_POLICY=yes
+    if prompt_yes_no "Enable SMTP inbound (port 25)?" "n"; then
+      ENABLE_SMTP=1
+      SMTP_FLAG_SET=1
+    fi
+  elif prompt_yes_no "Require gateway API token?" "n"; then
+    TOKEN_POLICY=yes
+  else
+    TOKEN_POLICY=no
+  fi
 }
 
 resolve_scenario() {
   if [[ -z "$SCENARIO" ]]; then
+    SCENARIO=http
     if [[ "$INTERACTIVE" == "1" ]] && is_tty; then
-      choose_scenario_interactive
-    else
-      die "AGENTPOST_SCENARIO is not set. Run ./start.sh configure or pass --scenario."
+      choose_http_deployment_interactive
     fi
   fi
   apply_scenario_defaults
@@ -363,15 +401,27 @@ write_env_file() {
 AGENTPOST_SCENARIO=${SCENARIO}
 AGENTPOST_DOMAIN=${DOMAIN}
 AGENTPOST_HTTP_PORT=${HTTP_PORT}
-AGENTPOST_PUBLIC_URL=${PUBLIC_URL}
 AGENTPOST_ENABLE_SMTP=${ENABLE_SMTP}
 AGENTPOST_ENABLE_CADDY=${ENABLE_CADDY}
 AGENTPOST_REQUIRE_TOKEN=${REQUIRE_TOKEN}
 AGENTPOST_SMTP_PUBLISH_PORT=${AGENTPOST_SMTP_PUBLISH_PORT:-25}
 AGENTPOST_SMTP_PORT=${SMTP_PORT}
+AGENTPOST_CONNECT_LOCALHOST=${CONNECT_LOCALHOST}
 MODE=${MODE}
 EOF
-  log "Wrote ${ENV_FILE} (scenario=$(scenario_label "$SCENARIO"), public_url=${PUBLIC_URL})"
+  if [[ -n "$CONNECT_LAN" ]]; then
+    printf 'AGENTPOST_CONNECT_LAN=%s\n' "$CONNECT_LAN" >>"$ENV_FILE"
+  fi
+  if [[ -n "$CONNECT_PUBLIC" ]]; then
+    printf 'AGENTPOST_CONNECT_PUBLIC=%s\n' "$CONNECT_PUBLIC" >>"$ENV_FILE"
+  fi
+  if [[ -n "$CONNECT_DOMAIN" ]]; then
+    printf 'AGENTPOST_CONNECT_DOMAIN=%s\n' "$CONNECT_DOMAIN" >>"$ENV_FILE"
+  fi
+  if [[ -n "$PUBLIC_URL" ]]; then
+    printf 'AGENTPOST_PUBLIC_URL=%s\n' "$PUBLIC_URL" >>"$ENV_FILE"
+  fi
+  log "Wrote ${ENV_FILE} (scenario=$(scenario_label "$SCENARIO"), connect_localhost=${CONNECT_LOCALHOST})"
 }
 
 write_config() {
@@ -511,17 +561,25 @@ print_endpoints() {
 AgentPost is running.
 
   Scenario:  $(scenario_label "$SCENARIO")
-  Server URL: ${PUBLIC_URL}
-  Mailbox:    @${DOMAIN}
+  Mailbox:   @${DOMAIN}
+  Local:     ${CONNECT_LOCALHOST}
+EOF
+  if [[ -n "$CONNECT_LAN" ]]; then
+    echo "  LAN:       ${CONNECT_LAN}"
+  fi
+  if [[ -n "$CONNECT_PUBLIC" ]]; then
+    echo "  Public IP: ${CONNECT_PUBLIC}"
+  fi
+  if [[ -n "$CONNECT_DOMAIN" ]]; then
+    echo "  Domain:    ${CONNECT_DOMAIN}"
+  fi
+  if [[ -n "$PUBLIC_URL" ]]; then
+    echo "  Legacy AGENTPOST_PUBLIC_URL: ${PUBLIC_URL}"
+  fi
+  cat <<EOF
 
-  Health:   ${PUBLIC_URL}/healthz
-  Skill:    ${PUBLIC_URL}/api/v1/skill
-  Register: POST ${PUBLIC_URL}/api/v1/register
-  Send:     POST ${PUBLIC_URL}/api/v1/send
-  Inbox:    GET  ${PUBLIC_URL}/api/v1/messages
-
-Agents should fetch the skill document first (URLs match deployment parameters):
-  curl -fsS ${PUBLIC_URL}/api/v1/skill
+Agents fetch skill from the base URL they can reach, for example:
+  curl -fsS ${CONNECT_LOCALHOST}/api/v1/skill
 EOF
   if [[ "$ENABLE_SMTP" == "1" ]]; then
     echo "  SMTP inbound: :${AGENTPOST_SMTP_PUBLISH_PORT:-25} (host) -> :2525 (container)"
@@ -534,19 +592,31 @@ EOF
 }
 
 print_agent_prompt() {
+  local skill_example="${CONNECT_LOCALHOST}"
+  if [[ -n "$CONNECT_DOMAIN" ]]; then
+    skill_example="$CONNECT_DOMAIN"
+  elif [[ -n "$CONNECT_PUBLIC" ]]; then
+    skill_example="$CONNECT_PUBLIC"
+  elif [[ -n "$CONNECT_LAN" ]]; then
+    skill_example="$CONNECT_LAN"
+  fi
+
   cat <<EOF
 
 --- Agent onboarding prompt (copy below) ---
 
 You are connecting to an AgentPost mail gateway on this deployment.
 
-1. Read the skill document first (authoritative API reference):
-   ${PUBLIC_URL}/api/v1/skill
+1. Read the skill document first (authoritative API reference).
+   Use the base URL your client can reach (see below). Example:
 
-   curl -fsS ${PUBLIC_URL}/api/v1/skill
+   curl -fsS ${skill_example}/api/v1/skill
+EOF
+  append_connection_urls_to_prompt
+  cat <<EOF
 
 2. Gateway credentials (use on all /api/v1/* except /healthz and /api/v1/skill):
-   AGENTPOST_SERVER=${PUBLIC_URL}
+   AGENTPOST_SERVER=<base URL from above>
    AGENTPOST_EMAIL_SUFFIX=${DOMAIN}
 EOF
   if [[ "$REQUIRE_TOKEN" == "1" && -n "${AGENTPOST_API_TOKEN:-}" ]]; then
@@ -570,14 +640,14 @@ EOF
    - Use X-Agent-Email: you@your-domain for auth headers.
 
 4. Rules:
-   - Use AGENTPOST_SERVER exactly as above; do not substitute another host.
+   - Set AGENTPOST_SERVER to the base URL your client actually uses (from the list above).
    - Any valid domain suffix is allowed at register; mailbox user@domain must be unique.
    - Same-domain mail is allowed by default; cross-domain requires recipient allowlist.
    - Request/reply protocol: one inbound request + one outbound reply = one conversation turn.
    - Poll is destructive: fetched messages are removed from the server.
    - Max TTL 24h; re-register before expiry.
 
-5. Operator dashboard: ${PUBLIC_URL}/dashboard/
+5. Operator dashboard: <base-url>/dashboard/  (same host as AGENTPOST_SERVER)
 
 --- end prompt ---
 
@@ -610,7 +680,16 @@ export_runtime_env() {
   export AGENTPOST_SCENARIO="$SCENARIO"
   export AGENTPOST_DOMAIN="$DOMAIN"
   export AGENTPOST_HTTP_PORT="$HTTP_PORT"
-  export AGENTPOST_PUBLIC_URL="$PUBLIC_URL"
+  export AGENTPOST_CONNECT_LOCALHOST="$CONNECT_LOCALHOST"
+  export AGENTPOST_CONNECT_LAN="${CONNECT_LAN:-}"
+  export AGENTPOST_CONNECT_PUBLIC="${CONNECT_PUBLIC:-}"
+  export AGENTPOST_CONNECT_DOMAIN="${CONNECT_DOMAIN:-}"
+  if [[ -n "$PUBLIC_URL" ]]; then
+    export AGENTPOST_PUBLIC_URL="$PUBLIC_URL"
+  else
+    unset AGENTPOST_PUBLIC_URL
+    export AGENTPOST_PUBLIC_URL=""
+  fi
   export AGENTPOST_ENABLE_CADDY="$ENABLE_CADDY"
   export AGENTPOST_REQUIRE_TOKEN="$REQUIRE_TOKEN"
   export AGENTPOST_SMTP_PORT="$SMTP_PORT"

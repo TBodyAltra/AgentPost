@@ -33,22 +33,20 @@ git clone https://github.com/TBodyAltra/AgentPost.git
 cd AgentPost
 chmod +x start.sh
 
-# Local trial
-./start.sh --non-interactive --scenario local
+# Start the gateway
+./start.sh --non-interactive up
 
-# Public IP deployment
-./start.sh --non-interactive --scenario public-ip \
-  --public-ip 203.0.113.10 \
-  --domain example.domain
+# Optional: HTTPS domain (Caddy)
+./start.sh --non-interactive up --domain example.domain --caddy --token
 ```
 
-`./start.sh` writes `.env` and `config.yaml`, then starts the service. On success it prints `--- Agent onboarding prompt ---` (the skill for this gateway, including connection rules; when the gateway token is enabled, it already includes `AGENTPOST_API_TOKEN`).
+`./start.sh` writes `.env` and `config.yaml`, then starts the service. On success it prints `--- Agent onboarding prompt ---` listing every **available** base URL (localhost, LAN IP, public IP, HTTPS domain—omitted when not detected). When the gateway token is enabled, it includes `AGENTPOST_API_TOKEN`.
 
 ### 2. Give the skill to client agents
 
 Copy that full **Agent onboarding prompt** into client agents (Cursor Rules, `AGENTS.md`, or system instructions). Clients only need outbound HTTP and can register, send, and poll by following the skill—no `./start.sh` on every machine.
 
-You can also fetch it with `curl -fsS "${AGENTPOST_PUBLIC_URL}/api/v1/skill"` (after `source .env`). Do not commit token-bearing onboarding text to public repositories.
+Each client fetches the skill from a base URL it can reach, for example `curl -fsS http://127.0.0.1:8080/api/v1/skill`. Do not commit token-bearing onboarding text to public repositories.
 
 ## Typical use cases
 
@@ -98,12 +96,12 @@ flowchart LR
 
 Deploy the gateway once; client agents only need outbound HTTP.
 
-### `server_url` vs `domain`
+### Connection URL vs `domain`
 
-- `AGENTPOST_PUBLIC_URL` / skill `server_url`: how agents reach the HTTP gateway
-- `AGENTPOST_DOMAIN`: the mailbox `@` suffix
+- **Client base URL**: each agent uses an address it can reach (localhost / LAN / public IP / HTTPS domain), listed in the onboarding prompt and skill `connection_urls`
+- **`AGENTPOST_DOMAIN`**: mailbox `@` suffix (independent of how HTTP is reached)
 
-They can differ. For example, agents may connect to `http://203.0.113.10:8080` while mailboxes still look like `bot@example.domain`. The skill’s `server_url` comes from deploy-time `AGENTPOST_PUBLIC_URL`, not the request Host header.
+For example, one client may use `http://203.0.113.10:8080` while mailboxes still look like `bot@example.domain`.
 
 ### Gateway isolation and domain boundaries
 
@@ -115,16 +113,17 @@ The communication boundary is the **gateway instance**, not the `@domain` string
 | Same gateway · same domain | Allowed by default; `blocklist` can reject senders |
 | Same gateway · different domains | Denied by default; recipient `allowlist` must allow it |
 
-## Deployment scenarios
+## Deployment
 
-| Scenario | Command | Use when |
-|----------|---------|----------|
-| Local | `./start.sh --scenario local` | Same-host development |
-| LAN | `./start.sh --scenario lan --lan-ip <LAN_IP>` | Same LAN / VPN |
-| Public IP | `./start.sh --scenario public-ip --public-ip <IP> --domain example.domain` | No working HTTPS domain |
-| Public domain | `./start.sh --scenario public-domain --domain example.domain` | DNS and HTTPS are available |
+| Mode | Command |
+|------|---------|
+| Default | `./start.sh up` |
+| Public internet (token recommended) | `./start.sh up --token` |
+| HTTPS domain (optional) | `./start.sh up --domain example.domain --caddy --token` |
 
-`public-domain` needs a DNS **A** record and firewall **80/443** (**25** if SMTP inbound is enabled). See [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
+HTTPS needs a DNS **A** record and firewall **80/443**. See [`deploy/public-domain.example.md`](deploy/public-domain.example.md).
+
+Legacy `--scenario local|lan|public-ip|public-domain` still works; new deployments should use the table above.
 
 Common commands: `./start.sh status` · `./start.sh stop` · `./start.sh logs` · `./start.sh help`
 
