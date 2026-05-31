@@ -49,6 +49,7 @@ func TestDashboardEmbeddedHTMLHasCriticalUI(t *testing.T) {
 		`directedDeliveryStatus`,
 		`matrixUserLabel`,
 		`groupEmailsByDomain`,
+		`domainBlockClasses`,
 		`parseSearchQuery`,
 		`mailboxMatchesSearch`,
 		`id="search-hint"`,

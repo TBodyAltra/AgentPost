@@ -379,6 +379,24 @@
       background: color-mix(in srgb, var(--accent) 32%, var(--bg-elevated)) !important;
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
     }
+    .matrix-table th.domain-block-start,
+    .matrix-table td.domain-block-start {
+      border-left: 2px solid var(--hairline-strong);
+    }
+    .matrix-table th.domain-block-end,
+    .matrix-table td.domain-block-end {
+      border-right: 2px solid var(--hairline-strong);
+    }
+    .matrix-table tbody tr.domain-block-start th.row-header,
+    .matrix-table tbody tr.domain-block-start td {
+      border-top: 2px solid var(--hairline-strong);
+    }
+    .matrix-table tbody tr.domain-block-end th.row-header,
+    .matrix-table tbody tr.domain-block-end td {
+      border-bottom: 2px solid var(--hairline-strong);
+    }
+    .matrix-table th.domain-col.domain-block-start { border-left: 2px solid var(--hairline-strong); }
+    .matrix-table th.domain-col.domain-block-end { border-right: 2px solid var(--hairline-strong); }
     .matrix-table td.cell-focus {
       background: color-mix(in srgb, var(--accent) 42%, var(--ok-soft)) !important;
       box-shadow: inset 0 0 0 2px var(--accent);
@@ -1009,6 +1027,25 @@
       return groups;
     }
 
+    function domainBlockClasses(email, emails) {
+      const idx = emails.indexOf(email);
+      if (idx < 0) return "";
+      const domain = emailDomain(email);
+      const prev = idx > 0 ? emailDomain(emails[idx - 1]) : null;
+      const next = idx < emails.length - 1 ? emailDomain(emails[idx + 1]) : null;
+      let cls = "";
+      if (prev !== domain) cls += " domain-block-start";
+      if (next !== domain) cls += " domain-block-end";
+      return cls;
+    }
+
+    function domainGroupBoundaryClasses(index, total) {
+      let cls = "";
+      if (index === 0) cls += " domain-block-start";
+      if (index === total - 1) cls += " domain-block-end";
+      return cls;
+    }
+
     function matrixHeaderClasses(email, axis) {
       let cls = "";
       if (email === state.selected) cls += " selected";
@@ -1227,35 +1264,39 @@
 
       let table = '<table class="matrix-table"><thead>';
       table += '<tr class="matrix-domain-row"><th class="corner" rowspan="2" colspan="2" title="' + esc(t("matrixDomain")) + '"></th>';
-      colGroups.forEach((g) => {
-        table += `<th class="domain-header domain-col" colspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
+      colGroups.forEach((g, gi) => {
+        const gBound = domainGroupBoundaryClasses(gi, colGroups.length);
+        table += `<th class="domain-header domain-col${gBound}" colspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
       });
       table += "</tr><tr>";
       emails.forEach((col) => {
-        const cls = "col-header" + matrixHeaderClasses(col, "col");
+        const cls = "col-header" + domainBlockClasses(col, emails) + matrixHeaderClasses(col, "col");
         table += `<th class="${cls}" data-email="${esc(col)}" title="${esc(col)}">${matrixUserLabel(col)}</th>`;
       });
       table += "</tr></thead><tbody>";
 
-      rowGroups.forEach((g) => {
+      rowGroups.forEach((g, gi) => {
+        const rowGroupBound = domainGroupBoundaryClasses(gi, rowGroups.length);
         g.mailboxes.forEach((row, idx) => {
-          table += "<tr>";
+          const rowBound = domainGroupBoundaryClasses(idx, g.mailboxes.length);
+          table += `<tr${rowBound ? ` class="${rowBound.trim()}"` : ""}>`;
           if (idx === 0) {
-            table += `<th class="domain-header domain-row" rowspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
+            table += `<th class="domain-header domain-row${rowGroupBound}" rowspan="${g.mailboxes.length}" title="${esc(g.domain)}">${esc(g.domain)}</th>`;
           }
           const rowCls = "row-header" + matrixHeaderClasses(row, "row");
           table += `<th class="${rowCls}" data-email="${esc(row)}" title="${esc(row)}">${matrixUserLabel(row)}</th>`;
           emails.forEach((col) => {
+            const colBound = domainBlockClasses(col, emails);
             if (row === col) {
               const axisCls = matrixAxisClasses(row, col);
-              table += `<td class="cell-self cell-data${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}" title="${esc(row)}">·</td>`;
+              table += `<td class="cell-self cell-data${colBound}${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}" title="${esc(row)}">·</td>`;
               return;
             }
             const ok = deliveryAllowed(row, col, links);
             const axisCls = matrixAxisClasses(row, col);
             table += ok
-              ? `<td class="cell-data cell-allowed${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}"><span class="matrix-dot"></span></td>`
-              : `<td class="cell-data cell-empty${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}"></td>`;
+              ? `<td class="cell-data cell-allowed${colBound}${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}"><span class="matrix-dot"></span></td>`
+              : `<td class="cell-data cell-empty${colBound}${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}"></td>`;
           });
           table += "</tr>";
         });
