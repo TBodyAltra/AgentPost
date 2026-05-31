@@ -38,6 +38,22 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
   });
 
+  test("regex search filters mailboxes and matrix", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, 2);
+    await expect(page.locator(".matrix-table")).toBeVisible();
+
+    const search = page.locator("#search-input");
+    await search.fill("/^alpha@/");
+    await expect(page.locator("#search-hint")).toHaveText(/regex|正則/i);
+    await expect(page.locator(".mailbox-item")).toHaveCount(1);
+    await expect(page.locator(".matrix-table tbody tr")).toHaveCount(2, { timeout: 5000 });
+
+    await search.fill("/[/");
+    await expect(page.locator("#search-hint")).toHaveClass(/err/);
+    await expect(page.locator(".mailbox-item")).toHaveCount(0);
+  });
+
   test("search shows matched mailboxes and delivery peers in matrix", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, 2);
