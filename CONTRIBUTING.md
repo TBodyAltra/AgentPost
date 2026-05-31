@@ -15,6 +15,14 @@ Run the test suite before sending a pull request:
 go test ./...
 ```
 
+Dashboard UI checks (JavaScript syntax + Playwright smoke tests):
+
+```bash
+npm ci --prefix e2e
+npx --prefix e2e playwright install chromium
+go test ./cmd/agentpost -run TestDashboard -count=1
+```
+
 For local development:
 
 ```bash
