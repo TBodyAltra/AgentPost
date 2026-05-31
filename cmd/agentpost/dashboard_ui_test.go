@@ -46,6 +46,8 @@ func TestDashboardEmbeddedHTMLHasCriticalUI(t *testing.T) {
 		`id="detail-content"`,
 		`collectDeliveryPeers`,
 		`renderTabInbox`,
+		`directedDeliveryStatus`,
+		`matrixAxisLabel`,
 	}
 	for _, needle := range required {
 		if !strings.Contains(html, needle) {
@@ -78,6 +80,20 @@ func TestDashboardJavaScriptSyntax(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("node --check failed: %v\n%s", err, out)
+	}
+}
+
+func TestDashboardJavaScriptResolvesReverseLinkPairs(t *testing.T) {
+	html := readEmbeddedDashboardHTML(t)
+	script, err := extractDashboardJavaScript(html)
+	if err != nil {
+		t.Fatalf("extract dashboard script: %v", err)
+	}
+	if !strings.Contains(script, "l.from === to && l.to === from") {
+		t.Fatal("dashboard must resolve delivery via reverse link pair (from/to stored once per mailbox pair)")
+	}
+	if !strings.Contains(script, "reverse.reverse_status") {
+		t.Fatal("dashboard must use reverse_status when matrix row/col order differs from link storage")
 	}
 }
 
