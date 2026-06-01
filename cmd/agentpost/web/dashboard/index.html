@@ -10,7 +10,8 @@
       --bg: #f5f5f7;
       --bg-elevated: #ffffff;
       --sidebar-w: 300px;
-      --detail-w: min(400px, 36vw);
+      --detail-w: 400px;
+      --log-h: 200px;
       --hairline: rgba(0, 0, 0, 0.08);
       --hairline-strong: rgba(0, 0, 0, 0.12);
       --text: #1d1d1f;
@@ -207,15 +208,49 @@
 
     .workspace {
       flex: 1; display: grid;
-      grid-template-columns: var(--sidebar-w) 1fr;
+      grid-template-columns: var(--sidebar-w) 6px 1fr;
       gap: 0; padding: 0.85rem 1.25rem 1.25rem;
       min-height: 0; overflow: hidden;
     }
     .workspace.has-detail {
-      grid-template-columns: var(--sidebar-w) 1fr var(--detail-w);
+      grid-template-columns: var(--sidebar-w) 6px 1fr 6px var(--detail-w);
     }
+    .resize-handle {
+      position: relative; z-index: 5; touch-action: none; flex-shrink: 0;
+      align-self: stretch;
+    }
+    .resize-handle.hidden { display: none; }
+    .resize-handle-v {
+      cursor: col-resize; width: 6px; margin: 0 -3px;
+    }
+    .resize-handle-v::after {
+      content: ""; position: absolute; top: 12%; bottom: 12%; left: 50%;
+      width: 2px; transform: translateX(-50%); border-radius: 2px;
+      background: var(--hairline); transition: background 0.15s, width 0.15s;
+    }
+    .resize-handle-v:hover::after,
+    .resize-handle-v.active::after {
+      background: var(--accent); width: 3px;
+    }
+    .resize-handle-h {
+      cursor: row-resize; height: 6px; width: 100%;
+      flex: 0 0 6px;
+    }
+    .resize-handle-h::after {
+      content: ""; position: absolute; left: 12%; right: 12%; top: 50%;
+      height: 2px; transform: translateY(-50%); border-radius: 2px;
+      background: var(--hairline); transition: background 0.15s, height 0.15s;
+    }
+    .resize-handle-h:hover::after,
+    .resize-handle-h.active::after {
+      background: var(--accent); height: 3px;
+    }
+    body.resizing-sidebar,
+    body.resizing-detail { cursor: col-resize; user-select: none; }
+    body.resizing-log { cursor: row-resize; user-select: none; }
     @media (max-width: 1100px) {
       .workspace, .workspace.has-detail { grid-template-columns: 1fr; }
+      .resize-handle { display: none !important; }
       .detail-drawer {
         position: fixed; right: 0; top: 0; bottom: 0; z-index: 60;
         width: min(100%, 420px); box-shadow: var(--shadow);
@@ -316,9 +351,8 @@
       flex: 1; min-height: 0; display: flex; flex-direction: column;
     }
     .log-panel {
-      flex: 0 0 clamp(160px, 32vh, 300px);
+      flex: 0 0 var(--log-h);
       display: flex; flex-direction: column;
-      border-top: 1px solid var(--hairline);
       min-height: 0;
     }
     .log-panel .panel-head { padding: 0.55rem 0.85rem; }
@@ -625,6 +659,8 @@
         <div id="mailbox-list"></div>
       </aside>
 
+      <div class="resize-handle resize-handle-v" id="resize-sidebar" role="separator" aria-orientation="vertical"></div>
+
       <section class="canvas">
         <div class="canvas-matrix">
           <div class="panel-head">
@@ -635,6 +671,7 @@
             <div id="graph-matrix" aria-label="Delivery matrix"></div>
           </div>
         </div>
+        <div class="resize-handle resize-handle-h" id="resize-log" role="separator" aria-orientation="horizontal"></div>
         <div class="log-panel">
           <div class="panel-head">
             <span class="panel-title" id="log-title">消息日志</span>
@@ -643,6 +680,8 @@
           <div class="log-body" id="message-log" aria-label="Message log"></div>
         </div>
       </section>
+
+      <div class="resize-handle resize-handle-v hidden" id="resize-detail" role="separator" aria-orientation="vertical"></div>
 
       <aside class="detail-drawer" id="detail-panel">
         <div class="panel-head">
@@ -668,7 +707,15 @@
     const THEME_KEY = "agentpost_dashboard_theme";
     const LANG_KEY = "agentpost_dashboard_lang";
     const TAB_KEY = "agentpost_dashboard_tab";
+    const SIDEBAR_W_KEY = "agentpost_dashboard_sidebar_w";
+    const DETAIL_W_KEY = "agentpost_dashboard_detail_w";
+    const LOG_H_KEY = "agentpost_dashboard_log_h";
     const MATRIX_CAP = 24;
+    const PANEL_LIMITS = {
+      sidebar: { min: 220, max: 480, def: 300 },
+      detail: { min: 280, max: 560, def: 400 },
+      log: { min: 120, max: 420, def: 200 },
+    };
 
     const I18N = {
       "zh-hans": {
@@ -729,6 +776,9 @@
         refreshed: "已刷新",
         connectFailed: "连接失败",
         closeDetail: "关闭",
+        resizeSidebar: "拖动调整邮箱列表宽度",
+        resizeDetail: "拖动调整详情面板宽度",
+        resizeLog: "拖动调整消息日志高度",
         inboxEmpty: "收件箱为空",
         inboxHint: "此处显示尚未被 Agent 轮询取走的信件。Agent 调用 GET /messages 后队列会清空，不会保留历史。",
         logTitle: "消息日志",
@@ -804,6 +854,9 @@
         refreshed: "已重新整理",
         connectFailed: "連線失敗",
         closeDetail: "關閉",
+        resizeSidebar: "拖動調整郵箱列表寬度",
+        resizeDetail: "拖動調整詳情面板寬度",
+        resizeLog: "拖動調整訊息日誌高度",
         inboxEmpty: "收件匣為空",
         inboxHint: "此處顯示尚未被 Agent 輪詢取走的信件。Agent 呼叫 GET /messages 後佇列會清空，不會保留歷史。",
         logTitle: "訊息日誌",
@@ -879,6 +932,9 @@
         refreshed: "Refreshed",
         connectFailed: "Connection failed",
         closeDetail: "Close",
+        resizeSidebar: "Drag to resize mailbox list",
+        resizeDetail: "Drag to resize detail panel",
+        resizeLog: "Drag to resize message log",
         inboxEmpty: "Inbox is empty",
         inboxHint: "Messages waiting for the agent to poll. GET /messages clears the queue; history is not retained on the server.",
         logTitle: "Message log",
@@ -953,6 +1009,9 @@
       $("detail-title").textContent = t("detailTitle");
       $("detail-close").setAttribute("aria-label", t("closeDetail"));
       $("search-input").placeholder = t("searchPlaceholder");
+      $("resize-sidebar").title = t("resizeSidebar");
+      $("resize-detail").title = t("resizeDetail");
+      $("resize-log").title = t("resizeLog");
       updateSearchHint();
       $("theme-auto-btn").textContent = t("themeAuto");
       $("lang-seg").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.lang === lang));
@@ -1598,6 +1657,94 @@
       const open = !!state.selected;
       $("detail-panel").classList.toggle("open", open);
       $("workspace").classList.toggle("has-detail", open);
+      $("resize-detail").classList.toggle("hidden", !open);
+    }
+
+    function clampPanel(n, min, max) {
+      return Math.min(max, Math.max(min, n));
+    }
+
+    function readPanelPx(key, fallback) {
+      const v = parseInt(localStorage.getItem(key), 10);
+      return Number.isFinite(v) && v > 0 ? v : fallback;
+    }
+
+    function cssPxVar(name) {
+      const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      const n = parseFloat(raw);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function applySavedPanelSizes() {
+      const root = document.documentElement;
+      const sw = readPanelPx(SIDEBAR_W_KEY, PANEL_LIMITS.sidebar.def);
+      const dw = readPanelPx(DETAIL_W_KEY, PANEL_LIMITS.detail.def);
+      const lh = readPanelPx(LOG_H_KEY, PANEL_LIMITS.log.def);
+      root.style.setProperty("--sidebar-w", `${clampPanel(sw, PANEL_LIMITS.sidebar.min, PANEL_LIMITS.sidebar.max)}px`);
+      root.style.setProperty("--detail-w", `${clampPanel(dw, PANEL_LIMITS.detail.min, PANEL_LIMITS.detail.max)}px`);
+      root.style.setProperty("--log-h", `${clampPanel(lh, PANEL_LIMITS.log.min, PANEL_LIMITS.log.max)}px`);
+    }
+
+    function bindPanelResize(handle, opts) {
+      handle.addEventListener("mousedown", (e) => {
+        if (e.button !== 0 || window.matchMedia("(max-width: 1100px)").matches) return;
+        e.preventDefault();
+        const start = opts.read();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        document.body.classList.add(opts.bodyClass);
+        handle.classList.add("active");
+        const onMove = (ev) => {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          opts.apply(start, opts.axis === "x" ? dx : dy);
+        };
+        const onUp = () => {
+          document.body.classList.remove(opts.bodyClass);
+          handle.classList.remove("active");
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          opts.persist();
+          if (state.data) renderMatrix(state.data);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
+
+    function initPanelResize() {
+      applySavedPanelSizes();
+      const root = document.documentElement;
+      bindPanelResize($("resize-sidebar"), {
+        axis: "x",
+        bodyClass: "resizing-sidebar",
+        read: () => cssPxVar("--sidebar-w") || PANEL_LIMITS.sidebar.def,
+        apply: (start, dx) => {
+          const w = clampPanel(start + dx, PANEL_LIMITS.sidebar.min, PANEL_LIMITS.sidebar.max);
+          root.style.setProperty("--sidebar-w", `${w}px`);
+        },
+        persist: () => localStorage.setItem(SIDEBAR_W_KEY, String(Math.round(cssPxVar("--sidebar-w")))),
+      });
+      bindPanelResize($("resize-detail"), {
+        axis: "x",
+        bodyClass: "resizing-detail",
+        read: () => cssPxVar("--detail-w") || PANEL_LIMITS.detail.def,
+        apply: (start, dx) => {
+          const w = clampPanel(start - dx, PANEL_LIMITS.detail.min, PANEL_LIMITS.detail.max);
+          root.style.setProperty("--detail-w", `${w}px`);
+        },
+        persist: () => localStorage.setItem(DETAIL_W_KEY, String(Math.round(cssPxVar("--detail-w")))),
+      });
+      bindPanelResize($("resize-log"), {
+        axis: "y",
+        bodyClass: "resizing-log",
+        read: () => cssPxVar("--log-h") || PANEL_LIMITS.log.def,
+        apply: (start, dy) => {
+          const h = clampPanel(start - dy, PANEL_LIMITS.log.min, PANEL_LIMITS.log.max);
+          root.style.setProperty("--log-h", `${h}px`);
+        },
+        persist: () => localStorage.setItem(LOG_H_KEY, String(Math.round(cssPxVar("--log-h")))),
+      });
     }
 
     function setMatrixAxis(row, col) {
@@ -1811,6 +1958,8 @@
     });
 
     window.addEventListener("resize", () => state.data && renderMatrix(state.data));
+
+    initPanelResize();
 
     (async function init() {
       const saved = sessionStorage.getItem(TOKEN_KEY);
