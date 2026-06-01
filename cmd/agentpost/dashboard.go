@@ -36,6 +36,7 @@ type dashboardMessagePreview struct {
 	MessageID  string    `json:"message_id"`
 	From       string    `json:"from"`
 	Subject    string    `json:"subject"`
+	BodyText   string    `json:"body_text,omitempty"`
 	ReceivedAt time.Time `json:"received_at"`
 }
 
@@ -254,6 +255,7 @@ func dashboardQueuePreviews(msgs []Message) []dashboardMessagePreview {
 			MessageID:  m.MessageID,
 			From:       m.From,
 			Subject:    dashboardTruncateSubject(m.Subject),
+			BodyText:   dashboardTruncateBody(m.BodyText),
 			ReceivedAt: m.ReceivedAt.UTC(),
 		})
 	}

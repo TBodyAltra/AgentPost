@@ -296,6 +296,9 @@ func TestDashboardQueuePreviewsAndTotals(t *testing.T) {
 	if alpha.Queue[1].Subject != strings.Repeat("x", 157)+"..." {
 		t.Fatalf("subject truncate = %q", alpha.Queue[1].Subject)
 	}
+	if alpha.Queue[0].BodyText != "body" {
+		t.Fatalf("queue body_text = %q, want body", alpha.Queue[0].BodyText)
+	}
 }
 
 func TestDashboardMessageLogDeliverAndReceive(t *testing.T) {
