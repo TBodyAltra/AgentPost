@@ -31,34 +31,61 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 20
+          fetch-depth: 30
 
       - name: Cancel wedged Pages deployments
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          cancel_if_wedged() {
+          set -uo pipefail
+
+          cancel_pages_sha() {
             local sha="$1"
-            local status
+            [ -n "${sha}" ] || return 0
+            echo "Cancelling Pages deployment for ${sha}"
+            gh api -X POST \
+              -H "Accept: application/vnd.github+json" \
+              "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}/cancel" 2>/dev/null || true
+          }
+
+          cancel_all_blocking_pages_deployments() {
+            local shas
+            shas="$(gh api \
+              "repos/${GITHUB_REPOSITORY}/pages/deployments?per_page=100" \
+              --paginate \
+              --jq '[.[].sha] | unique | .[]' 2>/dev/null || true)"
+            if [ -z "${shas}" ]; then
+              return 0
+            fi
+            while IFS= read -r sha; do
+              [ -z "${sha}" ] && continue
+              local status
+              status="$(gh api \
+                -H "Accept: application/vnd.github+json" \
+                "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}" \
+                --jq '.status' 2>/dev/null || echo "")"
+              case "${status}" in
+                deployment_in_progress|building|queued|pending)
+                  cancel_pages_sha "${sha}"
+                  ;;
+              esac
+            done <<< "${shas}"
+          }
+
+          cancel_all_blocking_pages_deployments
+          for sha in $(git log -30 --format=%H 2>/dev/null); do
             status="$(gh api \
               -H "Accept: application/vnd.github+json" \
               "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}" \
               --jq '.status' 2>/dev/null || echo "")"
-            if [ "${status}" = "deployment_in_progress" ]; then
-              echo "Cancelling wedged Pages deployment for ${sha}"
-              gh api -X POST \
-                -H "Accept: application/vnd.github+json" \
-                "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}/cancel" || true
-              sleep 30
-            fi
-          }
-          # Current commit and recent main history (502/cancel can leave in-progress locks).
-          cancel_if_wedged "${GITHUB_SHA}"
-          for sha in $(git log -15 --format=%H origin/main 2>/dev/null || git log -15 --format=%H); do
-            cancel_if_wedged "${sha}"
+            case "${status}" in
+              deployment_in_progress|building|queued|pending)
+                cancel_pages_sha "${sha}"
+                ;;
+            esac
           done
+          sleep 45
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -72,25 +99,39 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Retry deploy after wedged lock
+      - name: Unblock and retry deploy
         if: failure() && steps.deployment.outcome == 'failure'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          for sha in $(git log -15 --format=%H origin/main 2>/dev/null || git log -15 --format=%H); do
+          set -uo pipefail
+          cancel_pages_sha() {
+            local sha="$1"
+            [ -n "${sha}" ] || return 0
+            gh api -X POST \
+              -H "Accept: application/vnd.github+json" \
+              "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}/cancel" 2>/dev/null || true
+          }
+          shas="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/pages/deployments?per_page=100" \
+            --paginate \
+            --jq '[.[] | select(.status == "deployment_in_progress" or .status == "building" or .status == "queued" or .status == "pending") | .sha] | unique | .[]' 2>/dev/null || true)"
+          while IFS= read -r sha; do
+            cancel_pages_sha "${sha}"
+          done <<< "${shas}"
+          for sha in $(git log -30 --format=%H 2>/dev/null); do
             status="$(gh api \
               -H "Accept: application/vnd.github+json" \
               "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}" \
               --jq '.status' 2>/dev/null || echo "")"
-            if [ "${status}" = "deployment_in_progress" ]; then
-              echo "Cancelling blocking deployment ${sha} before retry"
-              gh api -X POST \
-                -H "Accept: application/vnd.github+json" \
-                "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}/cancel" || true
-            fi
+            case "${status}" in
+              deployment_in_progress|building|queued|pending)
+                cancel_pages_sha "${sha}"
+                ;;
+            esac
           done
-          sleep 60
+          sleep 90
 
       - name: Deploy to GitHub Pages (retry)
         id: deployment_retry

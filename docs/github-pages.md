@@ -25,10 +25,12 @@ Please cancel <commit-sha> first or wait for it to complete.
 
 通常是上一次部署遇到 GitHub **502** 或被取消，Pages 后端仍把该提交标为「进行中」，阻塞后续发布。
 
+当前 workflow 会在部署前通过 Pages API **列出并取消**所有 `deployment_in_progress` / `building` / `queued` / `pending` 的部署，等待约 45 秒后再发布；若仍失败，会再次取消阻塞项、等待约 90 秒后自动重试一次 `deploy-pages`。
+
 **处理步骤（任选其一）：**
 
 1. **重新运行 workflow**（推荐）  
-   仓库已包含「取消卡住部署 + 自动重试」步骤；在 **Actions → Deploy GitHub Pages → Re-run all jobs** 即可。
+   在 **Actions → Deploy GitHub Pages → Re-run all jobs** 即可（无需手动取消旧 SHA）。
 
 2. **仓库管理员用 CLI 取消卡住的提交**（将 `<sha>` 换成报错里的 commit）：
 
