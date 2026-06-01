@@ -18,9 +18,11 @@ func TestPagesWorkflowUsesGitHubActionsDeployment(t *testing.T) {
 
 	for _, want := range []string{
 		"name: Deploy GitHub Pages",
+		"Cancel wedged Pages deployments",
 		"uses: actions/configure-pages@v5",
 		"uses: actions/upload-pages-artifact@v4",
 		"uses: actions/deploy-pages@v4",
+		"Deploy to GitHub Pages (retry)",
 		"path: docs",
 		"name: github-pages",
 	} {
