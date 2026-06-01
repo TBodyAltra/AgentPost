@@ -13,11 +13,12 @@ import (
 var dashboardFS embed.FS
 
 type dashboardResponse struct {
-	GeneratedAt time.Time          `json:"generated_at"`
-	Gateway     dashboardGateway   `json:"gateway"`
-	Domains     []dashboardDomain  `json:"domains"`
-	Mailboxes   []dashboardMailbox `json:"mailboxes"`
-	Links       []dashboardLink    `json:"links"`
+	GeneratedAt time.Time                  `json:"generated_at"`
+	Gateway     dashboardGateway           `json:"gateway"`
+	Domains     []dashboardDomain          `json:"domains"`
+	Mailboxes   []dashboardMailbox         `json:"mailboxes"`
+	Links       []dashboardLink            `json:"links"`
+	MessageLog  []dashboardMessageLogEntry `json:"message_log"`
 }
 
 type dashboardGateway struct {
@@ -195,9 +196,10 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 			TotalQueuedMessages: totalQueued,
 			MailboxesWithQueue:  mailboxesWithQueue,
 		},
-		Domains:   domains,
-		Mailboxes: mailboxes,
-		Links:     links,
+		Domains:    domains,
+		Mailboxes:  mailboxes,
+		Links:      links,
+		MessageLog: dashboardMessageLogSnapshot(a.messageLog),
 	}
 }
 

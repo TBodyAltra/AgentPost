@@ -312,6 +312,49 @@
     }
 
     .canvas { min-width: 0; min-height: 0; }
+    .canvas-matrix {
+      flex: 1; min-height: 0; display: flex; flex-direction: column;
+    }
+    .log-panel {
+      flex: 0 0 clamp(160px, 32vh, 300px);
+      display: flex; flex-direction: column;
+      border-top: 1px solid var(--hairline);
+      min-height: 0;
+    }
+    .log-panel .panel-head { padding: 0.55rem 0.85rem; }
+    .log-body {
+      flex: 1; min-height: 0; overflow: auto;
+      background: var(--bg);
+      -webkit-overflow-scrolling: touch;
+    }
+    .log-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.72rem; font-family: var(--mono);
+    }
+    .log-table th {
+      position: sticky; top: 0; z-index: 1;
+      text-align: left; font-weight: 600; color: var(--text-3);
+      padding: 0.45rem 0.55rem; background: var(--bg-elevated);
+      border-bottom: 1px solid var(--hairline);
+      white-space: nowrap;
+    }
+    .log-table td {
+      padding: 0.4rem 0.55rem; border-bottom: 1px solid var(--hairline);
+      vertical-align: top; max-width: 10rem;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .log-table tr:hover td { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+    .log-table tr.log-row { cursor: pointer; }
+    .log-event {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      font-size: 0.68rem; font-weight: 600; padding: 0.12rem 0.4rem;
+      border-radius: 100px; white-space: nowrap;
+    }
+    .log-event.delivered { color: var(--accent); background: var(--accent-soft); }
+    .log-event.received { color: var(--ok); background: var(--ok-soft); }
+    .log-empty {
+      padding: 1.25rem; text-align: center; color: var(--text-3); font-size: 0.8rem;
+    }
     .matrix-body {
       flex: 1; min-height: 0; min-width: 0;
       overflow: auto; padding: 0.5rem; background: var(--bg);
@@ -583,12 +626,21 @@
       </aside>
 
       <section class="canvas">
-        <div class="panel-head">
-          <span class="panel-title" id="topology-title">投递矩阵</span>
-          <span class="live-pill" id="refresh-note"><span class="live-dot"></span></span>
+        <div class="canvas-matrix">
+          <div class="panel-head">
+            <span class="panel-title" id="topology-title">投递矩阵</span>
+            <span class="live-pill" id="refresh-note"><span class="live-dot"></span></span>
+          </div>
+          <div class="matrix-body" id="graph-wrap">
+            <div id="graph-matrix" aria-label="Delivery matrix"></div>
+          </div>
         </div>
-        <div class="matrix-body" id="graph-wrap">
-          <div id="graph-matrix" aria-label="Delivery matrix"></div>
+        <div class="log-panel">
+          <div class="panel-head">
+            <span class="panel-title" id="log-title">消息日志</span>
+            <span class="panel-sub" id="log-filter-note"></span>
+          </div>
+          <div class="log-body" id="message-log" aria-label="Message log"></div>
         </div>
       </section>
 
@@ -679,6 +731,18 @@
         closeDetail: "关闭",
         inboxEmpty: "收件箱为空",
         inboxHint: "此处显示尚未被 Agent 轮询取走的信件。Agent 调用 GET /messages 后队列会清空，不会保留历史。",
+        logTitle: "消息日志",
+        logFilterAll: "全部邮箱",
+        logFilterMailbox: "仅 {email}",
+        logColTime: "时间",
+        logColEvent: "类型",
+        logColFrom: "发件人",
+        logColTo: "收件人",
+        logColSubject: "主题",
+        logEventDelivered: "发信",
+        logEventReceived: "收信",
+        logEmpty: "暂无记录。发信或 Agent 轮询收信后会出现在此。",
+        logHint: "记录网关内的投递与轮询收信（内存保留最近约 1000 条，重启后清空）。",
         selectMailbox: "在左侧选择一个邮箱查看详情",
         noDisplayName: "未命名 Agent",
       },
@@ -742,6 +806,18 @@
         closeDetail: "關閉",
         inboxEmpty: "收件匣為空",
         inboxHint: "此處顯示尚未被 Agent 輪詢取走的信件。Agent 呼叫 GET /messages 後佇列會清空，不會保留歷史。",
+        logTitle: "訊息日誌",
+        logFilterAll: "全部郵箱",
+        logFilterMailbox: "僅 {email}",
+        logColTime: "時間",
+        logColEvent: "類型",
+        logColFrom: "寄件人",
+        logColTo: "收件人",
+        logColSubject: "主題",
+        logEventDelivered: "發信",
+        logEventReceived: "收信",
+        logEmpty: "暫無記錄。發信或 Agent 輪詢收信後會出現在此。",
+        logHint: "記錄閘道內的投遞與輪詢收信（記憶體保留最近約 1000 條，重啟後清空）。",
         selectMailbox: "在左側選擇一個郵箱查看詳情",
         noDisplayName: "未命名 Agent",
       },
@@ -805,6 +881,18 @@
         closeDetail: "Close",
         inboxEmpty: "Inbox is empty",
         inboxHint: "Messages waiting for the agent to poll. GET /messages clears the queue; history is not retained on the server.",
+        logTitle: "Message log",
+        logFilterAll: "All mailboxes",
+        logFilterMailbox: "{email} only",
+        logColTime: "Time",
+        logColEvent: "Type",
+        logColFrom: "From",
+        logColTo: "To",
+        logColSubject: "Subject",
+        logEventDelivered: "Sent",
+        logEventReceived: "Received",
+        logEmpty: "No entries yet. Send mail or poll with GET /messages to populate.",
+        logHint: "Deliveries and poll receipts on this gateway (last ~1000 in memory; cleared on restart).",
         selectMailbox: "Select a mailbox on the left to inspect details",
         noDisplayName: "Unnamed agent",
       },
@@ -860,6 +948,7 @@
       $("refresh-btn").title = t("refresh");
       $("sidebar-title").textContent = t("sidebarTitle");
       $("topology-title").textContent = t("topology");
+      $("log-title").textContent = t("logTitle");
       $("refresh-note").innerHTML = `<span class="live-dot"></span>${esc(t("live"))}`;
       $("detail-title").textContent = t("detailTitle");
       $("detail-close").setAttribute("aria-label", t("closeDetail"));
@@ -1522,6 +1611,7 @@
       if (state.data) {
         renderMailboxList(state.data);
         renderMatrix(state.data);
+        renderMessageLog(state.data);
         renderDetail(state.data, email);
       }
     }
@@ -1533,6 +1623,7 @@
       if (state.data) {
         renderMailboxList(state.data);
         renderMatrix(state.data);
+        renderMessageLog(state.data);
         $("detail-hero").innerHTML = "";
         $("detail-content").innerHTML = `<p class="muted" style="padding:1rem 0">${esc(t("selectMailbox"))}</p>`;
       }
@@ -1545,6 +1636,7 @@
       if (state.data) {
         renderMailboxList(state.data);
         renderMatrix(state.data);
+        renderMessageLog(state.data);
       }
     }
 
@@ -1555,11 +1647,62 @@
       }
     }
 
+    function messageLogForView(data) {
+      const log = data.message_log || [];
+      if (!state.selected) return log;
+      const sel = state.selected.toLowerCase();
+      return log.filter((e) => (e.from || "").toLowerCase() === sel || (e.to || "").toLowerCase() === sel);
+    }
+
+    function logEventLabel(event) {
+      return event === "received" ? t("logEventReceived") : t("logEventDelivered");
+    }
+
+    function renderMessageLog(data) {
+      $("log-filter-note").textContent = state.selected
+        ? t("logFilterMailbox").replace("{email}", state.selected)
+        : t("logFilterAll");
+      const entries = messageLogForView(data);
+      const el = $("message-log");
+      if (!entries.length) {
+        el.innerHTML = `<p class="log-empty">${esc(t("logEmpty"))}</p><p class="log-empty" style="font-size:0.72rem;margin-top:0.35rem;opacity:0.85">${esc(t("logHint"))}</p>`;
+        return;
+      }
+      const rows = entries.map((e) => {
+        const evClass = e.event === "received" ? "received" : "delivered";
+        const from = e.from || "";
+        const to = e.to || "";
+        return `<tr class="log-row" data-from="${esc(from)}" data-to="${esc(to)}">
+          <td>${fmtTime(e.at)}</td>
+          <td><span class="log-event ${evClass}">${esc(logEventLabel(e.event))}</span></td>
+          <td title="${esc(from)}">${esc(from)}</td>
+          <td title="${esc(to)}">${esc(to)}</td>
+          <td title="${esc(e.subject || "")}">${esc(e.subject || "—")}</td>
+        </tr>`;
+      }).join("");
+      el.innerHTML = `<table class="log-table"><thead><tr>
+        <th>${esc(t("logColTime"))}</th><th>${esc(t("logColEvent"))}</th>
+        <th>${esc(t("logColFrom"))}</th><th>${esc(t("logColTo"))}</th>
+        <th>${esc(t("logColSubject"))}</th>
+      </tr></thead><tbody>${rows}</tbody></table>
+      <p class="matrix-note" style="padding:0.45rem 0.25rem 0.35rem">${esc(t("logHint"))}</p>`;
+      el.querySelectorAll(".log-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          const from = row.getAttribute("data-from");
+          const to = row.getAttribute("data-to");
+          const sel = (state.selected || "").toLowerCase();
+          const pick = sel && from.toLowerCase() === sel ? to : from;
+          if (pick) selectMailbox(pick);
+        });
+      });
+    }
+
     function renderAll() {
       if (!state.data) return;
       renderStats(state.data);
       renderMailboxList(state.data);
       renderMatrix(state.data);
+      renderMessageLog(state.data);
       if (state.selected) renderDetail(state.data, state.selected);
       else {
         $("detail-hero").innerHTML = "";
