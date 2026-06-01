@@ -18,15 +18,47 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment_retry.outputs.page_url || steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 20
+
+      - name: Cancel wedged Pages deployments
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cancel_if_wedged() {
+            local sha="$1"
+            local status
+            status="$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}" \
+              --jq '.status' 2>/dev/null || echo "")"
+            if [ "${status}" = "deployment_in_progress" ]; then
+              echo "Cancelling wedged Pages deployment for ${sha}"
+              gh api -X POST \
+                -H "Accept: application/vnd.github+json" \
+                "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}/cancel" || true
+              sleep 30
+            fi
+          }
+          # Current commit and recent main history (502/cancel can leave in-progress locks).
+          cancel_if_wedged "${GITHUB_SHA}"
+          for sha in $(git log -15 --format=%H origin/main 2>/dev/null || git log -15 --format=%H); do
+            cancel_if_wedged "${sha}"
+          done
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -38,4 +70,29 @@ jobs:
 
       - name: Deploy to GitHub Pages
         id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Retry deploy after wedged lock
+        if: failure() && steps.deployment.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for sha in $(git log -15 --format=%H origin/main 2>/dev/null || git log -15 --format=%H); do
+            status="$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}" \
+              --jq '.status' 2>/dev/null || echo "")"
+            if [ "${status}" = "deployment_in_progress" ]; then
+              echo "Cancelling blocking deployment ${sha} before retry"
+              gh api -X POST \
+                -H "Accept: application/vnd.github+json" \
+                "repos/${GITHUB_REPOSITORY}/pages/deployments/${sha}/cancel" || true
+            fi
+          done
+          sleep 60
+
+      - name: Deploy to GitHub Pages (retry)
+        id: deployment_retry
+        if: failure() && steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
