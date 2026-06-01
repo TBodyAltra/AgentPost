@@ -29,7 +29,7 @@ func TestCaptureDashboardScreenshotForPages(t *testing.T) {
 	t.Cleanup(ts.Close)
 
 	out := filepath.Join(repoRoot(t), "docs", "images", "dashboard.png")
-	cmd := exec.Command("npm", "exec", "--", "playwright", "test", "capture-pages-dashboard.spec.mjs")
+	cmd := exec.Command("npm", "exec", "--", "playwright", "test", "--config=playwright.capture.config.mjs")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"BASE_URL="+ts.URL,

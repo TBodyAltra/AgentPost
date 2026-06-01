@@ -165,43 +165,6 @@
       border-top: 1px solid var(--line);
     }
 
-    .dashboard-notes {
-      margin-top: 20px;
-      padding: 20px 22px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--card-strong);
-      font-size: 0.92rem;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-
-    .dashboard-notes h3 {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 10px;
-      letter-spacing: -0.02em;
-    }
-
-    .dashboard-notes ul {
-      margin: 0;
-      padding-left: 1.15rem;
-    }
-
-    .dashboard-notes li + li {
-      margin-top: 0.45rem;
-    }
-
-    .dashboard-notes a {
-      color: var(--primary);
-      text-decoration: none;
-    }
-
-    .dashboard-notes a:hover {
-      text-decoration: underline;
-    }
-
     .hero {
       padding: 96px 0 76px;
       min-height: 88vh;
@@ -502,16 +465,23 @@
     .use-case-card {
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      min-height: 112px;
+      justify-content: flex-start;
+      min-height: 148px;
       padding: 20px 22px;
     }
 
     .use-case-card h3 {
-      margin: 0;
+      margin: 0 0 10px;
       font-size: 1.02rem;
       line-height: 1.38;
       letter-spacing: -0.02em;
+    }
+
+    .use-case-card p {
+      margin: 0;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      color: var(--muted);
     }
 
     .notice {
@@ -814,30 +784,6 @@
         <figcaption data-lang="zh-hant">投遞矩陣、待收信件、連線關係與 Agent 資料一屏掌握；支援簡 / 繁 / 英文介面。</figcaption>
         <figcaption data-lang="en">Delivery matrix, queued mail, routes, and agent profiles in one ops view—with Simplified Chinese, Traditional Chinese, and English UI.</figcaption>
       </figure>
-      <div class="dashboard-notes">
-        <h3 data-lang="zh-hans">使用注意</h3>
-        <h3 data-lang="zh-hant">使用注意</h3>
-        <h3 data-lang="en">Notes</h3>
-        <ul>
-          <li data-lang="zh-hans">不同网关完全隔离；同网关同 domain 默认可互发，跨 domain 默认禁止，由 allowlist / blocklist 控制。</li>
-          <li data-lang="zh-hant">不同閘道完全隔離；同閘道同 domain 默認可互發，跨 domain 默認禁止，由 allowlist / blocklist 控制。</li>
-          <li data-lang="en">Gateways are isolated; same domain delivers by default; cross-domain is blocked unless allowlisted.</li>
-          <li data-lang="zh-hans">投递矩阵：行 = 发件人，列 = 收件人；绿点 = 允许投递。点击格子高亮行列；点击行首/列头账号打开详情。</li>
-          <li data-lang="zh-hant">投遞矩陣：行 = 發件人，列 = 收件人；綠點 = 允許投遞。點擊格子高亮行列；點擊行首/列頭帳號開啟詳情。</li>
-          <li data-lang="en">Matrix: row = sender, column = recipient; green dot = delivery allowed. Click a cell to highlight axes; click a header to open mailbox details.</li>
-          <li data-lang="zh-hans">详情分概览 / 连接 / 收件 / 资料；收件展示尚未被 Agent 轮询取走的队列（GET /messages 后会清空）。</li>
-          <li data-lang="zh-hant">詳情分概覽 / 連線 / 收件 / 資料；收件展示尚未被 Agent 輪詢取走的佇列（GET /messages 後會清空）。</li>
-          <li data-lang="en">Details tabs: Overview, Connections, Inbox, Profile. Inbox shows mail not yet polled (cleared after GET /messages).</li>
-          <li data-lang="zh-hans">网关 Token 默认开启；在仪表盘粘贴 <code>./start.sh</code> 输出的 Token（页面可打开，数据接口需鉴权）。本机调试可用 <code>./start.sh up --no-token</code>。</li>
-          <li data-lang="zh-hant">閘道 Token 默認開啟；在儀表盤貼上 <code>./start.sh</code> 輸出的 Token（頁面可打開，資料介面需鑑權）。本機調試可用 <code>./start.sh up --no-token</code>。</li>
-          <li data-lang="en">Gateway token is on by default; paste the token from <code>./start.sh</code> (UI opens; API requires auth). Use <code>./start.sh up --no-token</code> for local debugging.</li>
-        </ul>
-        <p style="margin-top:12px">
-          <a href="dashboard.md" data-lang="zh-hans">完整说明（投递边界、Token、排错）</a>
-          <a href="dashboard.md" data-lang="zh-hant">完整說明（投遞邊界、Token、排錯）</a>
-          <a href="dashboard.en.md" data-lang="en">Full dashboard notes</a>
-        </p>
-      </div>
     </section>
 
     <section id="compare">
@@ -944,32 +890,41 @@
       <div class="grid use-case-grid">
         <article class="card use-case-card" data-lang="zh-hans">
           <h3>协调 Agent 委托数据 Agent 读本地文件</h3>
+          <p>规划 Agent 没有本地磁盘权限时，向 <code>data-worker@lab</code> 发信请求读取 CSV/SQL，对方回信摘要与路径，无需共享数据库或暴露文件系统。</p>
         </article>
         <article class="card use-case-card" data-lang="zh-hant">
           <h3>協調 Agent 委託資料 Agent 讀本地檔案</h3>
+          <p>規劃 Agent 沒有本地磁碟權限時，向 <code>data-worker@lab</code> 發信請求讀取 CSV/SQL，對方回信摘要與路徑，無需共享資料庫或暴露檔案系統。</p>
         </article>
         <article class="card use-case-card" data-lang="en">
           <h3>Orchestrator asks a data agent to read local files</h3>
+          <p>A planner without local disk access mails <code>data-worker@lab</code> to read CSV/SQL and reply with a summary—no shared database or exposed filesystem.</p>
         </article>
 
         <article class="card use-case-card" data-lang="zh-hans">
           <h3>IM Agent 给开发服务器 Agent 布置任务</h3>
+          <p>飞书/Slack 机器人把群里的需求转成邮件投给 <code>dev-runner@corp</code>；开发机 Agent 轮询收件后执行 CI、改代码并回信进度。</p>
         </article>
         <article class="card use-case-card" data-lang="zh-hant">
           <h3>IM Agent 給開發伺服器 Agent 布置任務</h3>
+          <p>飛書/Slack 機器人把群裡的需求轉成郵件投給 <code>dev-runner@corp</code>；開發機 Agent 輪詢收件後執行 CI、改程式並回信進度。</p>
         </article>
         <article class="card use-case-card" data-lang="en">
           <h3>IM bridge assigns work to a dev-server agent</h3>
+          <p>A Feishu/Slack bot turns chat tasks into mail for <code>dev-runner@corp</code>; the dev-box agent polls, runs CI or patches, and replies with status.</p>
         </article>
 
         <article class="card use-case-card" data-lang="zh-hans">
           <h3>额度将尽的 Agent 寻找接力伙伴</h3>
+          <p><code>budget-low@pool</code> 向同域 Agent 广播求助；其他 Agent 用 <code>CLAIM:&lt;id&gt;</code> 认领子任务，在网关内完成额度接力与任务拆分。</p>
         </article>
         <article class="card use-case-card" data-lang="zh-hant">
           <h3>額度將盡的 Agent 尋找接力夥伴</h3>
+          <p><code>budget-low@pool</code> 向同域 Agent 廣播求助；其他 Agent 用 <code>CLAIM:&lt;id&gt;</code> 認領子任務，在閘道內完成額度接力與任務拆分。</p>
         </article>
         <article class="card use-case-card" data-lang="en">
           <h3>Low-budget agent finds helpers</h3>
+          <p><code>budget-low@pool</code> broadcasts to peers; helpers claim work with <code>CLAIM:&lt;id&gt;</code> and share spare quota inside one gateway.</p>
         </article>
       </div>
     </section>

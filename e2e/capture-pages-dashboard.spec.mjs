@@ -22,8 +22,6 @@ test("capture dashboard screenshot for GitHub Pages", async ({ page }) => {
   await page.locator('#detail-tabs button[data-tab="inbox"]').click();
   await page.locator(".inbox-item").first().waitFor({ timeout: 5000 });
 
-  await page.locator(".matrix-table td.cell-allowed").first().click({ force: true });
-
   await page.screenshot({
     path: screenshotPath,
     fullPage: false,
