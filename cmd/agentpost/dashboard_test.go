@@ -341,6 +341,9 @@ func TestDashboardMessageLogDeliverAndReceive(t *testing.T) {
 	if snap.MessageLog[0].From != "alpha@agent.test" || snap.MessageLog[0].To != "beta@agent.test" {
 		t.Fatalf("unexpected parties: %+v", snap.MessageLog[0])
 	}
+	if snap.MessageLog[0].BodyText != "payload" {
+		t.Fatalf("body_text = %q, want payload", snap.MessageLog[0].BodyText)
+	}
 	if snap.MessageLog[0].ReceivedAt != nil {
 		t.Fatal("received_at should be nil before poll")
 	}

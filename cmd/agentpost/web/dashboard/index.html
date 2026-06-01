@@ -391,6 +391,30 @@
     .log-empty {
       padding: 1.25rem; text-align: center; color: var(--text-3); font-size: 0.8rem;
     }
+    .log-body-tooltip {
+      position: fixed; z-index: 200;
+      max-width: min(28rem, calc(100vw - 1.5rem));
+      max-height: min(16rem, calc(100vh - 1.5rem));
+      padding: 0.65rem 0.75rem;
+      border-radius: var(--radius-sm);
+      background: var(--bg-elevated);
+      border: 1px solid var(--hairline);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .log-body-tooltip.hidden { display: none; }
+    .log-body-tooltip-subject {
+      font-size: 0.78rem; font-weight: 600; color: var(--text);
+      margin-bottom: 0.45rem; line-height: 1.35;
+      word-break: break-word;
+    }
+    .log-body-tooltip-body {
+      margin: 0; font-size: 0.72rem; font-family: var(--mono);
+      color: var(--text-2); white-space: pre-wrap; word-break: break-word;
+      line-height: 1.45;
+    }
     .matrix-body {
       flex: 1; min-height: 0; min-width: 0;
       overflow: auto; padding: 0.5rem; background: var(--bg);
@@ -680,6 +704,10 @@
             <span class="panel-sub" id="log-filter-note"></span>
           </div>
           <div class="log-body" id="message-log" aria-label="Message log"></div>
+          <div id="log-body-tooltip" class="log-body-tooltip hidden" role="tooltip" aria-hidden="true">
+            <div class="log-body-tooltip-subject"></div>
+            <pre class="log-body-tooltip-body"></pre>
+          </div>
         </div>
       </section>
 
@@ -794,7 +822,9 @@
         logReceiptPending: "已投递，对方尚未轮询收信",
         logReceiptRead: "对方已轮询收信",
         logEmpty: "暂无记录。发信后会出现在此；对方轮询收信后显示双勾。",
-        logHint: "仅记录发信；对方 GET /messages 取走后，该行显示双勾（内存约 1000 条，重启清空）。",
+        logHint: "仅记录发信；对方 GET /messages 取走后，该行显示双勾（内存约 1000 条，重启清空）。悬停行可预览正文。",
+        logBodyEmpty: "（无正文）",
+        logBodyLabel: "正文",
         selectMailbox: "在左侧选择一个邮箱查看详情",
         noDisplayName: "未命名 Agent",
       },
@@ -872,7 +902,9 @@
         logReceiptPending: "已投遞，對方尚未輪詢收信",
         logReceiptRead: "對方已輪詢收信",
         logEmpty: "暫無記錄。發信後會出現在此；對方輪詢收信後顯示雙勾。",
-        logHint: "僅記錄發信；對方 GET /messages 取走後，該列顯示雙勾（記憶體約 1000 條，重啟清空）。",
+        logHint: "僅記錄發信；對方 GET /messages 取走後，該列顯示雙勾（記憶體約 1000 條，重啟清空）。懸停列可預覽正文。",
+        logBodyEmpty: "（無正文）",
+        logBodyLabel: "正文",
         selectMailbox: "在左側選擇一個郵箱查看詳情",
         noDisplayName: "未命名 Agent",
       },
@@ -950,7 +982,9 @@
         logReceiptPending: "Delivered; recipient has not polled yet",
         logReceiptRead: "Recipient polled the message",
         logEmpty: "No entries yet. Outbound deliveries appear here; double check when polled.",
-        logHint: "Send events only; double check after GET /messages (~1000 in memory; cleared on restart).",
+        logHint: "Send events only; double check after GET /messages (~1000 in memory; cleared on restart). Hover a row to preview the body.",
+        logBodyEmpty: "(empty body)",
+        logBodyLabel: "Body",
         selectMailbox: "Select a mailbox on the left to inspect details",
         noDisplayName: "Unnamed agent",
       },
@@ -1818,6 +1852,36 @@
       return `<span class="log-receipt pending" title="${title}" aria-label="${title}">✓</span>`;
     }
 
+    function hideLogBodyTooltip() {
+      const tip = $("log-body-tooltip");
+      tip.classList.add("hidden");
+      tip.setAttribute("aria-hidden", "true");
+    }
+
+    function showLogBodyTooltip(ev, entry) {
+      const tip = $("log-body-tooltip");
+      const body = String(entry.body_text ?? "").trim();
+      const subject = String(entry.subject ?? "").trim() || "—";
+      tip.querySelector(".log-body-tooltip-subject").textContent = subject;
+      tip.querySelector(".log-body-tooltip-body").textContent = body || t("logBodyEmpty");
+      tip.classList.remove("hidden");
+      tip.setAttribute("aria-hidden", "false");
+      const pad = 14;
+      tip.style.left = "0";
+      tip.style.top = "0";
+      const rect = tip.getBoundingClientRect();
+      let left = ev.clientX + pad;
+      let top = ev.clientY + pad;
+      if (left + rect.width > window.innerWidth - 8) {
+        left = ev.clientX - rect.width - pad;
+      }
+      if (top + rect.height > window.innerHeight - 8) {
+        top = ev.clientY - rect.height - pad;
+      }
+      tip.style.left = `${Math.max(8, left)}px`;
+      tip.style.top = `${Math.max(8, top)}px`;
+    }
+
     function renderMessageLog(data) {
       $("log-filter-note").textContent = state.selected
         ? t("logFilterMailbox").replace("{email}", state.selected)
@@ -1828,7 +1892,7 @@
         el.innerHTML = `<p class="log-empty">${esc(t("logEmpty"))}</p><p class="log-empty" style="font-size:0.72rem;margin-top:0.35rem;opacity:0.85">${esc(t("logHint"))}</p>`;
         return;
       }
-      const rows = entries.map((e) => {
+      const rowsHtml = entries.map((e) => {
         const from = e.from || "";
         const to = e.to || "";
         return `<tr class="log-row" data-from="${esc(from)}" data-to="${esc(to)}">
@@ -1843,9 +1907,14 @@
         <th>${esc(t("logColTime"))}</th><th>${esc(t("logColStatus"))}</th>
         <th>${esc(t("logColFrom"))}</th><th>${esc(t("logColTo"))}</th>
         <th>${esc(t("logColSubject"))}</th>
-      </tr></thead><tbody>${rows}</tbody></table>
+      </tr></thead><tbody>${rowsHtml}</tbody></table>
       <p class="matrix-note" style="padding:0.45rem 0.25rem 0.35rem">${esc(t("logHint"))}</p>`;
-      el.querySelectorAll(".log-row").forEach((row) => {
+      const logRows = el.querySelectorAll(".log-row");
+      logRows.forEach((row, i) => {
+        const entry = entries[i];
+        row.addEventListener("mouseenter", (ev) => showLogBodyTooltip(ev, entry));
+        row.addEventListener("mousemove", (ev) => showLogBodyTooltip(ev, entry));
+        row.addEventListener("mouseleave", hideLogBodyTooltip);
         row.addEventListener("click", () => {
           const from = row.getAttribute("data-from");
           const to = row.getAttribute("data-to");
@@ -1854,6 +1923,7 @@
           if (pick) selectMailbox(pick);
         });
       });
+      hideLogBodyTooltip();
     }
 
     function renderAll() {
