@@ -491,8 +491,28 @@
     }
     .matrix-table td.cell-empty { background: var(--bg-elevated); }
     .matrix-table td.cell-self {
-      background: color-mix(in srgb, var(--hairline) 35%, var(--bg-elevated));
-      color: var(--text-3); font-size: 0.62rem; line-height: 1; cursor: pointer;
+      background: var(--bg-elevated);
+      cursor: pointer;
+      position: relative;
+    }
+    .matrix-table td.cell-self::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      border-radius: 2px;
+      pointer-events: none;
+      opacity: 0.45;
+      background: linear-gradient(
+        135deg,
+        transparent 46%,
+        color-mix(in srgb, var(--hairline) 70%, transparent) 46%,
+        color-mix(in srgb, var(--hairline) 70%, transparent) 54%,
+        transparent 54%
+      );
+    }
+    .matrix-table td.cell-self.axis-highlight::before,
+    .matrix-table td.cell-self.cell-focus::before {
+      opacity: 0.25;
     }
     .matrix-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
     .matrix-note { font-size: 0.72rem; color: var(--text-3); padding: 0.5rem 0.25rem 0; text-align: center; }
@@ -1505,7 +1525,7 @@
             const colBound = domainBlockClasses(col, emails);
             if (row === col) {
               const axisCls = matrixAxisClasses(row, col);
-              table += `<td class="cell-self cell-data${colBound}${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}" title="${esc(row)}">·</td>`;
+              table += `<td class="cell-self cell-data${colBound}${axisCls}" data-row="${esc(row)}" data-col="${esc(col)}" title="${esc(row)}" aria-label="${esc(row)}"></td>`;
               return;
             }
             const ok = deliveryAllowed(row, col, links);
