@@ -152,6 +152,35 @@ func TestDashboardSearchParseUnit(t *testing.T) {
 	}
 }
 
+func TestDashboardLogBodyFormatUnit(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("node not installed")
+	}
+	path := filepath.Join("web", "dashboard", "log-body-format.test.mjs")
+	cmd := exec.Command("node", path)
+	cmd.Dir = filepath.Join(repoRoot(t), "cmd", "agentpost")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("log body format unit test: %v\n%s", err, out)
+	}
+}
+
+func TestDashboardMessageLogTooltipHoverAndBodyFormat(t *testing.T) {
+	html := string(readEmbeddedDashboardHTML(t))
+	for _, needle := range []string{
+		"function decodeStringEscapes",
+		"function extractAgentMessageText",
+		"function renderMessageBodyHtml",
+		"function scheduleHideLogBodyTooltip",
+		"initLogBodyTooltipHover",
+		"pointer-events: auto",
+	} {
+		if !strings.Contains(html, needle) {
+			t.Fatalf("dashboard missing %q", needle)
+		}
+	}
+}
+
 func TestDashboardMatrixSortsByDomainBeforeUsername(t *testing.T) {
 	html := readEmbeddedDashboardHTML(t)
 	script, err := extractDashboardJavaScript(html)

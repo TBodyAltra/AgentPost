@@ -403,6 +403,7 @@
       pointer-events: auto;
       overflow: auto;
       -webkit-overflow-scrolling: touch;
+      cursor: default;
     }
     .log-body-tooltip.hidden { display: none; }
     .log-body-tooltip-subject {
@@ -1039,7 +1040,6 @@
 
     let lang = "zh-hans";
     let detailTab = localStorage.getItem(TAB_KEY) || "overview";
-    let logTooltipHideTimer = null;
 
     let state = {
       data: null,
@@ -2001,23 +2001,27 @@
       return `<span class="log-receipt pending" title="${title}" aria-label="${title}">✓</span>`;
     }
 
+    const logTooltipState = { hideTimer: null, overRow: false, overTip: false };
+
     function hideLogBodyTooltip() {
-      if (logTooltipHideTimer) {
-        clearTimeout(logTooltipHideTimer);
-        logTooltipHideTimer = null;
-      }
       const tip = $("log-body-tooltip");
       tip.classList.add("hidden");
       tip.setAttribute("aria-hidden", "true");
     }
 
+    function cancelHideLogBodyTooltip() {
+      if (logTooltipState.hideTimer) {
+        clearTimeout(logTooltipState.hideTimer);
+        logTooltipState.hideTimer = null;
+      }
+    }
+
     function scheduleHideLogBodyTooltip() {
-      if (logTooltipHideTimer) clearTimeout(logTooltipHideTimer);
-      logTooltipHideTimer = setTimeout(() => {
-        logTooltipHideTimer = null;
-        const tip = $("log-body-tooltip");
-        if (tip.matches(":hover")) return;
-        hideLogBodyTooltip();
+      cancelHideLogBodyTooltip();
+      logTooltipState.hideTimer = setTimeout(() => {
+        if (!logTooltipState.overRow && !logTooltipState.overTip) {
+          hideLogBodyTooltip();
+        }
       }, 160);
     }
 
@@ -2040,17 +2044,31 @@
     }
 
     function showLogBodyTooltip(ev, entry) {
-      if (logTooltipHideTimer) {
-        clearTimeout(logTooltipHideTimer);
-        logTooltipHideTimer = null;
-      }
+      cancelHideLogBodyTooltip();
       const tip = $("log-body-tooltip");
-      const subject = String(entry.subject ?? "").trim() || "—";
+      const subject = decodeStringEscapes(String(entry.subject ?? "").trim()) || "—";
       tip.querySelector(".log-body-tooltip-subject").textContent = subject;
-      tip.querySelector(".log-body-tooltip-body").innerHTML = renderMessageBodyHtml(entry.body_text ?? "");
+      const bodyHtml = renderMessageBodyHtml(entry.body_text ?? "");
+      tip.querySelector(".log-body-tooltip-body").innerHTML = bodyHtml;
       tip.classList.remove("hidden");
       tip.setAttribute("aria-hidden", "false");
-      positionLogBodyTooltip(ev);
+      if (!logTooltipState.overTip) {
+        positionLogBodyTooltip(ev);
+      }
+    }
+
+    function initLogBodyTooltipHover() {
+      const tip = $("log-body-tooltip");
+      if (tip.dataset.hoverBound === "1") return;
+      tip.dataset.hoverBound = "1";
+      tip.addEventListener("mouseenter", () => {
+        logTooltipState.overTip = true;
+        cancelHideLogBodyTooltip();
+      });
+      tip.addEventListener("mouseleave", () => {
+        logTooltipState.overTip = false;
+        scheduleHideLogBodyTooltip();
+      });
     }
 
     function renderMessageLog(data) {
@@ -2083,12 +2101,18 @@
       const logRows = el.querySelectorAll(".log-row");
       logRows.forEach((row, i) => {
         const entry = entries[i];
-        row.addEventListener("mouseenter", (ev) => showLogBodyTooltip(ev, entry));
-        row.addEventListener("mousemove", (ev) => {
-          const tip = $("log-body-tooltip");
-          if (!tip.matches(":hover")) positionLogBodyTooltip(ev);
+        row.addEventListener("mouseenter", (ev) => {
+          logTooltipState.overRow = true;
+          cancelHideLogBodyTooltip();
+          showLogBodyTooltip(ev, entry);
         });
-        row.addEventListener("mouseleave", scheduleHideLogBodyTooltip);
+        row.addEventListener("mousemove", (ev) => {
+          if (!logTooltipState.overTip) showLogBodyTooltip(ev, entry);
+        });
+        row.addEventListener("mouseleave", () => {
+          logTooltipState.overRow = false;
+          scheduleHideLogBodyTooltip();
+        });
         row.addEventListener("click", () => {
           const from = row.getAttribute("data-from");
           const to = row.getAttribute("data-to");
@@ -2216,15 +2240,7 @@
     window.addEventListener("resize", () => state.data && renderMatrix(state.data));
 
     initPanelResize();
-
-    const logTip = $("log-body-tooltip");
-    logTip.addEventListener("mouseenter", () => {
-      if (logTooltipHideTimer) {
-        clearTimeout(logTooltipHideTimer);
-        logTooltipHideTimer = null;
-      }
-    });
-    logTip.addEventListener("mouseleave", hideLogBodyTooltip);
+    initLogBodyTooltipHover();
 
     (async function init() {
       const saved = sessionStorage.getItem(TOKEN_KEY);
