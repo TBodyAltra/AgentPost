@@ -682,7 +682,7 @@ func (a *App) handleMessages(w http.ResponseWriter, r *http.Request) {
 	messages := append([]Message(nil), a.messages[mailbox]...)
 	a.messages[mailbox] = nil
 	if len(messages) > 0 {
-		a.recordMessagesReceived(mailbox, messages)
+		a.markMessagesReceived(mailbox, messages)
 	}
 	a.mu.Unlock()
 

@@ -6,35 +6,37 @@ import (
 )
 
 const (
-	maxMessageLogEntries     = 1000
-	dashboardMessageLogMax   = 200
-	messageLogEventDelivered = "delivered"
-	messageLogEventReceived  = "received"
+	maxMessageLogEntries   = 1000
+	dashboardMessageLogMax = 200
 )
 
-// MessageLogEntry records a send (delivered to queue) or receive (polled by agent).
+// MessageLogEntry records a message delivered to a recipient queue.
+// ReceivedAt is set when the recipient polls with GET /api/v1/messages.
 type MessageLogEntry struct {
-	Event     string    `json:"event"`
-	At        time.Time `json:"at"`
-	From      string    `json:"from"`
-	To        string    `json:"to"`
-	Subject   string    `json:"subject"`
-	MessageID string    `json:"message_id"`
+	At         time.Time  `json:"at"`
+	From       string     `json:"from"`
+	To         string     `json:"to"`
+	Subject    string     `json:"subject"`
+	MessageID  string     `json:"message_id"`
+	ReceivedAt *time.Time `json:"received_at,omitempty"`
 }
 
 type dashboardMessageLogEntry struct {
-	Event     string    `json:"event"`
-	At        time.Time `json:"at"`
-	From      string    `json:"from"`
-	To        string    `json:"to"`
-	Subject   string    `json:"subject"`
-	MessageID string    `json:"message_id"`
+	At         time.Time  `json:"at"`
+	From       string     `json:"from"`
+	To         string     `json:"to"`
+	Subject    string     `json:"subject"`
+	MessageID  string     `json:"message_id"`
+	ReceivedAt *time.Time `json:"received_at,omitempty"`
 }
 
 func (a *App) recordMessageDelivered(message Message, recipientMailbox string) {
+	now := message.ReceivedAt.UTC()
+	if now.IsZero() {
+		now = a.now().UTC()
+	}
 	a.appendMessageLog(MessageLogEntry{
-		Event:     messageLogEventDelivered,
-		At:        message.ReceivedAt.UTC(),
+		At:        now,
 		From:      strings.ToLower(strings.TrimSpace(message.From)),
 		To:        strings.ToLower(strings.TrimSpace(recipientMailbox)),
 		Subject:   strings.TrimSpace(message.Subject),
@@ -42,27 +44,30 @@ func (a *App) recordMessageDelivered(message Message, recipientMailbox string) {
 	})
 }
 
-func (a *App) recordMessagesReceived(mailbox string, messages []Message) {
+func (a *App) markMessagesReceived(mailbox string, messages []Message) {
 	mailbox = strings.ToLower(strings.TrimSpace(mailbox))
 	now := a.now().UTC()
 	for _, m := range messages {
-		at := m.ReceivedAt.UTC()
-		if at.IsZero() {
-			at = now
+		msgID := strings.TrimSpace(m.MessageID)
+		if msgID == "" {
+			continue
 		}
-		a.appendMessageLog(MessageLogEntry{
-			Event:     messageLogEventReceived,
-			At:        at,
-			From:      strings.ToLower(strings.TrimSpace(m.From)),
-			To:        mailbox,
-			Subject:   strings.TrimSpace(m.Subject),
-			MessageID: m.MessageID,
-		})
+		for i := len(a.messageLog) - 1; i >= 0; i-- {
+			e := &a.messageLog[i]
+			if e.MessageID != msgID || e.To != mailbox {
+				continue
+			}
+			if e.ReceivedAt == nil || e.ReceivedAt.IsZero() {
+				at := now
+				e.ReceivedAt = &at
+			}
+			break
+		}
 	}
 }
 
 func (a *App) appendMessageLog(entry MessageLogEntry) {
-	if entry.Event == "" || entry.MessageID == "" {
+	if entry.MessageID == "" {
 		return
 	}
 	a.messageLog = append(a.messageLog, entry)
@@ -83,13 +88,18 @@ func dashboardMessageLogSnapshot(log []MessageLogEntry) []dashboardMessageLogEnt
 	out := make([]dashboardMessageLogEntry, 0, len(log)-start)
 	for i := len(log) - 1; i >= start; i-- {
 		e := log[i]
+		var receivedAt *time.Time
+		if e.ReceivedAt != nil && !e.ReceivedAt.IsZero() {
+			t := e.ReceivedAt.UTC()
+			receivedAt = &t
+		}
 		out = append(out, dashboardMessageLogEntry{
-			Event:     e.Event,
-			At:        e.At.UTC(),
-			From:      e.From,
-			To:        e.To,
-			Subject:   dashboardTruncateSubject(e.Subject),
-			MessageID: e.MessageID,
+			At:         e.At.UTC(),
+			From:       e.From,
+			To:         e.To,
+			Subject:    dashboardTruncateSubject(e.Subject),
+			MessageID:  e.MessageID,
+			ReceivedAt: receivedAt,
 		})
 	}
 	return out

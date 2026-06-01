@@ -338,11 +338,11 @@ func TestDashboardMessageLogDeliverAndReceive(t *testing.T) {
 	if len(snap.MessageLog) != 1 {
 		t.Fatalf("message_log len = %d, want 1 delivered", len(snap.MessageLog))
 	}
-	if snap.MessageLog[0].Event != messageLogEventDelivered {
-		t.Fatalf("event = %q, want delivered", snap.MessageLog[0].Event)
-	}
 	if snap.MessageLog[0].From != "alpha@agent.test" || snap.MessageLog[0].To != "beta@agent.test" {
 		t.Fatalf("unexpected parties: %+v", snap.MessageLog[0])
+	}
+	if snap.MessageLog[0].ReceivedAt != nil {
+		t.Fatal("received_at should be nil before poll")
 	}
 
 	pollReq := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, "beta@agent.test", privB)
@@ -359,11 +359,11 @@ func TestDashboardMessageLogDeliverAndReceive(t *testing.T) {
 	if err := json.NewDecoder(dashResp2.Body).Decode(&snap2); err != nil {
 		t.Fatalf("decode dashboard: %v", err)
 	}
-	if len(snap2.MessageLog) < 2 {
-		t.Fatalf("message_log len = %d, want at least 2 (delivered + received)", len(snap2.MessageLog))
+	if len(snap2.MessageLog) != 1 {
+		t.Fatalf("message_log len = %d, want still 1 entry (no separate receive row)", len(snap2.MessageLog))
 	}
-	if snap2.MessageLog[0].Event != messageLogEventReceived {
-		t.Fatalf("newest event = %q, want received", snap2.MessageLog[0].Event)
+	if snap2.MessageLog[0].ReceivedAt == nil {
+		t.Fatal("received_at should be set after poll")
 	}
 }
 
