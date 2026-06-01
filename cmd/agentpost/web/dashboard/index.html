@@ -414,7 +414,7 @@
     .log-body-tooltip-body {
       margin: 0; font-size: 0.8rem; font-family: var(--font);
       color: var(--text-2); word-break: break-word;
-      line-height: 1.5;
+      line-height: 1.5; overflow: visible;
     }
     .msg-body-md { font-size: 0.8rem; line-height: 1.5; color: var(--text-2); }
     .msg-body-md .md-p { margin: 0 0 0.55rem; }
@@ -754,7 +754,7 @@
           <div class="log-body" id="message-log" aria-label="Message log"></div>
           <div id="log-body-tooltip" class="log-body-tooltip hidden" role="tooltip" aria-hidden="true">
             <div class="log-body-tooltip-subject"></div>
-            <pre class="log-body-tooltip-body"></pre>
+            <div class="log-body-tooltip-body"></div>
           </div>
         </div>
       </section>
@@ -1168,26 +1168,60 @@
     }
 
     function decodeStringEscapes(s) {
-      return String(s)
-        .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
-        .replace(/\\r\\n/g, "\n")
-        .replace(/\\n/g, "\n")
-        .replace(/\\r/g, "\n")
-        .replace(/\\t/g, "\t");
+      let out = String(s);
+      for (let pass = 0; pass < 3; pass++) {
+        const next = out
+          .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+          .replace(/\\r\\n/g, "\n")
+          .replace(/\\n/g, "\n")
+          .replace(/\\r/g, "\n")
+          .replace(/\\t/g, "\t");
+        if (next === out) break;
+        out = next;
+      }
+      return out;
+    }
+
+    function finalizeAgentPlainText(s) {
+      let text = decodeStringEscapes(String(s ?? "").trim());
+      if (!text) return "";
+      const trimmed = text.trim();
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        try {
+          const inner = JSON.parse(trimmed);
+          if (typeof inner === "string") return finalizeAgentPlainText(inner);
+          if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+            if (typeof inner.request === "string") return finalizeAgentPlainText(inner.request);
+            if (typeof inner.reply === "string") return finalizeAgentPlainText(inner.reply);
+          }
+        } catch (_) { /* keep text */ }
+      }
+      return text;
     }
 
     function extractAgentMessageText(raw) {
-      let text = decodeStringEscapes(String(raw ?? "").trim());
+      let text = String(raw ?? "").trim();
       if (!text) return "";
-      try {
-        const obj = JSON.parse(text);
-        if (obj && typeof obj === "object" && !Array.isArray(obj)) {
-          if (typeof obj.request === "string") return decodeStringEscapes(obj.request);
-          if (typeof obj.reply === "string") return decodeStringEscapes(obj.reply);
-          return JSON.stringify(obj, null, 2);
+      for (let pass = 0; pass < 4; pass++) {
+        text = decodeStringEscapes(text);
+        if (!text) return "";
+        try {
+          const parsed = JSON.parse(text);
+          if (typeof parsed === "string") {
+            if (parsed === text) break;
+            text = parsed;
+            continue;
+          }
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            if (typeof parsed.request === "string") return finalizeAgentPlainText(parsed.request);
+            if (typeof parsed.reply === "string") return finalizeAgentPlainText(parsed.reply);
+            return JSON.stringify(parsed, null, 2);
+          }
+        } catch (_) {
+          break;
         }
-      } catch (_) { /* plain text */ }
-      return text;
+      }
+      return finalizeAgentPlainText(text);
     }
 
     function renderInlineMarkdown(s) {
@@ -2022,7 +2056,7 @@
         if (!logTooltipState.overRow && !logTooltipState.overTip) {
           hideLogBodyTooltip();
         }
-      }, 160);
+      }, 320);
     }
 
     function positionLogBodyTooltip(ev) {
@@ -2105,9 +2139,6 @@
           logTooltipState.overRow = true;
           cancelHideLogBodyTooltip();
           showLogBodyTooltip(ev, entry);
-        });
-        row.addEventListener("mousemove", (ev) => {
-          if (!logTooltipState.overTip) showLogBodyTooltip(ev, entry);
         });
         row.addEventListener("mouseleave", () => {
           logTooltipState.overRow = false;

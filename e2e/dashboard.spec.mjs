@@ -156,6 +156,27 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator(".toast.err")).toHaveCount(0);
   });
 
+  test("message log hover shows decoded markdown body", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, MAILBOX_COUNT);
+    await expect(page.locator(".log-table .log-row").first()).toBeVisible({ timeout: 15_000 });
+
+    const row = page.locator(".log-table .log-row").first();
+    await row.hover();
+    const tip = page.locator("#log-body-tooltip");
+    await expect(tip).not.toHaveClass(/hidden/);
+    await expect(tip).toContainText("目标");
+    await expect(tip).not.toContainText("\\u76ee");
+    await expect(tip.locator(".md-ol li")).toHaveCount(2);
+
+    await tip.hover();
+    await expect(tip).not.toHaveClass(/hidden/);
+    await tip.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await expect(tip).not.toHaveClass(/hidden/);
+  });
+
   test("refresh keeps stable KPI values without rolling from zero", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, MAILBOX_COUNT);

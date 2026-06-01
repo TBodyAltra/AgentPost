@@ -271,7 +271,7 @@ func dashboardTruncateSubject(s string) string {
 }
 
 func dashboardTruncateBody(s string) string {
-	s = strings.TrimSpace(s)
+	s = normalizeAgentMessageBodyForDisplay(s)
 	if len(s) <= 4000 {
 		return s
 	}
