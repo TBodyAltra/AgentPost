@@ -379,13 +379,15 @@
     }
     .log-table tr:hover td { background: color-mix(in srgb, var(--accent) 6%, transparent); }
     .log-table tr.log-row { cursor: pointer; }
-    .log-event {
-      display: inline-flex; align-items: center; gap: 0.25rem;
-      font-size: 0.68rem; font-weight: 600; padding: 0.12rem 0.4rem;
-      border-radius: 100px; white-space: nowrap;
+    .log-receipt {
+      display: inline-flex; align-items: center; justify-content: flex-end;
+      min-width: 1.75rem; font-size: 0.85rem; font-weight: 600;
+      letter-spacing: -0.12em; line-height: 1; white-space: nowrap;
+      font-family: system-ui, -apple-system, sans-serif;
     }
-    .log-event.delivered { color: var(--accent); background: var(--accent-soft); }
-    .log-event.received { color: var(--ok); background: var(--ok-soft); }
+    .log-receipt.pending { color: var(--text-3); opacity: 0.75; }
+    .log-receipt.read { color: var(--ok); }
+    .log-receipt.read .log-receipt-2 { margin-left: -0.35em; }
     .log-empty {
       padding: 1.25rem; text-align: center; color: var(--text-3); font-size: 0.8rem;
     }
@@ -785,14 +787,14 @@
         logFilterAll: "全部邮箱",
         logFilterMailbox: "仅 {email}",
         logColTime: "时间",
-        logColEvent: "类型",
+        logColStatus: "状态",
         logColFrom: "发件人",
         logColTo: "收件人",
         logColSubject: "主题",
-        logEventDelivered: "发信",
-        logEventReceived: "收信",
-        logEmpty: "暂无记录。发信或 Agent 轮询收信后会出现在此。",
-        logHint: "记录网关内的投递与轮询收信（内存保留最近约 1000 条，重启后清空）。",
+        logReceiptPending: "已投递，对方尚未轮询收信",
+        logReceiptRead: "对方已轮询收信",
+        logEmpty: "暂无记录。发信后会出现在此；对方轮询收信后显示双勾。",
+        logHint: "仅记录发信；对方 GET /messages 取走后，该行显示双勾（内存约 1000 条，重启清空）。",
         selectMailbox: "在左侧选择一个邮箱查看详情",
         noDisplayName: "未命名 Agent",
       },
@@ -863,14 +865,14 @@
         logFilterAll: "全部郵箱",
         logFilterMailbox: "僅 {email}",
         logColTime: "時間",
-        logColEvent: "類型",
+        logColStatus: "狀態",
         logColFrom: "寄件人",
         logColTo: "收件人",
         logColSubject: "主題",
-        logEventDelivered: "發信",
-        logEventReceived: "收信",
-        logEmpty: "暫無記錄。發信或 Agent 輪詢收信後會出現在此。",
-        logHint: "記錄閘道內的投遞與輪詢收信（記憶體保留最近約 1000 條，重啟後清空）。",
+        logReceiptPending: "已投遞，對方尚未輪詢收信",
+        logReceiptRead: "對方已輪詢收信",
+        logEmpty: "暫無記錄。發信後會出現在此；對方輪詢收信後顯示雙勾。",
+        logHint: "僅記錄發信；對方 GET /messages 取走後，該列顯示雙勾（記憶體約 1000 條，重啟清空）。",
         selectMailbox: "在左側選擇一個郵箱查看詳情",
         noDisplayName: "未命名 Agent",
       },
@@ -941,14 +943,14 @@
         logFilterAll: "All mailboxes",
         logFilterMailbox: "{email} only",
         logColTime: "Time",
-        logColEvent: "Type",
+        logColStatus: "Status",
         logColFrom: "From",
         logColTo: "To",
         logColSubject: "Subject",
-        logEventDelivered: "Sent",
-        logEventReceived: "Received",
-        logEmpty: "No entries yet. Send mail or poll with GET /messages to populate.",
-        logHint: "Deliveries and poll receipts on this gateway (last ~1000 in memory; cleared on restart).",
+        logReceiptPending: "Delivered; recipient has not polled yet",
+        logReceiptRead: "Recipient polled the message",
+        logEmpty: "No entries yet. Outbound deliveries appear here; double check when polled.",
+        logHint: "Send events only; double check after GET /messages (~1000 in memory; cleared on restart).",
         selectMailbox: "Select a mailbox on the left to inspect details",
         noDisplayName: "Unnamed agent",
       },
@@ -1801,34 +1803,44 @@
       return log.filter((e) => (e.from || "").toLowerCase() === sel || (e.to || "").toLowerCase() === sel);
     }
 
-    function logEventLabel(event) {
-      return event === "received" ? t("logEventReceived") : t("logEventDelivered");
+    function isLogEntryRead(e) {
+      if (e.received_at) return true;
+      if (e.event === "received") return true;
+      return false;
+    }
+
+    function renderLogReceipt(e) {
+      const read = isLogEntryRead(e);
+      const title = esc(read ? t("logReceiptRead") : t("logReceiptPending"));
+      if (read) {
+        return `<span class="log-receipt read" title="${title}" aria-label="${title}"><span>✓</span><span class="log-receipt-2">✓</span></span>`;
+      }
+      return `<span class="log-receipt pending" title="${title}" aria-label="${title}">✓</span>`;
     }
 
     function renderMessageLog(data) {
       $("log-filter-note").textContent = state.selected
         ? t("logFilterMailbox").replace("{email}", state.selected)
         : t("logFilterAll");
-      const entries = messageLogForView(data);
+      const entries = messageLogForView(data).filter((e) => e.event !== "received");
       const el = $("message-log");
       if (!entries.length) {
         el.innerHTML = `<p class="log-empty">${esc(t("logEmpty"))}</p><p class="log-empty" style="font-size:0.72rem;margin-top:0.35rem;opacity:0.85">${esc(t("logHint"))}</p>`;
         return;
       }
       const rows = entries.map((e) => {
-        const evClass = e.event === "received" ? "received" : "delivered";
         const from = e.from || "";
         const to = e.to || "";
         return `<tr class="log-row" data-from="${esc(from)}" data-to="${esc(to)}">
           <td>${fmtTime(e.at)}</td>
-          <td><span class="log-event ${evClass}">${esc(logEventLabel(e.event))}</span></td>
+          <td>${renderLogReceipt(e)}</td>
           <td title="${esc(from)}">${esc(from)}</td>
           <td title="${esc(to)}">${esc(to)}</td>
           <td title="${esc(e.subject || "")}">${esc(e.subject || "—")}</td>
         </tr>`;
       }).join("");
       el.innerHTML = `<table class="log-table"><thead><tr>
-        <th>${esc(t("logColTime"))}</th><th>${esc(t("logColEvent"))}</th>
+        <th>${esc(t("logColTime"))}</th><th>${esc(t("logColStatus"))}</th>
         <th>${esc(t("logColFrom"))}</th><th>${esc(t("logColTo"))}</th>
         <th>${esc(t("logColSubject"))}</th>
       </tr></thead><tbody>${rows}</tbody></table>
