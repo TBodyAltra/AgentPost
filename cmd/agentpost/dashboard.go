@@ -268,6 +268,14 @@ func dashboardTruncateSubject(s string) string {
 	return s[:157] + "..."
 }
 
+func dashboardTruncateBody(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= 4000 {
+		return s
+	}
+	return s[:3997] + "..."
+}
+
 func (a *App) dashboardHandler() http.Handler {
 	sub, err := fs.Sub(dashboardFS, "web/dashboard")
 	if err != nil {

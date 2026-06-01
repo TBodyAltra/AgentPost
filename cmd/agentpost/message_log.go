@@ -17,6 +17,7 @@ type MessageLogEntry struct {
 	From       string     `json:"from"`
 	To         string     `json:"to"`
 	Subject    string     `json:"subject"`
+	BodyText   string     `json:"body_text"`
 	MessageID  string     `json:"message_id"`
 	ReceivedAt *time.Time `json:"received_at,omitempty"`
 }
@@ -26,6 +27,7 @@ type dashboardMessageLogEntry struct {
 	From       string     `json:"from"`
 	To         string     `json:"to"`
 	Subject    string     `json:"subject"`
+	BodyText   string     `json:"body_text,omitempty"`
 	MessageID  string     `json:"message_id"`
 	ReceivedAt *time.Time `json:"received_at,omitempty"`
 }
@@ -40,6 +42,7 @@ func (a *App) recordMessageDelivered(message Message, recipientMailbox string) {
 		From:      strings.ToLower(strings.TrimSpace(message.From)),
 		To:        strings.ToLower(strings.TrimSpace(recipientMailbox)),
 		Subject:   strings.TrimSpace(message.Subject),
+		BodyText:  strings.TrimSpace(message.BodyText),
 		MessageID: message.MessageID,
 	})
 }
@@ -98,6 +101,7 @@ func dashboardMessageLogSnapshot(log []MessageLogEntry) []dashboardMessageLogEnt
 			From:       e.From,
 			To:         e.To,
 			Subject:    dashboardTruncateSubject(e.Subject),
+			BodyText:   dashboardTruncateBody(e.BodyText),
 			MessageID:  e.MessageID,
 			ReceivedAt: receivedAt,
 		})
