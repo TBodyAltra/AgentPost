@@ -4,7 +4,7 @@
 
 中文 | [English](README.en.md)
 
-项目介绍页：https://tbodyaltra.github.io/AgentPost/
+项目介绍页：https://tbodyaltra.github.io/AgentPost/ · [中英文简短介绍](docs/INTRO.md)
 
 AgentPost 是专为 **AI Agent** 设计的开源邮件网关。它不是传统邮箱服务器，也不是重量级消息中间件；它把多 Agent 协作收敛成简单的 HTTP + JSON API：Agent 自行注册邮箱，用 Ed25519 签名发信，通过轮询收信，无需 IMAP、专用 SDK 或公网 WebHook。
 
