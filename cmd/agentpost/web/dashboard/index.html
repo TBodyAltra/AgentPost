@@ -393,8 +393,8 @@
     }
     .log-body-tooltip {
       position: fixed; z-index: 200;
-      max-width: min(28rem, calc(100vw - 1.5rem));
-      max-height: min(16rem, calc(100vh - 1.5rem));
+      max-width: min(32rem, calc(100vw - 1.5rem));
+      max-height: min(20rem, calc(100vh - 1.5rem));
       padding: 0.65rem 0.75rem;
       border-radius: var(--radius-sm);
       background: var(--bg-elevated);
@@ -412,9 +412,36 @@
       word-break: break-word;
     }
     .log-body-tooltip-body {
-      margin: 0; font-size: 0.72rem; font-family: var(--mono);
-      color: var(--text-2); white-space: pre-wrap; word-break: break-word;
-      line-height: 1.45;
+      margin: 0; font-size: 0.8rem; font-family: var(--font);
+      color: var(--text-2); word-break: break-word;
+      line-height: 1.5;
+    }
+    .msg-body-md { font-size: 0.8rem; line-height: 1.5; color: var(--text-2); }
+    .msg-body-md .md-p { margin: 0 0 0.55rem; }
+    .msg-body-md .md-p:last-child { margin-bottom: 0; }
+    .msg-body-md .md-h1, .msg-body-md .md-h2, .msg-body-md .md-h3 {
+      margin: 0.35rem 0 0.4rem; font-size: 0.88rem; font-weight: 650; color: var(--text);
+    }
+    .msg-body-md .md-ul, .msg-body-md .md-ol {
+      margin: 0.2rem 0 0.55rem 1.1rem; padding: 0;
+    }
+    .msg-body-md .md-ul li, .msg-body-md .md-ol li { margin: 0.15rem 0; }
+    .msg-body-md .md-code {
+      margin: 0.35rem 0; padding: 0.5rem 0.55rem;
+      border-radius: 6px; background: var(--bg);
+      border: 1px solid var(--hairline);
+      overflow-x: auto; font-family: var(--mono); font-size: 0.72rem;
+      white-space: pre-wrap;
+    }
+    .msg-body-md .md-icode {
+      font-family: var(--mono); font-size: 0.76em;
+      padding: 0.05rem 0.25rem; border-radius: 4px;
+      background: var(--bg); border: 1px solid var(--hairline);
+    }
+    .msg-body-md .md-empty { margin: 0; color: var(--text-3); font-style: italic; }
+    .inbox-body {
+      margin-top: 0.35rem; padding-top: 0.35rem;
+      border-top: 1px solid var(--hairline);
     }
     .matrix-body {
       flex: 1; min-height: 0; min-width: 0;
@@ -1013,6 +1040,7 @@
 
     let lang = "zh-hans";
     let detailTab = localStorage.getItem(TAB_KEY) || "overview";
+
     let state = {
       data: null,
       selected: null,
@@ -1137,6 +1165,105 @@
 
     function esc(s) {
       return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+
+    function decodeStringEscapes(s) {
+      return String(s)
+        .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+        .replace(/\\r\\n/g, "\n")
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\n")
+        .replace(/\\t/g, "\t");
+    }
+
+    function extractAgentMessageText(raw) {
+      let text = decodeStringEscapes(String(raw ?? "").trim());
+      if (!text) return "";
+      try {
+        const obj = JSON.parse(text);
+        if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+          if (typeof obj.request === "string") return decodeStringEscapes(obj.request);
+          if (typeof obj.reply === "string") return decodeStringEscapes(obj.reply);
+          return JSON.stringify(obj, null, 2);
+        }
+      } catch (_) { /* plain text */ }
+      return text;
+    }
+
+    function renderInlineMarkdown(s) {
+      let html = esc(s);
+      html = html.replace(/`([^`\n]+)`/g, '<code class="md-icode">$1</code>');
+      html = html.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+      html = html.replace(/\n/g, "<br>");
+      return html;
+    }
+
+    function renderMarkdownTextBlock(text) {
+      const lines = String(text).replace(/\r\n/g, "\n").split("\n");
+      const out = [];
+      let i = 0;
+      while (i < lines.length) {
+        const trimmed = lines[i].trim();
+        if (!trimmed) { i += 1; continue; }
+        const hm = /^(#{1,3})\s+(.+)$/.exec(trimmed);
+        if (hm) {
+          const level = hm[1].length;
+          out.push(`<h${level + 2} class="md-h${level}">${renderInlineMarkdown(hm[2])}</h${level + 2}>`);
+          i += 1;
+          continue;
+        }
+        if (/^[-*]\s+/.test(trimmed)) {
+          const items = [];
+          while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
+            items.push(`<li>${renderInlineMarkdown(lines[i].trim().replace(/^[-*]\s+/, ""))}</li>`);
+            i += 1;
+          }
+          out.push(`<ul class="md-ul">${items.join("")}</ul>`);
+          continue;
+        }
+        if (/^\d+\.\s+/.test(trimmed)) {
+          const items = [];
+          while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
+            items.push(`<li>${renderInlineMarkdown(lines[i].trim().replace(/^\d+\.\s+/, ""))}</li>`);
+            i += 1;
+          }
+          out.push(`<ol class="md-ol">${items.join("")}</ol>`);
+          continue;
+        }
+        const para = [];
+        while (i < lines.length && lines[i].trim()) {
+          para.push(lines[i]);
+          i += 1;
+        }
+        out.push(`<p class="md-p">${renderInlineMarkdown(para.join("\n"))}</p>`);
+      }
+      return out.join("");
+    }
+
+    function renderMarkdownToHtml(text) {
+      const src = String(text ?? "");
+      if (!src.trim()) return `<p class="md-empty">${esc(t("logBodyEmpty"))}</p>`;
+      const parts = [];
+      const codeRe = /```([\w-]*)\n?([\s\S]*?)```/g;
+      let last = 0;
+      let match;
+      while ((match = codeRe.exec(src)) !== null) {
+        if (match.index > last) {
+          parts.push({ type: "text", content: src.slice(last, match.index) });
+        }
+        parts.push({ type: "code", content: match[2] });
+        last = match.index + match[0].length;
+      }
+      if (last < src.length) parts.push({ type: "text", content: src.slice(last) });
+      if (!parts.length) parts.push({ type: "text", content: src });
+      return parts.map((p) => (p.type === "code"
+        ? `<pre class="md-code"><code>${esc(p.content.replace(/\n$/, ""))}</code></pre>`
+        : renderMarkdownTextBlock(p.content))).join("");
+    }
+
+    function renderMessageBodyHtml(bodyText) {
+      const text = extractAgentMessageText(bodyText);
+      return `<div class="msg-body-md">${renderMarkdownToHtml(text)}</div>`;
     }
 
     function fmtTime(iso) {
@@ -1644,6 +1771,7 @@
         <div class="inbox-item unread">
           <div class="inbox-from">${esc(m.from)}</div>
           <div class="inbox-subject">${esc(m.subject || "—")}</div>
+          ${m.body_text ? `<div class="inbox-body">${renderMessageBodyHtml(m.body_text)}</div>` : ""}
           <div class="inbox-time">${fmtTime(m.received_at)} · <code>${esc(m.message_id)}</code></div>
         </div>`).join("");
       return `<p class="inbox-hint">${esc(t("inboxHint"))}</p><div class="inbox-list">${items}</div>`;
@@ -1875,29 +2003,6 @@
 
     const logTooltipState = { hideTimer: null, overRow: false, overTip: false };
 
-    function decodeUnicodeEscapes(text) {
-      const s = String(text ?? "");
-      if (!/\\u[0-9a-fA-F]{4}/.test(s)) return s;
-      return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
-        String.fromCodePoint(parseInt(hex, 16)));
-    }
-
-    function formatMessageBodyForDisplay(raw) {
-      let s = String(raw ?? "").trim();
-      if (!s) return "";
-      s = decodeUnicodeEscapes(s);
-      try {
-        const parsed = JSON.parse(s);
-        if (parsed !== null && typeof parsed === "object") {
-          return JSON.stringify(parsed, null, 2);
-        }
-        if (typeof parsed === "string") {
-          return decodeUnicodeEscapes(parsed);
-        }
-      } catch (_) { /* plain text */ }
-      return s;
-    }
-
     function hideLogBodyTooltip() {
       const tip = $("log-body-tooltip");
       tip.classList.add("hidden");
@@ -1939,11 +2044,12 @@
     }
 
     function showLogBodyTooltip(ev, entry) {
+      cancelHideLogBodyTooltip();
       const tip = $("log-body-tooltip");
-      const body = formatMessageBodyForDisplay(entry.body_text);
-      const subject = decodeUnicodeEscapes(String(entry.subject ?? "").trim()) || "—";
+      const subject = decodeStringEscapes(String(entry.subject ?? "").trim()) || "—";
       tip.querySelector(".log-body-tooltip-subject").textContent = subject;
-      tip.querySelector(".log-body-tooltip-body").textContent = body || t("logBodyEmpty");
+      const bodyHtml = renderMessageBodyHtml(entry.body_text ?? "");
+      tip.querySelector(".log-body-tooltip-body").innerHTML = bodyHtml;
       tip.classList.remove("hidden");
       tip.setAttribute("aria-hidden", "false");
       if (!logTooltipState.overTip) {

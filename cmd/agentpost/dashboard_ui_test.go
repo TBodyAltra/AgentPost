@@ -168,8 +168,9 @@ func TestDashboardLogBodyFormatUnit(t *testing.T) {
 func TestDashboardMessageLogTooltipHoverAndBodyFormat(t *testing.T) {
 	html := string(readEmbeddedDashboardHTML(t))
 	for _, needle := range []string{
-		"function formatMessageBodyForDisplay",
-		"function decodeUnicodeEscapes",
+		"function decodeStringEscapes",
+		"function extractAgentMessageText",
+		"function renderMessageBodyHtml",
 		"function scheduleHideLogBodyTooltip",
 		"initLogBodyTooltipHover",
 		"pointer-events: auto",

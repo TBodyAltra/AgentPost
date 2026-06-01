@@ -3,49 +3,52 @@
  * Run: node log-body-format.test.mjs
  */
 
-function decodeUnicodeEscapes(text) {
-  const s = String(text ?? "");
-  if (!/\\u[0-9a-fA-F]{4}/.test(s)) return s;
-  return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
-    String.fromCodePoint(parseInt(hex, 16)));
+function decodeStringEscapes(s) {
+  return String(s)
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\n")
+    .replace(/\\t/g, "\t");
 }
 
-function formatMessageBodyForDisplay(raw) {
-  let s = String(raw ?? "").trim();
-  if (!s) return "";
-  s = decodeUnicodeEscapes(s);
+function extractAgentMessageText(raw) {
+  let text = decodeStringEscapes(String(raw ?? "").trim());
+  if (!text) return "";
   try {
-    const parsed = JSON.parse(s);
-    if (parsed !== null && typeof parsed === "object") {
-      return JSON.stringify(parsed, null, 2);
-    }
-    if (typeof parsed === "string") {
-      return decodeUnicodeEscapes(parsed);
+    const obj = JSON.parse(text);
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      if (typeof obj.request === "string") return decodeStringEscapes(obj.request);
+      if (typeof obj.reply === "string") return decodeStringEscapes(obj.reply);
+      return JSON.stringify(obj, null, 2);
     }
   } catch (_) {
     /* plain text */
   }
-  return s;
+  return text;
 }
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
-    throw new Error(`${label}\n  expected: ${JSON.stringify(expected)}\n  actual:   ${JSON.stringify(actual)}`);
+    throw new Error(
+      `${label}\n  expected: ${JSON.stringify(expected)}\n  actual:   ${JSON.stringify(actual)}`,
+    );
   }
 }
 
-assertEqual(decodeUnicodeEscapes("\\u76ee\\u6807"), "目标", "decode plain escapes");
+assertEqual(decodeStringEscapes("\\u76ee\\u6807"), "目标", "decode unicode escapes");
+assertEqual(decodeStringEscapes("line1\\n\\n2. item"), "line1\n\n2. item", "decode newline escapes");
 
 const jsonBody = '{"request":"\\u76ee\\u6807\\u5212\\u5b8c\\u6210"}';
-const formatted = formatMessageBodyForDisplay(jsonBody);
-if (!formatted.includes("目标")) {
-  throw new Error(`formatted JSON should contain 目标, got: ${formatted}`);
+const extracted = extractAgentMessageText(jsonBody);
+if (!extracted.includes("目标")) {
+  throw new Error(`extracted request should contain 目标, got: ${extracted}`);
 }
-if (formatted.includes("\\u76ee")) {
-  throw new Error(`formatted JSON should not contain literal \\u escapes, got: ${formatted}`);
+if (extracted.includes("\\u76ee")) {
+  throw new Error(`extracted request should not contain literal \\u escapes, got: ${extracted}`);
 }
 
-assertEqual(formatMessageBodyForDisplay("plain hello"), "plain hello", "plain text");
-assertEqual(formatMessageBodyForDisplay(""), "", "empty");
+assertEqual(extractAgentMessageText("plain hello"), "plain hello", "plain text");
+assertEqual(extractAgentMessageText(""), "", "empty");
 
 console.log("log-body-format.test.mjs: ok");
