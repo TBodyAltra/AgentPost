@@ -25,6 +25,13 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
   });
 
+  test("message log panel is visible", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, MAILBOX_COUNT);
+    await expect(page.locator("#message-log")).toBeVisible();
+    await expect(page.locator("#log-title")).toBeVisible();
+  });
+
   test("mailbox detail opens on selection and shows tabbed sections", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, MAILBOX_COUNT);

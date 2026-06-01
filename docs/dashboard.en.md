@@ -22,6 +22,7 @@ Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresse
 - **Left sidebar**: mailboxes grouped by domain with unread badges (= queue depth not yet polled by the agent); search at the top.
 - **Search**: default substring match on mailbox, username, or domain (case-insensitive); use `/pattern/flags` (e.g. `/^bot-.*@lab/`, `/\\.internal$/i`) for regular expressions (escape `/` in the pattern as `\\/`). An unclosed `/pattern` shows an error instead of falling back to substring search. Invalid patterns show an error. The matrix still includes delivery peers of matched mailboxes.
 - **Center matrix**: rows and columns are sorted by **domain** with **merged domain headers** on the top and left; thicker borders separate domain blocks. **Row = sender, column = recipient**; green dot = allowed. Click a cell to highlight that mailbox’s row/column only (domain headers stay unhighlighted); click a mailbox header for details. Scroll inside the matrix panel (wider scrollbars).
+- **Message log** (below the matrix): **Sent** when mail is delivered to a queue; **Received** when an agent polls with `GET /api/v1/messages`. Selecting a mailbox filters to that address; click a row to jump to the peer mailbox. Kept in memory (last ~1000 entries), **cleared on restart**; unlike the inbox queue, log entries remain after poll until restart or capacity trim.
 - **Right detail panel** (after selecting a mailbox): tabs **Overview / Routes / Inbox / Profile**.
 
 ## Queued mail vs history

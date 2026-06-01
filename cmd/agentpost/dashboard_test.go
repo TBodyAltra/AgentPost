@@ -298,6 +298,75 @@ func TestDashboardQueuePreviewsAndTotals(t *testing.T) {
 	}
 }
 
+func TestDashboardMessageLogDeliverAndReceive(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubA, privA, _ := ed25519.GenerateKey(crand.Reader)
+	pubB, privB, _ := ed25519.GenerateKey(crand.Reader)
+	registerDashboardUser(t, handler, "alpha", "agent.test", pubA, nil)
+	registerDashboardUser(t, handler, "beta", "agent.test", pubB, nil)
+
+	sendBody := mustJSON(t, sendRequest{
+		To:      "beta@agent.test",
+		Subject: "log test",
+		Body:    "payload",
+	})
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "alpha@agent.test", privA)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusOK {
+		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
+	}
+
+	dashReq := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	dashResp := httptest.NewRecorder()
+	handler.ServeHTTP(dashResp, dashReq)
+	if dashResp.Code != http.StatusOK {
+		t.Fatalf("dashboard status = %d", dashResp.Code)
+	}
+	var snap dashboardResponse
+	if err := json.NewDecoder(dashResp.Body).Decode(&snap); err != nil {
+		t.Fatalf("decode dashboard: %v", err)
+	}
+	if len(snap.MessageLog) != 1 {
+		t.Fatalf("message_log len = %d, want 1 delivered", len(snap.MessageLog))
+	}
+	if snap.MessageLog[0].Event != messageLogEventDelivered {
+		t.Fatalf("event = %q, want delivered", snap.MessageLog[0].Event)
+	}
+	if snap.MessageLog[0].From != "alpha@agent.test" || snap.MessageLog[0].To != "beta@agent.test" {
+		t.Fatalf("unexpected parties: %+v", snap.MessageLog[0])
+	}
+
+	pollReq := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, "beta@agent.test", privB)
+	pollResp := httptest.NewRecorder()
+	handler.ServeHTTP(pollResp, pollReq)
+	if pollResp.Code != http.StatusOK {
+		t.Fatalf("poll status = %d", pollResp.Code)
+	}
+
+	dashReq2 := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	dashResp2 := httptest.NewRecorder()
+	handler.ServeHTTP(dashResp2, dashReq2)
+	var snap2 dashboardResponse
+	if err := json.NewDecoder(dashResp2.Body).Decode(&snap2); err != nil {
+		t.Fatalf("decode dashboard: %v", err)
+	}
+	if len(snap2.MessageLog) < 2 {
+		t.Fatalf("message_log len = %d, want at least 2 (delivered + received)", len(snap2.MessageLog))
+	}
+	if snap2.MessageLog[0].Event != messageLogEventReceived {
+		t.Fatalf("newest event = %q, want received", snap2.MessageLog[0].Event)
+	}
+}
+
 func TestDashboardDirectedDeliveryStatus(t *testing.T) {
 	users := map[string]*User{
 		"alice@a.test": {

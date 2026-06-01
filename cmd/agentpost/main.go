@@ -64,10 +64,11 @@ type App struct {
 	cfg Config
 	now func() time.Time
 
-	mu       sync.RWMutex
-	users    map[string]*User
-	messages map[string][]Message
-	limiters map[string]*rate.Limiter
+	mu         sync.RWMutex
+	users      map[string]*User
+	messages   map[string][]Message
+	messageLog []MessageLogEntry
+	limiters   map[string]*rate.Limiter
 
 	registerLimiters map[string]*registerLimiterState
 }
@@ -680,6 +681,9 @@ func (a *App) handleMessages(w http.ResponseWriter, r *http.Request) {
 	mailbox := userMailbox(user)
 	messages := append([]Message(nil), a.messages[mailbox]...)
 	a.messages[mailbox] = nil
+	if len(messages) > 0 {
+		a.recordMessagesReceived(mailbox, messages)
+	}
 	a.mu.Unlock()
 
 	writeJSON(w, http.StatusOK, messagesResponse{Messages: messages})
@@ -747,6 +751,7 @@ func (a *App) deliver(mailbox string, message Message) deliverResult {
 		return deliverRejectedByPolicy
 	}
 	a.messages[mailbox] = append(a.messages[mailbox], message)
+	a.recordMessageDelivered(message, mailbox)
 	return deliverOK
 }
 
