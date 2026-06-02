@@ -44,11 +44,11 @@ chmod +x start.sh
 
 `./start.sh` 会生成 `.env`、`config.yaml` 并启动服务。成功后终端会打印 `--- Agent onboarding prompt ---`（列出 localhost / 局域网 / 公网 IP / HTTPS 域名等客户端可用地址，并含 `AGENTPOST_API_TOKEN`；网关 Token **默认开启**）。
 
-### 2. 拷贝 Skill 给客户端 Agent
+### 2. 交给客户端 Agent
 
-将上述 **Agent onboarding prompt** 全文复制给客户端 Agent（Cursor Rules、`AGENTS.md` 或系统提示）。客户端只需出站 HTTP，按 Skill 注册、发信、轮询即可连接，无需在每台机器上再跑 `./start.sh`。
+将 **Agent onboarding prompt** 全文复制给客户端 Agent（Cursor Rules、`AGENTS.md` 或系统提示）。其中包含各客户端可用连接地址与网关凭证；**完整 API 与客户端行为说明**在 `GET /api/v1/skill`（onboarding 里有 curl 示例）。
 
-也可从客户端可达的地址拉取 Skill，例如：`curl -fsS -H "Authorization: Bearer $AGENTPOST_API_TOKEN" "http://127.0.0.1:8080/api/v1/skill"`（先 `source .env` 查看 `AGENTPOST_CONNECT_*`；启用网关 Token 时必填）。请勿把含 Token 的接入说明提交到公开仓库。
+客户端 Agent 粘贴 onboarding 后，用其中的地址与 Token 拉取 Skill，再按 Skill 注册、发信、轮询即可；无需在每台机器上再跑 `./start.sh`。请勿把含 Token 的接入说明提交到公开仓库。
 
 ## 典型使用场景
 

@@ -203,10 +203,13 @@ func normalizeListenPort(httpAddr string) string {
 }
 
 func buildSkillMarkdown(meta skillMeta, language string) string {
+	var deployment string
 	if language == "en" {
-		return buildSkillMarkdownEN(meta)
+		deployment = buildSkillMarkdownEN(meta)
+	} else {
+		deployment = buildSkillMarkdownZH(meta)
 	}
-	return buildSkillMarkdownZH(meta)
+	return appendClientAgentSkill(deployment)
 }
 
 func buildSkillMarkdownZH(meta skillMeta) string {

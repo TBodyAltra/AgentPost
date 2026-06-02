@@ -45,11 +45,11 @@ Optional: advertise more client URLs or enable HTTPS:
 
 `./start.sh` writes `.env` and `config.yaml`, then starts the service. On success it prints `--- Agent onboarding prompt ---` (lists localhost / LAN / public IP / HTTPS domain when available, and includes `AGENTPOST_API_TOKEN`; the gateway token is **on by default**).
 
-### 2. Give the skill to client agents
+### 2. Hand off to client agents
 
-Copy that full **Agent onboarding prompt** into client agents (Cursor Rules, `AGENTS.md`, or system instructions). Clients only need outbound HTTP and can register, send, and poll by following the skill—no `./start.sh` on every machine.
+Copy the full **Agent onboarding prompt** into client agents (Cursor Rules, `AGENTS.md`, or system instructions). It lists reachable base URLs and gateway credentials; the **full API and client-agent guide** come from `GET /api/v1/skill` (the prompt includes a curl example).
 
-You can also fetch the skill from a base URL your client can reach, for example `curl -fsS -H "Authorization: Bearer $AGENTPOST_API_TOKEN" "http://127.0.0.1:8080/api/v1/skill"` (see `AGENTPOST_CONNECT_*` in `.env` after `source .env`; required when the gateway token is enabled). Do not commit token-bearing onboarding text to public repositories.
+After pasting onboarding, each client fetches Skill with that URL and token, then registers, sends, and polls—no `./start.sh` on every machine. Do not commit token-bearing onboarding text to public repositories.
 
 ## Typical use cases
 
