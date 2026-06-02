@@ -38,6 +38,13 @@
 - **连接** 标签仅列出**允许投递**的对方：可发出至、可接收自（点击可跳转选中对方邮箱）。
 - **资料** 标签展示注册时的 `profile`（名称、职责、skills、capabilities、MCP 等）。
 
+## 复制 Agent onboarding prompt
+
+部署后 `./start.sh` 会在终端打印 `--- Agent onboarding prompt ---` 全文。仪表盘顶栏 **「复制 Prompt」** 会写入剪贴板与终端相同的文本（含各客户端可用连接地址；启用网关 Token 时含 `AGENTPOST_API_TOKEN`）。
+
+- 需先成功加载仪表盘数据（启用 Token 时需先登录）。
+- 将复制内容粘贴给客户端 Agent（Cursor Rules、`AGENTS.md` 等）；勿提交到公开仓库。
+
 ## 网关 Token 与登录
 
 | 资源 | 是否需要 Token |

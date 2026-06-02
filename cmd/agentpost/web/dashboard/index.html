@@ -769,6 +769,7 @@
           <button type="button" data-theme="light" title="Light">☀</button>
           <button type="button" data-theme="dark" title="Dark">☾</button>
         </div>
+        <button type="button" class="btn btn-ghost" id="copy-prompt-btn">复制 Prompt</button>
         <button type="button" class="icon-btn" id="refresh-btn" title="Refresh">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
         </button>
@@ -869,6 +870,9 @@
         connecting: "连接中…",
         tokenEmpty: "请输入网关 Token",
         logout: "退出",
+        copyPrompt: "复制 Prompt",
+        copyPromptDone: "已复制 Agent onboarding prompt",
+        copyPromptMissing: "暂无 onboarding prompt，请先连接网关",
         refresh: "刷新",
         themeAuto: "自动",
         sidebarTitle: "邮箱",
@@ -961,6 +965,9 @@
         connecting: "連接中…",
         tokenEmpty: "請輸入閘道 Token",
         logout: "登出",
+        copyPrompt: "複製 Prompt",
+        copyPromptDone: "已複製 Agent onboarding prompt",
+        copyPromptMissing: "暫無 onboarding prompt，請先連接閘道",
         refresh: "重新整理",
         themeAuto: "自動",
         sidebarTitle: "郵箱",
@@ -1053,6 +1060,9 @@
         connecting: "Connecting…",
         tokenEmpty: "Enter the gateway token",
         logout: "Log out",
+        copyPrompt: "Copy prompt",
+        copyPromptDone: "Agent onboarding prompt copied",
+        copyPromptMissing: "No onboarding prompt yet — connect to the gateway first",
         refresh: "Refresh",
         themeAuto: "Auto",
         sidebarTitle: "Mailboxes",
@@ -1179,6 +1189,8 @@
       $("login-desc").textContent = t("loginDesc");
       $("login-btn").textContent = t("loginBtn");
       $("logout-btn").textContent = t("logout");
+      $("copy-prompt-btn").textContent = t("copyPrompt");
+      $("copy-prompt-btn").title = t("copyPrompt");
       $("refresh-btn").title = t("refresh");
       $("sidebar-title").textContent = t("sidebarTitle");
       $("topology-title").textContent = t("topology");
@@ -1703,8 +1715,42 @@
       el.dataset.v = nextText;
     }
 
+    async function copyOnboardingPrompt() {
+      const text = state.data?.onboarding_prompt;
+      if (!text || !String(text).trim()) {
+        showToast(t("copyPromptMissing"), "err");
+        return;
+      }
+      const btn = $("copy-prompt-btn");
+      btn.disabled = true;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          if (!document.execCommand("copy")) throw new Error("copy failed");
+          document.body.removeChild(ta);
+        }
+        showToast(t("copyPromptDone"), "ok");
+      } catch (e) {
+        showToast(e.message || t("requestFailed"), "err");
+      } finally {
+        btn.disabled = !state.data?.onboarding_prompt;
+      }
+    }
+
     function renderStats(data) {
       const g = data.gateway;
+      const copyBtn = $("copy-prompt-btn");
+      if (copyBtn) {
+        copyBtn.disabled = !(data.onboarding_prompt && String(data.onboarding_prompt).trim());
+      }
       $("gateway-meta").innerHTML = [
         `<span class="chip"><code>${esc(g.server_url || "—")}</code></span>`,
         `<span class="chip">${t("defaultDomain")} <code>${esc(g.default_domain)}</code></span>`,
@@ -2413,10 +2459,12 @@
       state.data = null;
       state.selected = null;
       if (refreshTimer) clearInterval(refreshTimer);
+      $("copy-prompt-btn").disabled = true;
       updateLayout();
       showLogin();
     });
     $("refresh-btn").addEventListener("click", doRefresh);
+    $("copy-prompt-btn").addEventListener("click", () => { void copyOnboardingPrompt(); });
     $("log-clear-btn").addEventListener("click", async () => {
       if (!state.data || (state.data.message_log || []).length === 0) return;
       if (!window.confirm(t("logClearConfirm"))) return;

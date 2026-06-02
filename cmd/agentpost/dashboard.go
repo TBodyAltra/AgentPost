@@ -14,12 +14,13 @@ import (
 var dashboardFS embed.FS
 
 type dashboardResponse struct {
-	GeneratedAt time.Time                  `json:"generated_at"`
-	Gateway     dashboardGateway           `json:"gateway"`
-	Domains     []dashboardDomain          `json:"domains"`
-	Mailboxes   []dashboardMailbox         `json:"mailboxes"`
-	Links       []dashboardLink            `json:"links"`
-	MessageLog  []dashboardMessageLogEntry `json:"message_log"`
+	GeneratedAt      time.Time                  `json:"generated_at"`
+	Gateway          dashboardGateway           `json:"gateway"`
+	OnboardingPrompt string                     `json:"onboarding_prompt"`
+	Domains          []dashboardDomain          `json:"domains"`
+	Mailboxes        []dashboardMailbox         `json:"mailboxes"`
+	Links            []dashboardLink            `json:"links"`
+	MessageLog       []dashboardMessageLogEntry `json:"message_log"`
 }
 
 type dashboardGateway struct {
@@ -289,8 +290,10 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 		}
 	}
 
+	urls := readSkillConnectionURLs()
 	return dashboardResponse{
-		GeneratedAt: now,
+		GeneratedAt:      now,
+		OnboardingPrompt: buildAgentOnboardingPrompt(a.cfg, urls, skillExampleURL(urls, serverURL)),
 		Gateway: dashboardGateway{
 			DefaultDomain:          a.cfg.Domain,
 			ServerURL:              serverURL,
