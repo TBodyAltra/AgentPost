@@ -188,6 +188,23 @@ test.describe("AgentPost dashboard", () => {
     await expect(tip).not.toHaveClass(/hidden/);
   });
 
+  test("refresh keeps stable KPI values without rolling from zero", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, MAILBOX_COUNT);
+
+    const mb = page.locator("#stat-mb");
+    await expect(mb).toHaveAttribute("data-v", String(MAILBOX_COUNT));
+    const before = await mb.textContent();
+
+    await page.locator("#refresh-btn").click();
+    await expect(page.locator("#refresh-btn")).not.toHaveClass(/spinning/, { timeout: 10_000 });
+
+    await expect(mb).toHaveAttribute("data-v", String(MAILBOX_COUNT));
+    await expect(mb).toHaveText(before ?? "2");
+    await expect(mb).not.toHaveText("0");
+  });
+
+  // Last: mutates server state (removes one mailbox). Playwright shares one httptest server per run.
   test("delete mailbox from detail panel", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, MAILBOX_COUNT);
@@ -205,21 +222,5 @@ test.describe("AgentPost dashboard", () => {
       .toBe(MAILBOX_COUNT - 1);
     await expect(page.locator(".mailbox-item", { hasText: "partner" })).toHaveCount(0);
     await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
-  });
-
-  test("refresh keeps stable KPI values without rolling from zero", async ({ page }) => {
-    await page.goto("/dashboard/");
-    await waitForDashboardReady(page, MAILBOX_COUNT);
-
-    const mb = page.locator("#stat-mb");
-    await expect(mb).toHaveAttribute("data-v", String(MAILBOX_COUNT));
-    const before = await mb.textContent();
-
-    await page.locator("#refresh-btn").click();
-    await expect(page.locator("#refresh-btn")).not.toHaveClass(/spinning/, { timeout: 10_000 });
-
-    await expect(mb).toHaveAttribute("data-v", String(MAILBOX_COUNT));
-    await expect(mb).toHaveText(before ?? "2");
-    await expect(mb).not.toHaveText("0");
   });
 });
