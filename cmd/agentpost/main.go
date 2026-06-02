@@ -366,7 +366,7 @@ func (a *App) withGatewayAuth(next http.Handler) http.Handler {
 	}
 	expected := []byte(token)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" || r.URL.Path == "/api/v1/skill" {
+		if r.URL.Path == "/healthz" {
 			next.ServeHTTP(w, r)
 			return
 		}

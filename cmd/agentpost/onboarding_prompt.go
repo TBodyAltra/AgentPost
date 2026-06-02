@@ -15,18 +15,25 @@ func buildAgentOnboardingPrompt(cfg Config, urls skillConnectionURLs, skillExamp
 	var b strings.Builder
 	b.WriteString("\n--- Agent onboarding prompt (copy below) ---\n\n")
 	b.WriteString("You are connecting to an AgentPost mail gateway on this deployment.\n\n")
-	b.WriteString("1. Read the skill document first (authoritative API reference).\n")
-	b.WriteString("   Use the base URL your client can reach (see below). Example:\n\n")
-	fmt.Fprintf(&b, "   curl -fsS %s/api/v1/skill\n", skillExample)
 	appendOnboardingConnectionURLs(&b, urls)
 
 	token := strings.TrimSpace(cfg.APIToken)
-	b.WriteString("\n2. Gateway credentials (use on all /api/v1/* except /healthz and /api/v1/skill):\n")
+	b.WriteString("\n1. Gateway credentials (use on all /api/v1/* except /healthz):\n")
 	b.WriteString("   AGENTPOST_SERVER=<base URL from above>\n")
 	fmt.Fprintf(&b, "   AGENTPOST_EMAIL_SUFFIX=%s\n", cfg.Domain)
 	if token != "" {
 		fmt.Fprintf(&b, "   AGENTPOST_API_TOKEN=%s\n\n", token)
 		fmt.Fprintf(&b, "   Header: Authorization: Bearer %s\n", token)
+	} else {
+		b.WriteString("\n")
+	}
+
+	b.WriteString("2. Read the skill document (authoritative API reference).\n")
+	b.WriteString("   Use the base URL your client can reach (see above). Example:\n\n")
+	if token != "" {
+		fmt.Fprintf(&b, "   curl -fsS -H \"Authorization: Bearer %s\" %s/api/v1/skill\n", token, skillExample)
+	} else {
+		fmt.Fprintf(&b, "   curl -fsS %s/api/v1/skill\n", skillExample)
 	}
 
 	b.WriteString(`
@@ -74,8 +81,8 @@ func appendOnboardingConnectionURLs(b *strings.Builder, urls skillConnectionURLs
 		fmt.Fprintf(b, "  Domain (HTTPS):  %s\n", urls.Domain)
 	}
 	b.WriteString(`
-Pick one base URL for your client, then fetch skill from it:
-  curl -fsS <base-url>/api/v1/skill
+Pick one base URL for your client, then fetch skill from it (include Authorization when a gateway token is configured):
+  curl -fsS -H "Authorization: Bearer <AGENTPOST_API_TOKEN>" <base-url>/api/v1/skill
 
 Set AGENTPOST_SERVER to that same base URL (do not substitute another host).
 `)

@@ -49,7 +49,7 @@ Optional: advertise more client URLs or enable HTTPS:
 
 Copy that full **Agent onboarding prompt** into client agents (Cursor Rules, `AGENTS.md`, or system instructions). Clients only need outbound HTTP and can register, send, and poll by following the skill—no `./start.sh` on every machine.
 
-You can also fetch the skill from a base URL your client can reach, for example `curl -fsS "http://127.0.0.1:8080/api/v1/skill"` (see `AGENTPOST_CONNECT_*` in `.env` after `source .env`). Do not commit token-bearing onboarding text to public repositories.
+You can also fetch the skill from a base URL your client can reach, for example `curl -fsS -H "Authorization: Bearer $AGENTPOST_API_TOKEN" "http://127.0.0.1:8080/api/v1/skill"` (see `AGENTPOST_CONNECT_*` in `.env` after `source .env`; required when the gateway token is enabled). Do not commit token-bearing onboarding text to public repositories.
 
 ## Typical use cases
 
@@ -147,7 +147,7 @@ Templates: [`.env.example`](.env.example), [`config.example.yaml`](config.exampl
 
 Two authentication layers:
 
-1. **Gateway token**: recommended for public deployments; protects `/api/v1/*` except `/healthz` and `/api/v1/skill`.
+1. **Gateway token**: enabled by default; protects all `/api/v1/*` except `/healthz` (including `/api/v1/skill`).
 2. **Ed25519 signatures**: send, poll, and account routes use `X-Agent-Email`, `X-Agent-Timestamp`, and `X-Agent-Signature`; signed bytes are `<unix_ts>\n<raw_body>`.
 
 Registration example:

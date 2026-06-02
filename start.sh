@@ -203,8 +203,8 @@ EOF
   fi
   cat <<'EOF'
 
-Pick one base URL for your client, then fetch skill from it:
-  curl -fsS <base-url>/api/v1/skill
+Pick one base URL for your client, then fetch skill from it (include Authorization when a gateway token is configured):
+  curl -fsS -H "Authorization: Bearer <AGENTPOST_API_TOKEN>" <base-url>/api/v1/skill
 
 Set AGENTPOST_SERVER to that same base URL (do not substitute another host).
 EOF
@@ -524,14 +524,18 @@ EOF
   cat <<EOF
 
 Agents fetch skill from the base URL they can reach, for example:
-  curl -fsS ${CONNECT_LOCALHOST}/api/v1/skill
 EOF
+  if [[ "$REQUIRE_TOKEN" == "1" && -n "${AGENTPOST_API_TOKEN:-}" ]]; then
+    echo "  curl -fsS -H \"Authorization: Bearer \${AGENTPOST_API_TOKEN}\" ${CONNECT_LOCALHOST}/api/v1/skill"
+  else
+    echo "  curl -fsS ${CONNECT_LOCALHOST}/api/v1/skill"
+  fi
   if [[ "$ENABLE_SMTP" == "1" ]]; then
     echo "  SMTP inbound: :${AGENTPOST_SMTP_PUBLISH_PORT:-25} (host) -> :2525 (container)"
   fi
   if [[ "$REQUIRE_TOKEN" == "1" ]]; then
     echo ""
-    echo "  Gateway token: required on /api/v1/* except /healthz and /api/v1/skill"
+    echo "  Gateway token: required on /api/v1/* except /healthz"
   fi
   print_firewall_hints
 }
@@ -552,15 +556,11 @@ print_agent_prompt() {
 
 You are connecting to an AgentPost mail gateway on this deployment.
 
-1. Read the skill document first (authoritative API reference).
-   Use the base URL your client can reach (see below). Example:
-
-   curl -fsS ${skill_example}/api/v1/skill
 EOF
   append_connection_urls_to_prompt
   cat <<EOF
 
-2. Gateway credentials (use on all /api/v1/* except /healthz and /api/v1/skill):
+1. Gateway credentials (use on all /api/v1/* except /healthz):
    AGENTPOST_SERVER=<base URL from above>
    AGENTPOST_EMAIL_SUFFIX=${DOMAIN}
 EOF
@@ -570,6 +570,17 @@ EOF
 
    Header: Authorization: Bearer ${AGENTPOST_API_TOKEN}
 EOF
+  fi
+  cat <<EOF
+
+2. Read the skill document (authoritative API reference).
+   Use the base URL your client can reach (see above). Example:
+
+EOF
+  if [[ "$REQUIRE_TOKEN" == "1" && -n "${AGENTPOST_API_TOKEN:-}" ]]; then
+    echo "   curl -fsS -H \"Authorization: Bearer ${AGENTPOST_API_TOKEN}\" ${skill_example}/api/v1/skill"
+  else
+    echo "   curl -fsS ${skill_example}/api/v1/skill"
   fi
   cat <<EOF
 

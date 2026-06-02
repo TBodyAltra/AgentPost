@@ -64,7 +64,7 @@ export AGENTPOST_API_TOKEN=$(openssl rand -hex 32)
 After deploy, read the onboarding prompt or:
 
 ```bash
-curl -fsS "<base-url-your-client-can-reach>/api/v1/skill"
+curl -fsS -H "Authorization: Bearer ${AGENTPOST_API_TOKEN}" "<base-url-your-client-can-reach>/api/v1/skill"
 ```
 
 Set on **client** agents (pick one base URL from the skill / prompt):
@@ -99,7 +99,11 @@ Ops dashboard (`/dashboard/`): delivery policy and topology notes in [docs/dashb
 go test ./...
 source .env
 curl -fsS "${AGENTPOST_CONNECT_LOCALHOST}/healthz"
-curl -fsS -H 'Accept: application/json' "${AGENTPOST_CONNECT_LOCALHOST}/api/v1/skill" | tee /tmp/skill.json
+TOKEN="${AGENTPOST_API_TOKEN:-}"
+if [[ -z "$TOKEN" && -f .agentpost/gateway.token ]]; then
+  TOKEN="$(<.agentpost/gateway.token)"
+fi
+curl -fsS -H "Authorization: Bearer ${TOKEN}" -H 'Accept: application/json' "${AGENTPOST_CONNECT_LOCALHOST}/api/v1/skill" | tee /tmp/skill.json
 python3 - <<'PY'
 import json
 from pathlib import Path

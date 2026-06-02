@@ -976,6 +976,14 @@ func TestExternalRelayFlagOnlyChangesMissingRecipientResponse(t *testing.T) {
 	}
 }
 
+func skillGETRequest(target, token string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return req
+}
+
 func TestSkillEndpoint(t *testing.T) {
 	t.Setenv("AGENTPOST_CONNECT_LOCALHOST", "http://127.0.0.1:8080")
 	t.Setenv("AGENTPOST_CONNECT_LAN", "http://192.168.1.50:8080")
@@ -991,7 +999,7 @@ func TestSkillEndpoint(t *testing.T) {
 	})
 	handler := app.routes()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
+	req := skillGETRequest("/api/v1/skill", "secret-gateway-token")
 	req.Host = "wrong.example.com"
 	req.Header.Set("X-Forwarded-Proto", "http")
 	resp := httptest.NewRecorder()
@@ -1034,7 +1042,7 @@ func TestSkillEndpoint(t *testing.T) {
 		t.Fatalf("skill should be in Chinese by default")
 	}
 
-	jsonReq := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
+	jsonReq := skillGETRequest("/api/v1/skill", "secret-gateway-token")
 	jsonReq.Header.Set("Accept", "application/json")
 	jsonResp := httptest.NewRecorder()
 	handler.ServeHTTP(jsonResp, jsonReq)
@@ -1069,7 +1077,7 @@ func TestSkillEndpointEnglish(t *testing.T) {
 	})
 	handler := app.routes()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/skill?lang=en", nil)
+	req := skillGETRequest("/api/v1/skill?lang=en", "secret-gateway-token")
 	resp := httptest.NewRecorder()
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
@@ -1101,7 +1109,7 @@ func TestSkillEndpointEnglish(t *testing.T) {
 		t.Fatalf("English skill should not include the Chinese title")
 	}
 
-	jsonReq := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
+	jsonReq := skillGETRequest("/api/v1/skill", "secret-gateway-token")
 	jsonReq.Header.Set("Accept", "application/json")
 	jsonReq.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	jsonResp := httptest.NewRecorder()
@@ -1316,6 +1324,20 @@ func TestGatewayTokenRequiredWhenConfigured(t *testing.T) {
 	handler.ServeHTTP(healthResp, healthReq)
 	if healthResp.Code != http.StatusOK {
 		t.Fatalf("healthz status = %d, want %d", healthResp.Code, http.StatusOK)
+	}
+
+	skillReq := httptest.NewRequest(http.MethodGet, "/api/v1/skill", nil)
+	skillResp := httptest.NewRecorder()
+	handler.ServeHTTP(skillResp, skillReq)
+	if skillResp.Code != http.StatusUnauthorized {
+		t.Fatalf("skill without token status = %d, want %d", skillResp.Code, http.StatusUnauthorized)
+	}
+
+	skillReq = skillGETRequest("/api/v1/skill", "secret-gateway-token")
+	skillResp = httptest.NewRecorder()
+	handler.ServeHTTP(skillResp, skillReq)
+	if skillResp.Code != http.StatusOK {
+		t.Fatalf("skill with token status = %d, body = %s", skillResp.Code, skillResp.Body.String())
 	}
 }
 
