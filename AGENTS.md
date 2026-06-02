@@ -41,12 +41,14 @@ Optional flags:
 
 After `./start.sh up`, the terminal prints an **Agent onboarding prompt** listing every client base URL (localhost, LAN, public IP, HTTPS domain when configured). Copy that prompt to client agents.
 
-**Gateway token:** enabled by default. Token is printed once at startup (not written to `.env`). Reuse across restarts:
+**Gateway token:** enabled by default. On first `./start.sh up` a token is generated and saved to `.agentpost/gateway.token` (mode `0600`, **not** in `.env`). Later runs reuse that file automatically so client agents keep the same token after redeploy. Override in the shell if needed:
 
 ```bash
 export AGENTPOST_API_TOKEN=$(openssl rand -hex 32)
 ./start.sh --non-interactive up
 ```
+
+**Registered mailboxes:** when `AGENTPOST_DATA_DIR` is set (default `.agentpost/data`), active registrations are saved to `mailboxes.json` and restored on restart. **Queues, message log, and poll activity timestamps are not persisted** (in-memory only).
 
 ## Commands
 

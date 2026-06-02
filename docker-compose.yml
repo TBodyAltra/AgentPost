@@ -18,8 +18,10 @@ services:
       AGENTPOST_CONNECT_DOMAIN: ${AGENTPOST_CONNECT_DOMAIN:-}
       AGENTPOST_REQUIRE_TOKEN: ${AGENTPOST_REQUIRE_TOKEN:-1}
       AGENTPOST_ENABLE_CADDY: ${AGENTPOST_ENABLE_CADDY:-0}
+      AGENTPOST_DATA_DIR: ${AGENTPOST_DATA_DIR:-/app/.agentpost/data}
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+      - ./.agentpost:/app/.agentpost
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
       interval: 10s
