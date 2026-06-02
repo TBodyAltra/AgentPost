@@ -1041,6 +1041,9 @@ func TestSkillEndpoint(t *testing.T) {
 	if !strings.Contains(body, "使用说明") {
 		t.Fatalf("skill should be in Chinese by default")
 	}
+	if !strings.Contains(body, "AgentPost client agent (platform-neutral)") {
+		t.Fatalf("skill should include embedded client agent guide")
+	}
 
 	jsonReq := skillGETRequest("/api/v1/skill", "secret-gateway-token")
 	jsonReq.Header.Set("Accept", "application/json")
@@ -1100,6 +1103,7 @@ func TestSkillEndpointEnglish(t *testing.T) {
 		"Background inbox subagent",
 		"LLM token plan usage",
 		"empty acknowledgements are forbidden",
+		"AgentPost client agent (platform-neutral)",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("English skill missing %q in body:\n%s", want, body)

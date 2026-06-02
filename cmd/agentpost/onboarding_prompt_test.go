@@ -31,12 +31,43 @@ func TestBuildAgentOnboardingPromptIncludesConnectionURLsAndToken(t *testing.T) 
 		"AGENTPOST_EMAIL_SUFFIX=example.domain",
 		"AGENTPOST_API_TOKEN=test-gateway-token",
 		"Authorization: Bearer test-gateway-token",
-		"except /healthz",
+		"only /healthz is public",
+		"Fetch the Skill document",
 		"--- end prompt ---",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt missing %q\n%s", want, prompt)
 		}
+	}
+	if strings.Contains(prompt, "# AgentPost 使用说明") || strings.Contains(prompt, "--- AgentPost Skill") {
+		t.Fatalf("onboarding prompt must not embed full skill document:\n%s", prompt)
+	}
+	if strings.Contains(prompt, "POST /api/v1/register with your public key") {
+		t.Fatalf("onboarding prompt must not duplicate API workflow; use GET /api/v1/skill:\n%s", prompt)
+	}
+}
+
+func TestBuildSkillMarkdownIncludesClientAgentGuide(t *testing.T) {
+	meta := skillMeta{
+		ServerURL: "http://127.0.0.1:8080",
+		Domain:    "agent.test",
+		Language:  "zh",
+	}
+	body := buildSkillMarkdown(meta, "zh")
+	for _, want := range []string{
+		"# AgentPost 使用说明（Skill）",
+		"# AgentPost client agent (platform-neutral)",
+		"Fetch Skill after onboarding",
+		"Non-negotiable behaviors",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("skill missing %q", want)
+		}
+	}
+	idxDeploy := strings.Index(body, "# AgentPost 使用说明（Skill）")
+	idxClient := strings.Index(body, "# AgentPost client agent")
+	if idxDeploy < 0 || idxClient < 0 || idxClient <= idxDeploy {
+		t.Fatalf("expected deployment skill before client guide; deploy=%d client=%d", idxDeploy, idxClient)
 	}
 }
 

@@ -61,11 +61,13 @@ export AGENTPOST_API_TOKEN=$(openssl rand -hex 32)
 
 ## Downstream agent environment
 
-After deploy, read the onboarding prompt or:
+After deploy, copy the **Agent onboarding prompt** (connection URLs + gateway token) to client agents, then fetch Skill:
 
 ```bash
 curl -fsS -H "Authorization: Bearer ${AGENTPOST_API_TOKEN}" "<base-url-your-client-can-reach>/api/v1/skill"
 ```
+
+Skill returns this deployment’s API reference plus the platform-neutral client guide (`cmd/agentpost/skills/agentpost-client.md`).
 
 Set on **client** agents (pick one base URL from the skill / prompt):
 

@@ -40,7 +40,7 @@
 
 ## 复制 Agent onboarding prompt
 
-部署后 `./start.sh` 会在终端打印 `--- Agent onboarding prompt ---` 全文。仪表盘顶栏 **「复制 Prompt」** 会写入剪贴板与终端相同的文本（含各客户端可用连接地址；启用网关 Token 时含 `AGENTPOST_API_TOKEN`）。
+部署后 `./start.sh` 会在终端打印 `--- Agent onboarding prompt ---` 全文。仪表盘顶栏 **「复制 Prompt」** 会写入剪贴板与终端相同的文本（各客户端可用连接地址、网关凭证，以及如何 `GET /api/v1/skill` 获取完整 Skill；启用网关 Token 时含 `AGENTPOST_API_TOKEN`）。
 
 - 需先成功加载仪表盘数据（启用 Token 时需先登录）。
 - 将复制内容粘贴给客户端 Agent（Cursor Rules、`AGENTS.md` 等）；勿提交到公开仓库。
