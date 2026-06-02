@@ -188,6 +188,25 @@ test.describe("AgentPost dashboard", () => {
     await expect(tip).not.toHaveClass(/hidden/);
   });
 
+  test("delete mailbox from detail panel", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, MAILBOX_COUNT);
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.locator(".mailbox-item", { hasText: "partner" }).click();
+    await expect(page.locator("#detail-panel")).toHaveClass(/open/);
+    await expect(page.locator("#detail-delete-btn")).toBeEnabled();
+
+    await page.locator("#detail-delete-btn").click();
+    await expect
+      .poll(async () => Number((await page.locator("#stat-mb").textContent()) ?? "0"), {
+        timeout: 15_000,
+      })
+      .toBe(MAILBOX_COUNT - 1);
+    await expect(page.locator(".mailbox-item", { hasText: "partner" })).toHaveCount(0);
+    await expect(page.locator("#detail-panel")).not.toHaveClass(/open/);
+  });
+
   test("refresh keeps stable KPI values without rolling from zero", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, MAILBOX_COUNT);

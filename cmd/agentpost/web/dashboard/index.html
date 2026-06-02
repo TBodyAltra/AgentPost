@@ -614,8 +614,31 @@
 
     .detail-drawer { display: none; }
     .detail-drawer.open { display: flex; }
+    .detail-head-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-shrink: 0;
+    }
+    .mailbox-delete-btn {
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 0.28rem 0.55rem;
+      border-radius: 8px;
+      border: 1px solid color-mix(in srgb, var(--danger, #ff453a) 40%, var(--hairline));
+      background: color-mix(in srgb, var(--danger, #ff453a) 8%, var(--bg));
+      color: var(--danger, #ff453a);
+      cursor: pointer;
+      font-family: var(--font);
+      white-space: nowrap;
+    }
+    .mailbox-delete-btn:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--danger, #ff453a) 16%, var(--bg));
+    }
+    .mailbox-delete-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     .detail-close {
-      margin-left: auto; width: 28px; height: 28px; border-radius: 8px;
+      width: 28px; height: 28px; border-radius: 8px;
       border: none; background: var(--bg); color: var(--text-2); cursor: pointer;
       font-size: 1.1rem; line-height: 1;
     }
@@ -805,7 +828,10 @@
       <aside class="detail-drawer" id="detail-panel">
         <div class="panel-head">
           <span class="panel-title" id="detail-title">邮箱详情</span>
-          <button type="button" class="detail-close" id="detail-close" aria-label="Close">×</button>
+          <div class="detail-head-actions">
+            <button type="button" class="mailbox-delete-btn" id="detail-delete-btn" disabled>删除</button>
+            <button type="button" class="detail-close" id="detail-close" aria-label="Close">×</button>
+          </div>
         </div>
         <div class="detail-hero" id="detail-hero"></div>
         <div class="detail-tabs" id="detail-tabs" role="tablist">
@@ -923,6 +949,9 @@
         logCleared: "消息日志已清空",
         logBodyEmpty: "（无正文）",
         logBodyLabel: "正文",
+        mailboxDelete: "删除邮箱",
+        mailboxDeleteConfirm: "永久删除邮箱 {email}？将移除该账号、待收队列与 profile，且无法恢复。",
+        mailboxDeleted: "邮箱已删除",
         selectMailbox: "在左侧选择一个邮箱查看详情",
         noDisplayName: "未命名 Agent",
       },
@@ -1012,6 +1041,9 @@
         logCleared: "訊息日誌已清空",
         logBodyEmpty: "（無正文）",
         logBodyLabel: "正文",
+        mailboxDelete: "刪除郵箱",
+        mailboxDeleteConfirm: "永久刪除郵箱 {email}？將移除該帳號、待收佇列與 profile，且無法復原。",
+        mailboxDeleted: "郵箱已刪除",
         selectMailbox: "在左側選擇一個郵箱查看詳情",
         noDisplayName: "未命名 Agent",
       },
@@ -1101,6 +1133,9 @@
         logCleared: "Message log cleared",
         logBodyEmpty: "(empty body)",
         logBodyLabel: "Body",
+        mailboxDelete: "Delete mailbox",
+        mailboxDeleteConfirm: "Permanently delete {email}? This removes the account, queued mail, and profile and cannot be undone.",
+        mailboxDeleted: "Mailbox deleted",
         selectMailbox: "Select a mailbox on the left to inspect details",
         noDisplayName: "Unnamed agent",
       },
@@ -1150,6 +1185,8 @@
       $("log-title").textContent = t("logTitle");
       $("log-clear-btn").textContent = t("logClear");
       $("log-clear-btn").title = t("logClear");
+      $("detail-delete-btn").textContent = t("mailboxDelete");
+      $("detail-delete-btn").title = t("mailboxDelete");
       $("refresh-note").innerHTML = `<span class="live-dot"></span>${esc(t("live"))}`;
       $("detail-title").textContent = t("detailTitle");
       $("detail-close").setAttribute("aria-label", t("closeDetail"));
@@ -1222,6 +1259,18 @@
         headers: headers(),
       });
       if (res.status === 401) throw new Error(t("tokenInvalid"));
+      if (!res.ok) throw new Error(t("requestFailed") + " " + res.status);
+      return res.json();
+    }
+
+    async function deleteMailbox(email) {
+      const res = await fetch("/api/v1/dashboard/mailbox", {
+        method: "DELETE",
+        headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.status === 401) throw new Error(t("tokenInvalid"));
+      if (res.status === 404) throw new Error(t("detailMissing"));
       if (!res.ok) throw new Error(t("requestFailed") + " " + res.status);
       return res.json();
     }
@@ -1995,6 +2044,7 @@
       $("detail-panel").classList.toggle("open", open);
       $("workspace").classList.toggle("has-detail", open);
       $("resize-detail").classList.toggle("hidden", !open);
+      $("detail-delete-btn").disabled = !open;
     }
 
     function clampPanel(n, min, max) {
@@ -2385,6 +2435,25 @@
       }
     });
     $("detail-close").addEventListener("click", clearMailboxSelection);
+    $("detail-delete-btn").addEventListener("click", async () => {
+      const email = state.selected;
+      if (!email) return;
+      const msg = t("mailboxDeleteConfirm").replace("{email}", email);
+      if (!window.confirm(msg)) return;
+      const btn = $("detail-delete-btn");
+      btn.disabled = true;
+      try {
+        await deleteMailbox(email);
+        clearMailboxSelection();
+        state.data = await fetchDashboard();
+        renderAll();
+        showToast(t("mailboxDeleted"), "ok");
+      } catch (e) {
+        showToast(e.message || String(e), "err");
+        if (String(e.message).toLowerCase().includes("token")) showLogin();
+        updateLayout();
+      }
+    });
 
     const searchInput = $("search-input");
     searchInput.addEventListener("input", () => {
