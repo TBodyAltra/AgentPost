@@ -38,6 +38,7 @@ func TestDashboardEmbeddedHTMLHasCriticalUI(t *testing.T) {
 		`id="workspace"`,
 		`id="detail-panel"`,
 		`id="detail-close"`,
+		`id="detail-delete-btn"`,
 		`id="detail-tabs"`,
 		`id="stats"`,
 		`id="lang-seg"`,

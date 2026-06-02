@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"embed"
 	"io/fs"
 	"net/http"
@@ -96,6 +97,71 @@ func (a *App) handleDashboardMessageLog(w http.ResponseWriter, r *http.Request) 
 		"message_log":  []dashboardMessageLogEntry{},
 		"generated_at": a.now().UTC(),
 	})
+}
+
+type dashboardDeleteMailboxRequest struct {
+	Email string `json:"email"`
+}
+
+func (a *App) handleDashboardMailbox(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
+		return
+	}
+	email := strings.TrimSpace(r.URL.Query().Get("email"))
+	if email == "" {
+		if !hasJSONContentType(r) {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: "email is required (query ?email= or JSON body)"})
+			return
+		}
+		body, err := readLimited(r.Body, defaultMaxMessageBytes)
+		if err != nil {
+			writeJSON(w, http.StatusRequestEntityTooLarge, errorResponse{Error: err.Error()})
+			return
+		}
+		var req dashboardDeleteMailboxRequest
+		if err := decodeJSON(bytes.NewReader(body), &req); err != nil {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+			return
+		}
+		email = req.Email
+	}
+	mailbox, err := normalizeEmail(email)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
+		return
+	}
+
+	a.mu.Lock()
+	user, ok := a.users[mailbox]
+	if !ok || !user.ExpiresAt.After(a.now()) {
+		a.mu.Unlock()
+		writeJSON(w, http.StatusNotFound, errorResponse{Error: "mailbox not found"})
+		return
+	}
+	a.deleteUserLocked(mailbox)
+	a.pruneMessageLogForMailboxLocked(mailbox)
+	a.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"email":  mailbox,
+		"status": "deleted",
+	})
+}
+
+func (a *App) pruneMessageLogForMailboxLocked(mailbox string) {
+	mailbox = strings.ToLower(strings.TrimSpace(mailbox))
+	if mailbox == "" || len(a.messageLog) == 0 {
+		return
+	}
+	kept := a.messageLog[:0]
+	for _, e := range a.messageLog {
+		if e.From == mailbox || e.To == mailbox {
+			continue
+		}
+		kept = append(kept, e)
+	}
+	a.messageLog = kept
 }
 
 func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {

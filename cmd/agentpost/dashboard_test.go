@@ -427,6 +427,104 @@ func TestDashboardMessageLogClear(t *testing.T) {
 	}
 }
 
+func TestDashboardDeleteMailbox(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubA, privA, _ := ed25519.GenerateKey(crand.Reader)
+	pubB, _, _ := ed25519.GenerateKey(crand.Reader)
+	registerDashboardUser(t, handler, "alpha", "agent.test", pubA, nil)
+	registerDashboardUser(t, handler, "beta", "agent.test", pubB, nil)
+
+	sendBody := mustJSON(t, sendRequest{
+		To:      "beta@agent.test",
+		Subject: "delete me",
+		Body:    "x",
+	})
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "alpha@agent.test", privA)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusOK {
+		t.Fatalf("send status = %d", sendResp.Code)
+	}
+
+	delBody := mustJSON(t, map[string]string{"email": "alpha@agent.test"})
+	delReq := httptest.NewRequest(http.MethodDelete, "/api/v1/dashboard/mailbox", bytes.NewReader(delBody))
+	delReq.Header.Set("Content-Type", "application/json")
+	delResp := httptest.NewRecorder()
+	handler.ServeHTTP(delResp, delReq)
+	if delResp.Code != http.StatusOK {
+		t.Fatalf("delete mailbox status = %d, body = %s", delResp.Code, delResp.Body.String())
+	}
+
+	dashReq := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	dashResp := httptest.NewRecorder()
+	handler.ServeHTTP(dashResp, dashReq)
+	var snap dashboardResponse
+	if err := json.NewDecoder(dashResp.Body).Decode(&snap); err != nil {
+		t.Fatalf("decode dashboard: %v", err)
+	}
+	if len(snap.Mailboxes) != 1 || snap.Mailboxes[0].Email != "beta@agent.test" {
+		t.Fatalf("mailboxes after delete = %+v, want only beta", snap.Mailboxes)
+	}
+	if len(snap.MessageLog) != 0 {
+		t.Fatalf("message_log len = %d after delete alpha, want 0", len(snap.MessageLog))
+	}
+
+	delAgain := httptest.NewRequest(http.MethodDelete, "/api/v1/dashboard/mailbox?email=alpha@agent.test", nil)
+	delAgainResp := httptest.NewRecorder()
+	handler.ServeHTTP(delAgainResp, delAgain)
+	if delAgainResp.Code != http.StatusNotFound {
+		t.Fatalf("delete again status = %d, want 404", delAgainResp.Code)
+	}
+
+	sendAfter := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "alpha@agent.test", privA)
+	sendAfter.Header.Set("Content-Type", "application/json")
+	sendAfterResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendAfterResp, sendAfter)
+	if sendAfterResp.Code != http.StatusNotFound && sendAfterResp.Code != http.StatusUnauthorized {
+		t.Fatalf("send from deleted alpha status = %d, want 404 or 401", sendAfterResp.Code)
+	}
+}
+
+func TestDashboardDeleteMailboxRequiresTokenWhenConfigured(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+		APIToken:        "secret-gateway-token",
+	})
+	handler := app.routes()
+
+	pubA, _, _ := ed25519.GenerateKey(crand.Reader)
+	registerDashboardUserWithGateway(t, handler, "secret-gateway-token", "alpha", "agent.test", pubA, nil)
+
+	delBody := mustJSON(t, map[string]string{"email": "alpha@agent.test"})
+	delReq := httptest.NewRequest(http.MethodDelete, "/api/v1/dashboard/mailbox", bytes.NewReader(delBody))
+	delReq.Header.Set("Content-Type", "application/json")
+	delResp := httptest.NewRecorder()
+	handler.ServeHTTP(delResp, delReq)
+	if delResp.Code != http.StatusUnauthorized {
+		t.Fatalf("delete without token status = %d, want 401", delResp.Code)
+	}
+
+	delReq2 := httptest.NewRequest(http.MethodDelete, "/api/v1/dashboard/mailbox", bytes.NewReader(delBody))
+	delReq2.Header.Set("Content-Type", "application/json")
+	delReq2.Header.Set("Authorization", "Bearer secret-gateway-token")
+	delResp2 := httptest.NewRecorder()
+	handler.ServeHTTP(delResp2, delReq2)
+	if delResp2.Code != http.StatusOK {
+		t.Fatalf("delete with token status = %d, body = %s", delResp2.Code, delResp2.Body.String())
+	}
+}
+
 func TestDashboardMailboxActivityAfterPoll(t *testing.T) {
 	fixed := time.Date(2026, 6, 2, 12, 0, 0, 0, time.UTC)
 	app := NewApp(Config{
