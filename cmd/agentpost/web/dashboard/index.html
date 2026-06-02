@@ -839,9 +839,7 @@
         statMailboxes: "活跃邮箱",
         statDomains: "网域",
         statUnread: "待收信件",
-        statPairs: "允许投递",
         statPollingOnline: "轮询在线",
-        statPollingRecent: "近期轮询",
         statUpdated: "更新",
         defaultDomain: "默认域",
         tokenRequired: "需 Token",
@@ -927,9 +925,7 @@
         statMailboxes: "活躍郵箱",
         statDomains: "網域",
         statUnread: "待收信件",
-        statPairs: "允許投遞",
         statPollingOnline: "輪詢在線",
-        statPollingRecent: "近期輪詢",
         statUpdated: "更新",
         defaultDomain: "預設域",
         tokenRequired: "需 Token",
@@ -1015,9 +1011,7 @@
         statMailboxes: "Active",
         statDomains: "Domains",
         statUnread: "Queued mail",
-        statPairs: "Allowed routes",
         statPollingOnline: "Polling online",
-        statPollingRecent: "Recently polled",
         statUpdated: "Updated",
         defaultDomain: "Default",
         tokenRequired: "Token required",
@@ -1103,16 +1097,6 @@
 
     function deliveryPermits(status) {
       return status === "allowed" || status === "allowlisted";
-    }
-
-    function countAllowedEdges(links) {
-      return links.reduce((n, l) => {
-        const fwd = deliveryPermits(l.forward_status);
-        const rev = deliveryPermits(l.reverse_status);
-        if (fwd && rev) return n + 1;
-        if (fwd || rev) return n + 1;
-        return n;
-      }, 0);
     }
 
     function detectLang() {
@@ -1642,8 +1626,6 @@
         ["dm", t("statDomains"), g.domain_count, ""],
         ["unread", t("statUnread"), g.total_queued_messages ?? 0, "highlight"],
         ["poll", t("statPollingOnline"), g.polling_online_mailboxes ?? 0, "highlight"],
-        ["pollr", t("statPollingRecent"), g.polling_recent_mailboxes ?? 0, ""],
-        ["lk", t("statPairs"), countAllowedEdges(data.links), ""],
       ];
       const statsEl = $("stats");
       if (!statsEl.dataset.initialized) {

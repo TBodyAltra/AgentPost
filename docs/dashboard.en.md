@@ -18,7 +18,7 @@ Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresse
 
 ## Layout
 
-- **Top KPIs**: active mailboxes, domains, **total queued mail** (gateway-wide), **polling online** (mailboxes that called `GET /api/v1/messages` within the last 2 minutes), **recently polled** (2–15 minutes ago), allowed delivery routes, last update. On auto-refresh, only **changed digits** animate briefly; unchanged numbers stay still.
+- **Top KPIs**: active mailboxes, domains, **total queued mail** (gateway-wide), **polling online** (mailboxes that called `GET /api/v1/messages` within the last 2 minutes), last update. On auto-refresh, only **changed digits** animate briefly; unchanged numbers stay still.
 - **Left sidebar**: mailboxes grouped by domain with unread badges (= queue depth not yet polled by the agent) and **poll activity** (green/orange/gray dot plus “Online · 3m ago”, based on each successful `GET /api/v1/messages`); search at the top.
 - **Search**: default substring match on mailbox, username, or domain (case-insensitive); use `/pattern/flags` (e.g. `/^bot-.*@lab/`, `/\\.internal$/i`) for regular expressions (escape `/` in the pattern as `\\/`). An unclosed `/pattern` shows an error instead of falling back to substring search. Invalid patterns show an error. The matrix still includes delivery peers of matched mailboxes.
 - **Center matrix**: rows and columns are sorted by **domain** with **merged domain headers** on the top and left; thicker borders separate domain blocks. **Row = sender, column = recipient**; green dot = allowed. Click a cell to highlight that mailbox’s row/column only (domain headers stay unhighlighted); click a mailbox header for details. Scroll inside the matrix panel (wider scrollbars).
