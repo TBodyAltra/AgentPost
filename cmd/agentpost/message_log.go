@@ -80,6 +80,10 @@ func (a *App) appendMessageLog(entry MessageLogEntry) {
 	}
 }
 
+func (a *App) clearMessageLog() {
+	a.messageLog = nil
+}
+
 func dashboardMessageLogSnapshot(log []MessageLogEntry) []dashboardMessageLogEntry {
 	if len(log) == 0 {
 		return nil

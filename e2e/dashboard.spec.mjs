@@ -30,6 +30,7 @@ test.describe("AgentPost dashboard", () => {
     await waitForDashboardReady(page, MAILBOX_COUNT);
     await expect(page.locator("#message-log")).toBeVisible();
     await expect(page.locator("#log-title")).toBeVisible();
+    await expect(page.locator("#log-clear-btn")).toBeVisible();
   });
 
   test("mailbox detail opens on selection and shows tabbed sections", async ({ page }) => {

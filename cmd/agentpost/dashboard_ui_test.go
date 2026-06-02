@@ -43,6 +43,8 @@ func TestDashboardEmbeddedHTMLHasCriticalUI(t *testing.T) {
 		`id="lang-seg"`,
 		`id="login-btn"`,
 		`id="refresh-btn"`,
+		`id="log-clear-btn"`,
+		`clearMessageLog`,
 		`id="detail-content"`,
 		`collectDeliveryPeers`,
 		`renderTabInbox`,

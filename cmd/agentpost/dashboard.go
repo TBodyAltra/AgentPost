@@ -83,6 +83,21 @@ func (a *App) handleDashboardAPI(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, a.buildDashboardSnapshot(r))
 }
 
+func (a *App) handleDashboardMessageLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
+		return
+	}
+	a.mu.Lock()
+	a.clearMessageLog()
+	a.mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":       "cleared",
+		"message_log":  []dashboardMessageLogEntry{},
+		"generated_at": a.now().UTC(),
+	})
+}
+
 func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 	now := a.now().UTC()
 	serverURL, _ := a.resolveServerURL(r)
