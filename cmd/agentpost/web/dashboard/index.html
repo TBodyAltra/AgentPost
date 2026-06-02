@@ -376,6 +376,24 @@
       min-height: 0;
     }
     .log-panel .panel-head { padding: 0.55rem 0.85rem; }
+    .log-panel .panel-head .panel-sub { margin-left: 0; }
+    .log-head-actions {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 0.65rem; flex-shrink: 0;
+    }
+    .log-clear-btn {
+      font-size: 0.72rem; font-weight: 500; font-family: var(--font);
+      padding: 0.28rem 0.65rem; border-radius: 8px;
+      border: 1px solid var(--hairline); background: var(--bg);
+      color: var(--text-2); cursor: pointer; white-space: nowrap;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+    }
+    .log-clear-btn:hover:not(:disabled) {
+      color: var(--danger, #ff453a);
+      border-color: color-mix(in srgb, var(--danger, #ff453a) 40%, var(--hairline));
+      background: color-mix(in srgb, var(--danger, #ff453a) 8%, var(--bg));
+    }
+    .log-clear-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     .log-body {
       flex: 1; min-height: 0; overflow: auto;
       background: var(--bg);
@@ -769,7 +787,10 @@
         <div class="log-panel">
           <div class="panel-head">
             <span class="panel-title" id="log-title">消息日志</span>
-            <span class="panel-sub" id="log-filter-note"></span>
+            <div class="log-head-actions">
+              <span class="panel-sub" id="log-filter-note"></span>
+              <button type="button" class="log-clear-btn" id="log-clear-btn">清空</button>
+            </div>
           </div>
           <div class="log-body" id="message-log" aria-label="Message log"></div>
           <div id="log-body-tooltip" class="log-body-tooltip hidden" role="tooltip" aria-hidden="true">
@@ -897,6 +918,9 @@
         logReceiptRead: "对方已轮询收信",
         logEmpty: "暂无记录。发信后会出现在此；对方轮询收信后显示双勾。",
         logHint: "仅记录发信；对方 GET /messages 取走后，该行显示双勾（内存约 1000 条，重启清空）。悬停行可预览正文。",
+        logClear: "清空",
+        logClearConfirm: "清空网关内的全部消息日志？此操作不可恢复。",
+        logCleared: "消息日志已清空",
         logBodyEmpty: "（无正文）",
         logBodyLabel: "正文",
         selectMailbox: "在左侧选择一个邮箱查看详情",
@@ -983,6 +1007,9 @@
         logReceiptRead: "對方已輪詢收信",
         logEmpty: "暫無記錄。發信後會出現在此；對方輪詢收信後顯示雙勾。",
         logHint: "僅記錄發信；對方 GET /messages 取走後，該列顯示雙勾（記憶體約 1000 條，重啟清空）。懸停列可預覽正文。",
+        logClear: "清空",
+        logClearConfirm: "清空閘道內的全部訊息日誌？此操作無法復原。",
+        logCleared: "訊息日誌已清空",
         logBodyEmpty: "（無正文）",
         logBodyLabel: "正文",
         selectMailbox: "在左側選擇一個郵箱查看詳情",
@@ -1069,6 +1096,9 @@
         logReceiptRead: "Recipient polled the message",
         logEmpty: "No entries yet. Outbound deliveries appear here; double check when polled.",
         logHint: "Send events only; double check after GET /messages (~1000 in memory; cleared on restart). Hover a row to preview the body.",
+        logClear: "Clear",
+        logClearConfirm: "Clear all message log entries? This cannot be undone.",
+        logCleared: "Message log cleared",
         logBodyEmpty: "(empty body)",
         logBodyLabel: "Body",
         selectMailbox: "Select a mailbox on the left to inspect details",
@@ -1118,6 +1148,8 @@
       $("sidebar-title").textContent = t("sidebarTitle");
       $("topology-title").textContent = t("topology");
       $("log-title").textContent = t("logTitle");
+      $("log-clear-btn").textContent = t("logClear");
+      $("log-clear-btn").title = t("logClear");
       $("refresh-note").innerHTML = `<span class="live-dot"></span>${esc(t("live"))}`;
       $("detail-title").textContent = t("detailTitle");
       $("detail-close").setAttribute("aria-label", t("closeDetail"));
@@ -1179,6 +1211,16 @@
 
     async function fetchDashboard() {
       const res = await fetch("/api/v1/dashboard", { headers: headers() });
+      if (res.status === 401) throw new Error(t("tokenInvalid"));
+      if (!res.ok) throw new Error(t("requestFailed") + " " + res.status);
+      return res.json();
+    }
+
+    async function clearMessageLog() {
+      const res = await fetch("/api/v1/dashboard/message-log", {
+        method: "DELETE",
+        headers: headers(),
+      });
       if (res.status === 401) throw new Error(t("tokenInvalid"));
       if (!res.ok) throw new Error(t("requestFailed") + " " + res.status);
       return res.json();
@@ -2186,6 +2228,9 @@
         ? t("logFilterMailbox").replace("{email}", state.selected)
         : t("logFilterAll");
       const entries = messageLogForView(data).filter((e) => e.event !== "received");
+      const clearBtn = $("log-clear-btn");
+      const totalLog = (data.message_log || []).length;
+      clearBtn.disabled = totalLog === 0;
       const el = $("message-log");
       if (!entries.length) {
         el.innerHTML = `<p class="log-empty">${esc(t("logEmpty"))}</p><p class="log-empty" style="font-size:0.72rem;margin-top:0.35rem;opacity:0.85">${esc(t("logHint"))}</p>`;
@@ -2322,6 +2367,23 @@
       showLogin();
     });
     $("refresh-btn").addEventListener("click", doRefresh);
+    $("log-clear-btn").addEventListener("click", async () => {
+      if (!state.data || (state.data.message_log || []).length === 0) return;
+      if (!window.confirm(t("logClearConfirm"))) return;
+      const btn = $("log-clear-btn");
+      btn.disabled = true;
+      try {
+        const data = await clearMessageLog();
+        state.data = { ...state.data, message_log: data.message_log || [] };
+        renderMessageLog(state.data);
+        showToast(t("logCleared"), "ok");
+      } catch (e) {
+        showToast(e.message || String(e), "err");
+        if (String(e.message).toLowerCase().includes("token")) showLogin();
+      } finally {
+        if (state.data) renderMessageLog(state.data);
+      }
+    });
     $("detail-close").addEventListener("click", clearMailboxSelection);
 
     const searchInput = $("search-input");

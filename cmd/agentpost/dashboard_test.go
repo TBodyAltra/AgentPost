@@ -374,6 +374,59 @@ func TestDashboardMessageLogDeliverAndReceive(t *testing.T) {
 	}
 }
 
+func TestDashboardMessageLogClear(t *testing.T) {
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	handler := app.routes()
+
+	pubA, privA, _ := ed25519.GenerateKey(crand.Reader)
+	pubB, _, _ := ed25519.GenerateKey(crand.Reader)
+	registerDashboardUser(t, handler, "alpha", "agent.test", pubA, nil)
+	registerDashboardUser(t, handler, "beta", "agent.test", pubB, nil)
+
+	sendBody := mustJSON(t, sendRequest{
+		To:      "beta@agent.test",
+		Subject: "clear test",
+		Body:    "x",
+	})
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "alpha@agent.test", privA)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusOK {
+		t.Fatalf("send status = %d", sendResp.Code)
+	}
+
+	clearReq := httptest.NewRequest(http.MethodDelete, "/api/v1/dashboard/message-log", nil)
+	clearResp := httptest.NewRecorder()
+	handler.ServeHTTP(clearResp, clearReq)
+	if clearResp.Code != http.StatusOK {
+		t.Fatalf("clear status = %d, body = %s", clearResp.Code, clearResp.Body.String())
+	}
+
+	dashReq := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	dashResp := httptest.NewRecorder()
+	handler.ServeHTTP(dashResp, dashReq)
+	var snap dashboardResponse
+	if err := json.NewDecoder(dashResp.Body).Decode(&snap); err != nil {
+		t.Fatalf("decode dashboard: %v", err)
+	}
+	if len(snap.MessageLog) != 0 {
+		t.Fatalf("message_log len = %d after clear, want 0", len(snap.MessageLog))
+	}
+
+	clearAgain := httptest.NewRequest(http.MethodDelete, "/api/v1/dashboard/message-log", nil)
+	clearAgainResp := httptest.NewRecorder()
+	handler.ServeHTTP(clearAgainResp, clearAgain)
+	if clearAgainResp.Code != http.StatusOK {
+		t.Fatalf("clear again status = %d", clearAgainResp.Code)
+	}
+}
+
 func TestDashboardMailboxActivityAfterPoll(t *testing.T) {
 	fixed := time.Date(2026, 6, 2, 12, 0, 0, 0, time.UTC)
 	app := NewApp(Config{

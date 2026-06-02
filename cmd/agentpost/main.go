@@ -336,6 +336,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("/api/v1/messages", a.handleMessages)
 	mux.HandleFunc("/api/v1/skill", a.handleSkill)
 	mux.HandleFunc("/api/v1/dashboard", a.handleDashboardAPI)
+	mux.HandleFunc("/api/v1/dashboard/message-log", a.handleDashboardMessageLog)
 	mux.Handle("/dashboard/", a.dashboardHandler())
 	mux.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard/", http.StatusFound)
