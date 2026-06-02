@@ -39,7 +39,7 @@ Optional flags:
 ./start.sh --non-interactive up --no-token                        # disable gateway token (not recommended)
 ```
 
-After `./start.sh up`, the terminal prints an **Agent onboarding prompt** listing every client base URL (localhost, LAN, public IP, HTTPS domain when configured). Copy that prompt to client agents.
+After `./start.sh up`, the terminal prints an **Agent onboarding prompt** listing every client base URL (localhost, LAN, public IP, HTTPS domain when configured) and **embeds the full Skill document** for this deployment. Copy that prompt to client agents. A Cursor client skill lives at `.cursor/skills/agentpost-client/SKILL.md`.
 
 **Gateway token:** enabled by default. On first `./start.sh up` a token is generated and saved to `.agentpost/gateway.token` (mode `0600`, **not** in `.env`). Later runs reuse that file automatically so client agents keep the same token after redeploy. Override in the shell if needed:
 

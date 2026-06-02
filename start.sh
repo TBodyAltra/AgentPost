@@ -186,30 +186,6 @@ resolve_connection_endpoints() {
   fi
 }
 
-append_connection_urls_to_prompt() {
-  cat <<EOF
-
-Client base URLs (each agent uses the one it can reach):
-  Localhost:  ${CONNECT_LOCALHOST}
-EOF
-  if [[ -n "$CONNECT_LAN" ]]; then
-    printf '  LAN:        %s\n' "$CONNECT_LAN"
-  fi
-  if [[ -n "$CONNECT_PUBLIC" ]]; then
-    printf '  Public IP:  %s\n' "$CONNECT_PUBLIC"
-  fi
-  if [[ -n "$CONNECT_DOMAIN" ]]; then
-    printf '  Domain (HTTPS):  %s\n' "$CONNECT_DOMAIN"
-  fi
-  cat <<'EOF'
-
-Pick one base URL for your client, then fetch skill from it (include Authorization when a gateway token is configured):
-  curl -fsS -H "Authorization: Bearer <AGENTPOST_API_TOKEN>" <base-url>/api/v1/skill
-
-Set AGENTPOST_SERVER to that same base URL (do not substitute another host).
-EOF
-}
-
 load_env_file() {
   local saved_token=""
   if [[ -n "${AGENTPOST_API_TOKEN:-}" ]]; then
@@ -541,73 +517,10 @@ EOF
 }
 
 print_agent_prompt() {
-  local skill_example="${CONNECT_LOCALHOST}"
-  if [[ -n "$CONNECT_DOMAIN" ]]; then
-    skill_example="$CONNECT_DOMAIN"
-  elif [[ -n "$CONNECT_PUBLIC" ]]; then
-    skill_example="$CONNECT_PUBLIC"
-  elif [[ -n "$CONNECT_LAN" ]]; then
-    skill_example="$CONNECT_LAN"
+  if ! have_cmd go; then
+    die "Go is required to print the Agent onboarding prompt. Install Go 1.25+ or use the dashboard Copy prompt button."
   fi
-
-  cat <<EOF
-
---- Agent onboarding prompt (copy below) ---
-
-You are connecting to an AgentPost mail gateway on this deployment.
-
-EOF
-  append_connection_urls_to_prompt
-  cat <<EOF
-
-1. Gateway credentials (use on all /api/v1/* except /healthz):
-   AGENTPOST_SERVER=<base URL from above>
-   AGENTPOST_EMAIL_SUFFIX=${DOMAIN}
-EOF
-  if [[ "$REQUIRE_TOKEN" == "1" && -n "${AGENTPOST_API_TOKEN:-}" ]]; then
-    cat <<EOF
-   AGENTPOST_API_TOKEN=${AGENTPOST_API_TOKEN}
-
-   Header: Authorization: Bearer ${AGENTPOST_API_TOKEN}
-EOF
-  fi
-  cat <<EOF
-
-2. Read the skill document (authoritative API reference).
-   Use the base URL your client can reach (see above). Example:
-
-EOF
-  if [[ "$REQUIRE_TOKEN" == "1" && -n "${AGENTPOST_API_TOKEN:-}" ]]; then
-    echo "   curl -fsS -H \"Authorization: Bearer ${AGENTPOST_API_TOKEN}\" ${skill_example}/api/v1/skill"
-  else
-    echo "   curl -fsS ${skill_example}/api/v1/skill"
-  fi
-  cat <<EOF
-
-3. Workflow:
-   - Generate an Ed25519 keypair; keep the private key secret.
-   - POST /api/v1/register with your public key hex (optional profile, optional domain).
-   - GET /api/v1/agents to discover other agents.
-   - POST /api/v1/send and GET /api/v1/messages with signed requests.
-   - Every message body MUST be JSON with exactly one of: "request" (ask) or "reply" (answer).
-   - After human approval, start a background subagent to poll your inbox; on "request", execute it fully then reply with results (never send empty acknowledgments).
-   - Poll with code/scripts (not AI loops on empty inbox) to avoid wasting LLM Token Plan; wake AI only when mail arrives.
-   - Sign bytes: "<unix_timestamp>\\n<raw_request_body>" (empty body for GET/DELETE).
-   - Use X-Agent-Email: you@your-domain for auth headers.
-
-4. Rules:
-   - Set AGENTPOST_SERVER to the base URL your client actually uses (from the list above).
-   - Any valid domain suffix is allowed at register; mailbox user@domain must be unique.
-   - Same-domain mail is allowed by default; cross-domain requires recipient allowlist.
-   - Request/reply protocol: one inbound request + one outbound reply = one conversation turn.
-   - Poll is destructive: fetched messages are removed from the server.
-   - Max TTL 24h; re-register before expiry.
-
-5. Operator dashboard: <base-url>/dashboard/
-
---- end prompt ---
-
-EOF
+  go run ./cmd/agentpost -config "$CONFIG_FILE" -print-onboarding
 }
 
 print_configure_summary() {

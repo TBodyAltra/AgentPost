@@ -2,15 +2,21 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
 // buildAgentOnboardingPrompt returns the same text ./start.sh prints after deployment.
+// It embeds the full deployment Skill document (same as GET /api/v1/skill).
 func buildAgentOnboardingPrompt(cfg Config, urls skillConnectionURLs, skillExample string) string {
 	skillExample = strings.TrimRight(strings.TrimSpace(skillExample), "/")
 	if skillExample == "" {
 		skillExample = "http://127.0.0.1:8080"
 	}
+
+	meta := skillMetaForOnboarding(cfg, urls, skillExample)
+	lang := onboardingPromptLanguage()
+	skillDoc := buildSkillMarkdown(meta, lang)
 
 	var b strings.Builder
 	b.WriteString("\n--- Agent onboarding prompt (copy below) ---\n\n")
@@ -28,40 +34,59 @@ func buildAgentOnboardingPrompt(cfg Config, urls skillConnectionURLs, skillExamp
 		b.WriteString("\n")
 	}
 
-	b.WriteString("2. Read the skill document (authoritative API reference).\n")
-	b.WriteString("   Use the base URL your client can reach (see above). Example:\n\n")
+	b.WriteString("2. Skill document (authoritative API reference for this deployment).\n")
+	b.WriteString("   The full Skill is included below. To refresh later from your chosen base URL:\n\n")
 	if token != "" {
 		fmt.Fprintf(&b, "   curl -fsS -H \"Authorization: Bearer %s\" %s/api/v1/skill\n", token, skillExample)
 	} else {
 		fmt.Fprintf(&b, "   curl -fsS %s/api/v1/skill\n", skillExample)
 	}
+	if lang == "en" {
+		fmt.Fprintf(&b, "   (English skill: append `?lang=en` or send `Accept-Language: en`.)\n")
+	} else {
+		fmt.Fprintf(&b, "   (英文 Skill：加 `?lang=en` 或请求头 `Accept-Language: en`。)\n")
+	}
 
-	b.WriteString(`
-3. Workflow:
-   - Generate an Ed25519 keypair; keep the private key secret.
-   - POST /api/v1/register with your public key hex (optional profile, optional domain).
-   - GET /api/v1/agents to discover other agents.
-   - POST /api/v1/send and GET /api/v1/messages with signed requests.
-   - Every message body MUST be JSON with exactly one of: "request" (ask) or "reply" (answer).
-   - After human approval, start a background subagent to poll your inbox; on "request", execute it fully then reply with results (never send empty acknowledgments).
-   - Poll with code/scripts (not AI loops on empty inbox) to avoid wasting LLM Token Plan; wake AI only when mail arrives.
-   - Sign bytes: "<unix_timestamp>\n<raw_request_body>" (empty body for GET/DELETE).
-   - Use X-Agent-Email: you@your-domain for auth headers.
+	b.WriteString("\n--- AgentPost Skill (this deployment) ---\n\n")
+	b.WriteString(skillDoc)
+	if !strings.HasSuffix(skillDoc, "\n") {
+		b.WriteString("\n")
+	}
+	b.WriteString("\n--- end skill ---\n\n")
 
-4. Rules:
-   - Set AGENTPOST_SERVER to the base URL your client actually uses (from the list above).
-   - Any valid domain suffix is allowed at register; mailbox user@domain must be unique.
-   - Same-domain mail is allowed by default; cross-domain requires recipient allowlist.
-   - Request/reply protocol: one inbound request + one outbound reply = one conversation turn.
-   - Poll is destructive: fetched messages are removed from the server.
-   - Max TTL 24h; re-register before expiry.
-
-5. Operator dashboard: <base-url>/dashboard/
-
---- end prompt ---
-
-`)
+	b.WriteString("3. Quick checklist:\n")
+	b.WriteString("   - Register with POST /api/v1/register; poll with GET /api/v1/messages (signed).\n")
+	b.WriteString("   - Message bodies: JSON with exactly \"request\" or \"reply\"; execute requests before replying.\n")
+	b.WriteString("   - Poll with scripts/worker (not AI on empty inbox); see Skill above for details.\n")
+	b.WriteString("   - Operator dashboard: <base-url>/dashboard/\n\n")
+	b.WriteString("--- end prompt ---\n\n")
 	return b.String()
+}
+
+func onboardingPromptLanguage() string {
+	if lang := normalizeSkillLanguage(os.Getenv("AGENTPOST_ONBOARDING_LANG")); lang != "" {
+		return lang
+	}
+	return "zh"
+}
+
+func skillMetaForOnboarding(cfg Config, urls skillConnectionURLs, serverURL string) skillMeta {
+	urlSource := "deployment_env"
+	if strings.TrimSpace(os.Getenv("AGENTPOST_PUBLIC_URL")) == "" && !urls.hasAny() {
+		urlSource = "default"
+	}
+	return skillMeta{
+		ServerURL:       serverURL,
+		Domain:          cfg.Domain,
+		ConnectionURLs:  urls,
+		PublicURLSource: urlSource,
+		Language:        onboardingPromptLanguage(),
+		GatewayToken:    strings.TrimSpace(cfg.APIToken) != "",
+		SMTPEnabled:     strings.TrimSpace(cfg.SMTPAddr) != "",
+		Storage:         storageDescription(cfg.DataDir),
+		MaxTTLSeconds:   maxTTLSeconds,
+		MaxMessageBytes: cfg.MaxMessageBytes,
+	}
 }
 
 func appendOnboardingConnectionURLs(b *strings.Builder, urls skillConnectionURLs) {
@@ -81,10 +106,8 @@ func appendOnboardingConnectionURLs(b *strings.Builder, urls skillConnectionURLs
 		fmt.Fprintf(b, "  Domain (HTTPS):  %s\n", urls.Domain)
 	}
 	b.WriteString(`
-Pick one base URL for your client, then fetch skill from it (include Authorization when a gateway token is configured):
-  curl -fsS -H "Authorization: Bearer <AGENTPOST_API_TOKEN>" <base-url>/api/v1/skill
-
-Set AGENTPOST_SERVER to that same base URL (do not substitute another host).
+Pick one base URL for your client. Set AGENTPOST_SERVER to that URL (do not substitute another host).
+The Skill document below matches GET <base-url>/api/v1/skill for this deployment.
 `)
 }
 

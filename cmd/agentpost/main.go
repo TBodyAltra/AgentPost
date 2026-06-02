@@ -183,11 +183,22 @@ type errorResponse struct {
 
 func main() {
 	configPath := flag.String("config", envOrDefault("AGENTPOST_CONFIG", "config.yaml"), "path to config.yaml")
+	printOnboarding := flag.Bool("print-onboarding", false, "print Agent onboarding prompt (with embedded Skill) and exit")
 	flag.Parse()
 
 	cfg, err := loadConfig(*configPath)
 	if err != nil {
 		log.Fatalf("load config: %v", err)
+	}
+
+	if *printOnboarding {
+		urls := readSkillConnectionURLs()
+		fallback := strings.TrimRight(strings.TrimSpace(os.Getenv("AGENTPOST_CONNECT_LOCALHOST")), "/")
+		if fallback == "" {
+			fallback = "http://127.0.0.1" + normalizeListenPort(cfg.HTTPAddr)
+		}
+		fmt.Print(buildAgentOnboardingPrompt(cfg, urls, skillExampleURL(urls, fallback)))
+		return
 	}
 
 	app := NewApp(cfg)
