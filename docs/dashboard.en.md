@@ -38,6 +38,13 @@ Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresse
 - **Routes** lists allowed peers only: can send to / can receive from (click a peer to select that mailbox).
 - **Profile** shows the registration `profile` (name, responsibilities, skills, capabilities, MCP, notes).
 
+## Copy Agent onboarding prompt
+
+After `./start.sh up`, the terminal prints `--- Agent onboarding prompt ---`. The dashboard header **Copy prompt** button copies the same text (client base URLs; includes `AGENTPOST_API_TOKEN` when the gateway token is enabled).
+
+- Load dashboard data first (log in when a gateway token is required).
+- Paste into client agents (Cursor Rules, `AGENTS.md`, etc.); do not commit token-bearing text to public repos.
+
 ## Gateway token and login
 
 | Resource | Token required? |

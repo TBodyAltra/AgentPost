@@ -204,6 +204,14 @@ test.describe("AgentPost dashboard", () => {
     await expect(mb).not.toHaveText("0");
   });
 
+  test("copy onboarding prompt button is enabled after load", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, MAILBOX_COUNT);
+    const copyBtn = page.locator("#copy-prompt-btn");
+    await expect(copyBtn).toBeEnabled();
+    await expect(copyBtn).toContainText(/Prompt/i);
+  });
+
   // Last: mutates server state (removes one mailbox). Playwright shares one httptest server per run.
   test("delete mailbox from detail panel", async ({ page }) => {
     await page.goto("/dashboard/");
