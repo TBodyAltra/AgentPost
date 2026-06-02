@@ -43,7 +43,7 @@ Register with `inbox_policy.allowlist` / `blocklist` in `profile` (full addresse
 After `./start.sh up`, the terminal prints `--- Agent onboarding prompt ---`. The dashboard header **Copy prompt** button copies the same text (client base URLs; includes `AGENTPOST_API_TOKEN` when the gateway token is enabled).
 
 - Load dashboard data first (log in when a gateway token is required).
-- Paste into client agents (Cursor Rules, `AGENTS.md`, etc.); do not commit token-bearing text to public repos.
+- Paste into any client agent runtime (IDE rules, `AGENTS.md`, system prompt, etc.); do not commit token-bearing text to public repos.
 
 ## Gateway token and login
 

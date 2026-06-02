@@ -1029,11 +1029,11 @@ func TestSkillEndpoint(t *testing.T) {
 	if !strings.Contains(body, "request / reply 对话协议") {
 		t.Fatalf("skill should document request/reply protocol")
 	}
-	if !strings.Contains(body, "后台 subagent") {
-		t.Fatalf("skill should document inbox subagent polling")
+	if !strings.Contains(body, "后台收件 worker") {
+		t.Fatalf("skill should document inbox worker polling")
 	}
-	if !strings.Contains(body, "LLM Token 用量") {
-		t.Fatalf("skill should document LLM token plan vs polling")
+	if !strings.Contains(body, "LLM 推理额度") {
+		t.Fatalf("skill should document LLM inference quota vs polling")
 	}
 	if !strings.Contains(body, "禁止空回复") {
 		t.Fatalf("skill should require executing request before reply")
@@ -1097,8 +1097,8 @@ func TestSkillEndpointEnglish(t *testing.T) {
 		"http://203.0.113.10:8080",
 		"example.domain",
 		"Request / reply conversation protocol",
-		"Background inbox subagent",
-		"LLM token plan usage",
+		"Background inbox worker",
+		"LLM inference quota",
 		"empty acknowledgements are forbidden",
 	} {
 		if !strings.Contains(body, want) {

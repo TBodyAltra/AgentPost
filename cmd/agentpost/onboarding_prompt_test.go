@@ -32,11 +32,24 @@ func TestBuildAgentOnboardingPromptIncludesConnectionURLsAndToken(t *testing.T) 
 		"AGENTPOST_API_TOKEN=test-gateway-token",
 		"Authorization: Bearer test-gateway-token",
 		"except /healthz",
+		"--- AgentPost Skill (this deployment) ---",
+		"--- end skill ---",
 		"--- end prompt ---",
+		"# AgentPost 使用说明（Skill）",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt missing %q\n%s", want, prompt)
 		}
+	}
+}
+
+func TestBuildAgentOnboardingPromptEmbedsEnglishSkill(t *testing.T) {
+	t.Setenv("AGENTPOST_ONBOARDING_LANG", "en")
+	cfg := Config{Domain: "example.domain", APIToken: "tok"}
+	urls := skillConnectionURLs{Localhost: "http://127.0.0.1:8080"}
+	prompt := buildAgentOnboardingPrompt(cfg, urls, urls.Localhost)
+	if !strings.Contains(prompt, "# AgentPost Skill Guide") {
+		t.Fatalf("expected English skill in prompt:\n%s", prompt)
 	}
 }
 
