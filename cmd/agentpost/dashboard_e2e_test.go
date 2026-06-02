@@ -55,7 +55,7 @@ func TestDashboardPlaywrightE2E(t *testing.T) {
 	})
 	handler := app.routes()
 
-	pubA, _, _ := ed25519.GenerateKey(crand.Reader)
+	pubA, privA, _ := ed25519.GenerateKey(crand.Reader)
 	pubB, _, _ := ed25519.GenerateKey(crand.Reader)
 	pubG, _, _ := ed25519.GenerateKey(crand.Reader)
 	registerDashboardUser(t, handler, "alpha", "agent.test", pubA, nil)
@@ -68,6 +68,19 @@ func TestDashboardPlaywrightE2E(t *testing.T) {
 	registerDashboardUser(t, handler, "partner", "partner.test", pubP, &InboxPolicy{
 		Allowlist: []string{"alpha@agent.test"},
 	})
+
+	sendBody := mustJSON(t, sendRequest{
+		To:      "beta@agent.test",
+		Subject: "unicode preview",
+		Body:    `{"request":"\u76ee\u6807\n\n1. first\n2. second"}`,
+	})
+	sendReq := signedRequest(t, http.MethodPost, "/api/v1/send", sendBody, "alpha@agent.test", privA)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	handler.ServeHTTP(sendResp, sendReq)
+	if sendResp.Code != http.StatusOK {
+		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
+	}
 
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
