@@ -22,14 +22,16 @@ type dashboardResponse struct {
 }
 
 type dashboardGateway struct {
-	DefaultDomain       string `json:"default_domain"`
-	ServerURL           string `json:"server_url"`
-	GatewayToken        bool   `json:"gateway_token_required"`
-	SMTPEnabled         bool   `json:"smtp_inbound_enabled"`
-	ActiveMailboxes     int    `json:"active_mailboxes"`
-	DomainCount         int    `json:"domain_count"`
-	TotalQueuedMessages int    `json:"total_queued_messages"`
-	MailboxesWithQueue  int    `json:"mailboxes_with_queue"`
+	DefaultDomain          string `json:"default_domain"`
+	ServerURL              string `json:"server_url"`
+	GatewayToken           bool   `json:"gateway_token_required"`
+	SMTPEnabled            bool   `json:"smtp_inbound_enabled"`
+	ActiveMailboxes        int    `json:"active_mailboxes"`
+	DomainCount            int    `json:"domain_count"`
+	TotalQueuedMessages    int    `json:"total_queued_messages"`
+	MailboxesWithQueue     int    `json:"mailboxes_with_queue"`
+	PollingOnlineMailboxes int    `json:"polling_online_mailboxes"`
+	PollingRecentMailboxes int    `json:"polling_recent_mailboxes"`
 }
 
 type dashboardMessagePreview struct {
@@ -53,6 +55,9 @@ type dashboardMailbox struct {
 	Email               string                    `json:"email"`
 	ExpiresAt           time.Time                 `json:"expires_at"`
 	RegisteredAt        time.Time                 `json:"registered_at"`
+	LastPolledAt        *time.Time                `json:"last_polled_at,omitempty"`
+	ActivityLevel       string                    `json:"activity_level"`
+	SecondsSincePoll    int64                     `json:"seconds_since_poll,omitempty"`
 	TTLRemainingSeconds int64                     `json:"ttl_remaining_seconds"`
 	QueuedMessages      int                       `json:"queued_messages"`
 	Queue               []dashboardMessagePreview `json:"queue,omitempty"`
@@ -90,6 +95,7 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 	activeEmails := make([]string, 0, len(a.users))
 	totalQueued := 0
 	mailboxesWithQueue := 0
+	activityLevels := make([]string, 0, len(a.users))
 
 	for _, user := range a.users {
 		if !user.ExpiresAt.After(now) {
@@ -107,12 +113,27 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 		if qn > 0 {
 			mailboxesWithQueue++
 		}
+		level := mailboxActivityLevel(user.LastPolledAt, now)
+		activityLevels = append(activityLevels, level)
+		var lastPolled *time.Time
+		var secondsSincePoll int64
+		if !user.LastPolledAt.IsZero() {
+			lp := user.LastPolledAt.UTC()
+			lastPolled = &lp
+			secondsSincePoll = int64(now.Sub(lp).Seconds())
+			if secondsSincePoll < 0 {
+				secondsSincePoll = 0
+			}
+		}
 		mailboxes = append(mailboxes, dashboardMailbox{
 			Username:            user.Username,
 			Domain:              user.Domain,
 			Email:               email,
 			ExpiresAt:           user.ExpiresAt.UTC(),
 			RegisteredAt:        user.RegisteredAt.UTC(),
+			LastPolledAt:        lastPolled,
+			ActivityLevel:       level,
+			SecondsSincePoll:    secondsSincePoll,
 			TTLRemainingSeconds: ttlRemaining,
 			QueuedMessages:      qn,
 			Queue:               dashboardQueuePreviews(queue),
@@ -121,6 +142,8 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 		})
 		domainMailboxes[user.Domain] = append(domainMailboxes[user.Domain], email)
 	}
+
+	pollingOnline, pollingRecent := mailboxActivityCounts(activityLevels)
 
 	sort.Slice(mailboxes, func(i, j int) bool {
 		if mailboxes[i].Domain != mailboxes[j].Domain {
@@ -188,14 +211,16 @@ func (a *App) buildDashboardSnapshot(r *http.Request) dashboardResponse {
 	return dashboardResponse{
 		GeneratedAt: now,
 		Gateway: dashboardGateway{
-			DefaultDomain:       a.cfg.Domain,
-			ServerURL:           serverURL,
-			GatewayToken:        strings.TrimSpace(a.cfg.APIToken) != "",
-			SMTPEnabled:         strings.TrimSpace(a.cfg.SMTPAddr) != "",
-			ActiveMailboxes:     len(mailboxes),
-			DomainCount:         len(domains),
-			TotalQueuedMessages: totalQueued,
-			MailboxesWithQueue:  mailboxesWithQueue,
+			DefaultDomain:          a.cfg.Domain,
+			ServerURL:              serverURL,
+			GatewayToken:           strings.TrimSpace(a.cfg.APIToken) != "",
+			SMTPEnabled:            strings.TrimSpace(a.cfg.SMTPAddr) != "",
+			ActiveMailboxes:        len(mailboxes),
+			DomainCount:            len(domains),
+			TotalQueuedMessages:    totalQueued,
+			MailboxesWithQueue:     mailboxesWithQueue,
+			PollingOnlineMailboxes: pollingOnline,
+			PollingRecentMailboxes: pollingRecent,
 		},
 		Domains:    domains,
 		Mailboxes:  mailboxes,

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDashboardAPIRequiresGatewayTokenWhenConfigured(t *testing.T) {
@@ -370,6 +371,80 @@ func TestDashboardMessageLogDeliverAndReceive(t *testing.T) {
 	}
 	if snap2.MessageLog[0].ReceivedAt == nil {
 		t.Fatal("received_at should be set after poll")
+	}
+}
+
+func TestDashboardMailboxActivityAfterPoll(t *testing.T) {
+	fixed := time.Date(2026, 6, 2, 12, 0, 0, 0, time.UTC)
+	app := NewApp(Config{
+		Domain:          "agent.test",
+		HTTPAddr:        ":0",
+		SMTPAddr:        "",
+		MaxMessageBytes: defaultMaxMessageBytes,
+	})
+	app.now = func() time.Time { return fixed }
+	handler := app.routes()
+
+	pubA, _, _ := ed25519.GenerateKey(crand.Reader)
+	pubB, privB, _ := ed25519.GenerateKey(crand.Reader)
+	registerDashboardUser(t, handler, "alpha", "agent.test", pubA, nil)
+	registerDashboardUser(t, handler, "beta", "agent.test", pubB, nil)
+
+	dashBefore := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	respBefore := httptest.NewRecorder()
+	handler.ServeHTTP(respBefore, dashBefore)
+	var snapBefore dashboardResponse
+	if err := json.NewDecoder(respBefore.Body).Decode(&snapBefore); err != nil {
+		t.Fatalf("decode dashboard: %v", err)
+	}
+	for _, mb := range snapBefore.Mailboxes {
+		if mb.ActivityLevel != activityLevelOffline {
+			t.Fatalf("%s activity before poll = %q, want offline", mb.Email, mb.ActivityLevel)
+		}
+		if mb.LastPolledAt != nil {
+			t.Fatalf("%s last_polled_at should be nil before poll", mb.Email)
+		}
+	}
+	if snapBefore.Gateway.PollingOnlineMailboxes != 0 || snapBefore.Gateway.PollingRecentMailboxes != 0 {
+		t.Fatalf("gateway polling counts before poll = online %d recent %d",
+			snapBefore.Gateway.PollingOnlineMailboxes, snapBefore.Gateway.PollingRecentMailboxes)
+	}
+
+	pollReq := signedRequestAt(t, http.MethodGet, "/api/v1/messages", nil, "beta@agent.test", privB, fixed)
+	pollResp := httptest.NewRecorder()
+	handler.ServeHTTP(pollResp, pollReq)
+	if pollResp.Code != http.StatusOK {
+		t.Fatalf("poll status = %d", pollResp.Code)
+	}
+
+	dashAfter := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+	respAfter := httptest.NewRecorder()
+	handler.ServeHTTP(respAfter, dashAfter)
+	var snapAfter dashboardResponse
+	if err := json.NewDecoder(respAfter.Body).Decode(&snapAfter); err != nil {
+		t.Fatalf("decode dashboard: %v", err)
+	}
+
+	var beta dashboardMailbox
+	for _, mb := range snapAfter.Mailboxes {
+		if mb.Email == "beta@agent.test" {
+			beta = mb
+		}
+		if mb.Email == "alpha@agent.test" && mb.ActivityLevel != activityLevelOffline {
+			t.Fatalf("alpha activity after beta poll = %q, want offline", mb.ActivityLevel)
+		}
+	}
+	if beta.Email == "" {
+		t.Fatal("beta mailbox missing from dashboard")
+	}
+	if beta.ActivityLevel != activityLevelOnline {
+		t.Fatalf("beta activity = %q, want online", beta.ActivityLevel)
+	}
+	if beta.LastPolledAt == nil {
+		t.Fatal("beta last_polled_at should be set")
+	}
+	if snapAfter.Gateway.PollingOnlineMailboxes != 1 {
+		t.Fatalf("polling_online_mailboxes = %d, want 1", snapAfter.Gateway.PollingOnlineMailboxes)
 	}
 }
 

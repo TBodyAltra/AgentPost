@@ -56,7 +56,7 @@ func TestDashboardPlaywrightE2E(t *testing.T) {
 	handler := app.routes()
 
 	pubA, privA, _ := ed25519.GenerateKey(crand.Reader)
-	pubB, _, _ := ed25519.GenerateKey(crand.Reader)
+	pubB, privB, _ := ed25519.GenerateKey(crand.Reader)
 	pubG, _, _ := ed25519.GenerateKey(crand.Reader)
 	registerDashboardUser(t, handler, "alpha", "agent.test", pubA, nil)
 	registerDashboardUser(t, handler, "beta", "agent.test", pubB, nil)
@@ -80,6 +80,13 @@ func TestDashboardPlaywrightE2E(t *testing.T) {
 	handler.ServeHTTP(sendResp, sendReq)
 	if sendResp.Code != http.StatusOK {
 		t.Fatalf("send status = %d, body = %s", sendResp.Code, sendResp.Body.String())
+	}
+
+	pollReq := signedRequest(t, http.MethodGet, "/api/v1/messages", nil, "beta@agent.test", privB)
+	pollResp := httptest.NewRecorder()
+	handler.ServeHTTP(pollResp, pollReq)
+	if pollResp.Code != http.StatusOK {
+		t.Fatalf("poll status = %d, body = %s", pollResp.Code, pollResp.Body.String())
 	}
 
 	ts := httptest.NewServer(handler)

@@ -53,6 +53,8 @@ func TestDashboardEmbeddedHTMLHasCriticalUI(t *testing.T) {
 		`parseSearchQuery`,
 		`mailboxMatchesSearch`,
 		`id="search-hint"`,
+		`formatMailboxActivity`,
+		`activityLabel`,
 	}
 	for _, needle := range required {
 		if !strings.Contains(html, needle) {
