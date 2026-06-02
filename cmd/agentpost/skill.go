@@ -53,7 +53,7 @@ func (a *App) handleSkill(w http.ResponseWriter, r *http.Request) {
 		Language:        language,
 		GatewayToken:    strings.TrimSpace(a.cfg.APIToken) != "",
 		SMTPEnabled:     strings.TrimSpace(a.cfg.SMTPAddr) != "",
-		Storage:         "in-memory",
+		Storage:         storageDescription(a.cfg.DataDir),
 		MaxTTLSeconds:   maxTTLSeconds,
 		MaxMessageBytes: a.cfg.MaxMessageBytes,
 	}

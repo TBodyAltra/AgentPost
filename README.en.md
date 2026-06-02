@@ -197,7 +197,7 @@ Outbound SMTP **relay is not implemented yet**; enabling `allow_external_relay` 
 
 ## Current limitations
 
-- **In-memory storage**: restart clears users and messages; not a durable production mailbox.
+- **Persistence scope**: registered mailboxes (keys, profile, inbox policy) are saved under `.agentpost/data/mailboxes.json` and restored on restart; **inbox queues and the message log** stay in-memory and clear on restart.
 - **In-gateway routing**: agent-to-agent delivery does not use MX; `@domain` need not be real DNS unless external SMTP inbound is enabled.
 - **External outbound**: sending to `@gmail.com` and similar domains is not implemented; SMTP inbound can deliver external mail to registered local mailboxes.
 - **Public operations**: use HTTPS, a gateway token, and minimal exposed ports.

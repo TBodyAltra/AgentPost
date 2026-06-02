@@ -57,6 +57,7 @@ type Config struct {
 	SMTPAddr           string `yaml:"smtp_addr"`
 	AllowExternalRelay bool   `yaml:"allow_external_relay"`
 	MaxMessageBytes    int64  `yaml:"max_message_bytes"`
+	DataDir            string `yaml:"data_dir,omitempty"`
 	APIToken           string `yaml:"-"`
 }
 
@@ -309,6 +310,9 @@ func applyEnvOverrides(cfg *Config) {
 	if requireToken, set := envBoolSet("AGENTPOST_REQUIRE_TOKEN"); set && !requireToken {
 		cfg.APIToken = ""
 	}
+	if v := strings.TrimSpace(os.Getenv("AGENTPOST_DATA_DIR")); v != "" {
+		cfg.DataDir = v
+	}
 }
 
 func NewApp(cfg Config) *App {
@@ -316,7 +320,10 @@ func NewApp(cfg Config) *App {
 	if cfg.MaxMessageBytes <= 0 {
 		cfg.MaxMessageBytes = defaultMaxMessageBytes
 	}
-	return &App{
+	if strings.TrimSpace(cfg.DataDir) == "" {
+		cfg.DataDir = strings.TrimSpace(os.Getenv("AGENTPOST_DATA_DIR"))
+	}
+	app := &App{
 		cfg:              cfg,
 		now:              time.Now,
 		users:            make(map[string]*User),
@@ -324,6 +331,10 @@ func NewApp(cfg Config) *App {
 		limiters:         make(map[string]*rate.Limiter),
 		registerLimiters: make(map[string]*registerLimiterState),
 	}
+	if strings.TrimSpace(cfg.DataDir) != "" {
+		app.loadPersistedUsers()
+	}
+	return app
 }
 
 func (a *App) routes() http.Handler {
@@ -472,8 +483,9 @@ func (a *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		InboxPolicy:  inboxPolicy,
 	}
 	a.messages[mailbox] = nil
-	a.limiters[mailbox] = rate.NewLimiter(rate.Every(time.Minute/2), 2)
+	a.ensureLimiterLocked(mailbox)
 	a.mu.Unlock()
+	a.persistUsersAsync()
 
 	writeJSON(w, http.StatusCreated, registerResponse{
 		Email:        mailbox,
@@ -533,6 +545,7 @@ func (a *App) handleAccount(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	a.deleteUserLocked(email)
 	a.mu.Unlock()
+	a.persistUsersAsync()
 
 	writeJSON(w, http.StatusOK, unregisterResponse{
 		Email:  email,
@@ -579,6 +592,7 @@ func (a *App) handleInboxPolicy(w http.ResponseWriter, r *http.Request) {
 			stored.InboxPolicy = policy
 		}
 		a.mu.Unlock()
+		a.persistUsersAsync()
 		writeJSON(w, http.StatusOK, inboxPolicyResponse{InboxPolicy: policy})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
@@ -779,7 +793,6 @@ func (a *App) cleanupExpired() {
 	now := a.now()
 
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	for mailbox, user := range a.users {
 		if !user.ExpiresAt.After(now) {
 			a.deleteUserLocked(mailbox)
@@ -790,6 +803,8 @@ func (a *App) cleanupExpired() {
 			delete(a.registerLimiters, key)
 		}
 	}
+	a.mu.Unlock()
+	a.persistUsersAsync()
 }
 
 func (a *App) deleteUserLocked(mailbox string) {

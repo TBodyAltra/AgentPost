@@ -18,6 +18,9 @@ SMTP_PORT="${AGENTPOST_SMTP_PORT:-2525}"
 INTERACTIVE=1
 CONFIGURE_ONLY=0
 TOKEN_GENERATED=0
+TOKEN_FROM_FILE=0
+AGENTPOST_DIR="${AGENTPOST_DIR:-.agentpost}"
+TOKEN_FILE="${AGENTPOST_TOKEN_FILE:-${AGENTPOST_DIR}/gateway.token}"
 LAN_IP=""
 PUBLIC_IP=""
 CONNECT_LOCALHOST=""
@@ -410,10 +413,21 @@ ensure_api_token() {
     export AGENTPOST_API_TOKEN
     return
   fi
+  if [[ -f "$TOKEN_FILE" ]]; then
+    AGENTPOST_API_TOKEN="$(tr -d '[:space:]' <"$TOKEN_FILE")"
+    if [[ -n "$AGENTPOST_API_TOKEN" ]]; then
+      TOKEN_FROM_FILE=1
+      export AGENTPOST_API_TOKEN
+      return
+    fi
+  fi
   if [[ -z "${AGENTPOST_API_TOKEN+x}" ]]; then
     AGENTPOST_API_TOKEN="$(openssl rand -hex 32)"
     TOKEN_GENERATED=1
     export AGENTPOST_API_TOKEN
+    mkdir -p "$(dirname "$TOKEN_FILE")"
+    printf '%s\n' "$AGENTPOST_API_TOKEN" >"$TOKEN_FILE"
+    chmod 600 "$TOKEN_FILE" 2>/dev/null || true
     return
   fi
   unset AGENTPOST_API_TOKEN
@@ -426,11 +440,13 @@ print_api_token() {
   fi
   if [[ "$TOKEN_GENERATED" == "1" ]]; then
     echo ""
-    log "AGENTPOST_API_TOKEN (shown once — not saved to any file):"
+    log "AGENTPOST_API_TOKEN (new — saved for next restart):"
     printf '%s\n' "$AGENTPOST_API_TOKEN"
     echo ""
-    log "Save this token now. Reuse it with: AGENTPOST_API_TOKEN=<token> ./start.sh"
+    log "Stored in ${TOKEN_FILE} (not in .env). Clients can keep using this token after redeploy."
     echo ""
+  elif [[ "$TOKEN_FROM_FILE" == "1" ]]; then
+    log "Using gateway token from ${TOKEN_FILE} (same as last deploy)."
   elif [[ -n "${AGENTPOST_API_TOKEN:-}" ]]; then
     log "Using AGENTPOST_API_TOKEN from the current shell environment."
   fi
@@ -616,6 +632,7 @@ cmd_configure() {
 }
 
 export_runtime_env() {
+  export AGENTPOST_DATA_DIR="${AGENTPOST_DATA_DIR:-${ROOT}/${AGENTPOST_DIR}/data}"
   export AGENTPOST_DOMAIN="$DOMAIN"
   export AGENTPOST_HTTP_PORT="$HTTP_PORT"
   export AGENTPOST_CONNECT_LOCALHOST="$CONNECT_LOCALHOST"
