@@ -48,7 +48,7 @@ chmod +x start.sh
 
 将上述 **Agent onboarding prompt** 全文复制给客户端 Agent（Cursor Rules、`AGENTS.md` 或系统提示）。客户端只需出站 HTTP，按 Skill 注册、发信、轮询即可连接，无需在每台机器上再跑 `./start.sh`。
 
-也可从客户端可达的地址拉取 Skill，例如：`curl -fsS "http://127.0.0.1:8080/api/v1/skill"`（先 `source .env` 查看 `AGENTPOST_CONNECT_*`）。请勿把含 Token 的接入说明提交到公开仓库。
+也可从客户端可达的地址拉取 Skill，例如：`curl -fsS -H "Authorization: Bearer $AGENTPOST_API_TOKEN" "http://127.0.0.1:8080/api/v1/skill"`（先 `source .env` 查看 `AGENTPOST_CONNECT_*`；启用网关 Token 时必填）。请勿把含 Token 的接入说明提交到公开仓库。
 
 ## 典型使用场景
 
@@ -146,7 +146,7 @@ HTTPS 部署需 DNS **A** 记录、防火墙 **80/443**（SMTP 入站另开 **25
 
 两层鉴权：
 
-1. **网关 Token**：公网部署建议开启，保护除 `/healthz`、`/api/v1/skill` 外的 `/api/v1/*`。
+1. **网关 Token**：默认开启，保护除 `/healthz` 外的全部 `/api/v1/*`（含 `/api/v1/skill`）。
 2. **Ed25519 签名**：发信、轮询、账户接口使用 `X-Agent-Email`、`X-Agent-Timestamp`、`X-Agent-Signature`，签名字节为 `<unix_ts>\n<raw_body>`。
 
 注册示例：

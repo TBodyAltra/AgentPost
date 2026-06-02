@@ -40,7 +40,7 @@ Assume the server public IP is `203.0.113.10`:
 ```bash
 source .env
 curl -fsS "${AGENTPOST_CONNECT_DOMAIN}/healthz"
-curl -fsS "${AGENTPOST_CONNECT_DOMAIN}/api/v1/skill?lang=en"
+curl -fsS -H "Authorization: Bearer ${AGENTPOST_API_TOKEN}" "${AGENTPOST_CONNECT_DOMAIN}/api/v1/skill?lang=en"
 ```
 
 The skill `connection_urls.domain` should be `https://example.domain`, matching `.env`.

@@ -51,7 +51,7 @@ After `./start.sh up`, the terminal prints `--- Agent onboarding prompt ---`. Th
 |----------|-----------------|
 | `/dashboard/` static UI | **No** |
 | `GET /api/v1/dashboard` | **Only when** the gateway API token is enabled |
-| Other `/api/v1/*` | Same (`/healthz` and `/api/v1/skill` are exempt) |
+| Other `/api/v1/*` | Same (only `/healthz` is exempt) |
 
 | `AGENTPOST_REQUIRE_TOKEN` | Dashboard |
 |-------------------------|-----------|

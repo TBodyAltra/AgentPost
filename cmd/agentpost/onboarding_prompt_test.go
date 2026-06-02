@@ -23,7 +23,7 @@ func TestBuildAgentOnboardingPromptIncludesConnectionURLsAndToken(t *testing.T) 
 
 	for _, want := range []string{
 		"--- Agent onboarding prompt (copy below) ---",
-		"curl -fsS https://example.domain/api/v1/skill",
+		`curl -fsS -H "Authorization: Bearer test-gateway-token" https://example.domain/api/v1/skill`,
 		"Localhost:  http://127.0.0.1:8080",
 		"LAN:        http://192.168.1.50:8080",
 		"Public IP:  http://203.0.113.10:8080",
@@ -31,6 +31,7 @@ func TestBuildAgentOnboardingPromptIncludesConnectionURLsAndToken(t *testing.T) 
 		"AGENTPOST_EMAIL_SUFFIX=example.domain",
 		"AGENTPOST_API_TOKEN=test-gateway-token",
 		"Authorization: Bearer test-gateway-token",
+		"except /healthz",
 		"--- end prompt ---",
 	} {
 		if !strings.Contains(prompt, want) {

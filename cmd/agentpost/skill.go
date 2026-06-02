@@ -141,7 +141,14 @@ func readSkillConnectionURLs() skillConnectionURLs {
 	}
 }
 
-func appendSkillConnectionURLsMarkdown(b *strings.Builder, urls skillConnectionURLs, language string) {
+func skillCurlGET(url string, gatewayToken bool) string {
+	if gatewayToken {
+		return fmt.Sprintf("curl -fsS -H \"Authorization: Bearer <AGENTPOST_API_TOKEN>\" %s", url)
+	}
+	return fmt.Sprintf("curl -fsS %s", url)
+}
+
+func appendSkillConnectionURLsMarkdown(b *strings.Builder, urls skillConnectionURLs, language string, gatewayToken bool) {
 	if !urls.hasAny() {
 		return
 	}
@@ -161,7 +168,7 @@ func appendSkillConnectionURLsMarkdown(b *strings.Builder, urls skillConnectionU
 		if urls.Domain != "" {
 			fmt.Fprintf(b, "| Domain (HTTPS) | `%s` |\n", urls.Domain)
 		}
-		fmt.Fprintf(b, "\nFetch this skill from your chosen base URL, for example:\n\n```bash\ncurl -fsS <base-url>/api/v1/skill\n```\n\nSet `AGENTPOST_SERVER` to that same base URL.\n\n")
+		fmt.Fprintf(b, "\nFetch this skill from your chosen base URL, for example:\n\n```bash\n%s\n```\n\nSet `AGENTPOST_SERVER` to that same base URL.\n\n", skillCurlGET("<base-url>/api/v1/skill", gatewayToken))
 		return
 	}
 	fmt.Fprintf(b, "### 客户端可用连接地址\n\n")
@@ -179,7 +186,7 @@ func appendSkillConnectionURLsMarkdown(b *strings.Builder, urls skillConnectionU
 	if urls.Domain != "" {
 		fmt.Fprintf(b, "| 域名 (HTTPS) | `%s` |\n", urls.Domain)
 	}
-	fmt.Fprintf(b, "\n请用所选地址拉取 Skill，例如：\n\n```bash\ncurl -fsS <基础-url>/api/v1/skill\n```\n\n`AGENTPOST_SERVER` 设为同一基础 URL。\n\n")
+	fmt.Fprintf(b, "\n请用所选地址拉取 Skill，例如：\n\n```bash\n%s\n```\n\n`AGENTPOST_SERVER` 设为同一基础 URL。\n\n", skillCurlGET("<基础-url>/api/v1/skill", gatewayToken))
 }
 
 func normalizeListenPort(httpAddr string) string {
@@ -219,20 +226,20 @@ func buildSkillMarkdownZH(meta skillMeta) string {
 	fmt.Fprintf(&b, "| 变量 | 值 |\n|------|----|\n")
 	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s`（本次请求的参考地址；客户端请改用下表自己可达的 URL） |\n", meta.ServerURL)
 	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s`（注册时省略 `domain` 的默认值） |\n\n", meta.Domain)
-	appendSkillConnectionURLsMarkdown(&b, meta.ConnectionURLs, "zh")
+	appendSkillConnectionURLsMarkdown(&b, meta.ConnectionURLs, "zh", meta.GatewayToken)
 	fmt.Fprintf(&b, "注册时可选择**任意合法 mailbox domain**；完整地址 `user@domain` 在本网关上必须唯一。\n\n")
 	if meta.ConnectionURLs.hasAny() {
 		fmt.Fprintf(&b, "网关由 `./start.sh up` 启动。每个客户端从**上表**选用自己可达的基础 URL；可选 **域名 (HTTPS)** 行表示已启用 Caddy。\n\n")
 	}
 
 	fmt.Fprintf(&b, "健康检查：\n\n```bash\ncurl -fsS %s/healthz\n```\n\n", meta.ServerURL)
-	fmt.Fprintf(&b, "重新获取本 Skill：\n\n```bash\ncurl -fsS %s/api/v1/skill\n```\n\n", meta.ServerURL)
+	fmt.Fprintf(&b, "重新获取本 Skill：\n\n```bash\n%s\n```\n\n", skillCurlGET(meta.ServerURL+"/api/v1/skill", meta.GatewayToken))
 	fmt.Fprintf(&b, "运维 Dashboard（domain、投递拓扑、账户详情）：\n\n```\n%s/dashboard/\n```\n\n", meta.ServerURL)
 	fmt.Fprintf(&b, "Dashboard 数据接口：`GET %s/api/v1/dashboard`（若配置了网关 Token 则需提供）。\n\n", meta.ServerURL)
 
 	if meta.GatewayToken {
 		fmt.Fprintf(&b, "## 网关 Token\n\n")
-		fmt.Fprintf(&b, "本部署要求除 `/healthz`、`/api/v1/skill` 外，所有 `/api/v1/*` 请求携带网关 Token。\n\n")
+		fmt.Fprintf(&b, "本部署要求除 `/healthz` 外，所有 `/api/v1/*` 请求（含本 Skill）携带网关 Token。\n\n")
 		fmt.Fprintf(&b, "```http\nAuthorization: Bearer <AGENTPOST_API_TOKEN>\n```\n\n")
 		fmt.Fprintf(&b, "Token **不会**写入本文档，请向部署运维人员索取。\n\n")
 	} else {
@@ -445,20 +452,20 @@ func buildSkillMarkdownEN(meta skillMeta) string {
 	fmt.Fprintf(&b, "| Variable | Value |\n|----------|-------|\n")
 	fmt.Fprintf(&b, "| `AGENTPOST_SERVER` | `%s` (reference from this request; clients should use a reachable URL from the table below) |\n", meta.ServerURL)
 	fmt.Fprintf(&b, "| `AGENTPOST_EMAIL_SUFFIX` | `%s` (default domain when registration omits `domain`) |\n\n", meta.Domain)
-	appendSkillConnectionURLsMarkdown(&b, meta.ConnectionURLs, "en")
+	appendSkillConnectionURLsMarkdown(&b, meta.ConnectionURLs, "en", meta.GatewayToken)
 	fmt.Fprintf(&b, "Agents may register any valid mailbox domain. The full address `user@domain` must be unique on this gateway.\n\n")
 	if meta.ConnectionURLs.hasAny() {
 		fmt.Fprintf(&b, "The gateway was started with `./start.sh up`. Each client picks a reachable base URL from the table above; **Domain (HTTPS)** appears when Caddy is enabled.\n\n")
 	}
 
 	fmt.Fprintf(&b, "Health check:\n\n```bash\ncurl -fsS %s/healthz\n```\n\n", meta.ServerURL)
-	fmt.Fprintf(&b, "Fetch this skill again:\n\n```bash\ncurl -fsS %s/api/v1/skill?lang=en\n```\n\n", meta.ServerURL)
+	fmt.Fprintf(&b, "Fetch this skill again:\n\n```bash\n%s\n```\n\n", skillCurlGET(meta.ServerURL+"/api/v1/skill?lang=en", meta.GatewayToken))
 	fmt.Fprintf(&b, "Ops dashboard (domains, mailbox graph, account details):\n\n```\n%s/dashboard/\n```\n\n", meta.ServerURL)
 	fmt.Fprintf(&b, "Dashboard data API: `GET %s/api/v1/dashboard` (requires the gateway token if configured).\n\n", meta.ServerURL)
 
 	fmt.Fprintf(&b, "## Gateway token\n\n")
 	if meta.GatewayToken {
-		fmt.Fprintf(&b, "This deployment requires a gateway token for every `/api/v1/*` request except `/healthz` and `/api/v1/skill`.\n\n")
+		fmt.Fprintf(&b, "This deployment requires a gateway token for every `/api/v1/*` request except `/healthz` (including this skill document).\n\n")
 		fmt.Fprintf(&b, "```http\nAuthorization: Bearer <AGENTPOST_API_TOKEN>\n```\n\n")
 		fmt.Fprintf(&b, "The token is **not** included in this skill. Ask the deployment operator for it.\n\n")
 	} else {

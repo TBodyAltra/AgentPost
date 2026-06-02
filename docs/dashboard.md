@@ -51,7 +51,7 @@
 |------|----------------|
 | `/dashboard/` 静态页面 | **不需要**（页面本身可打开） |
 | `GET /api/v1/dashboard` | **仅当**网关启用了 API Token 时需要 |
-| 其它 `/api/v1/*` | 同上（`/healthz`、`/api/v1/skill` 除外） |
+| 其它 `/api/v1/*` | 同上（仅 `/healthz` 除外） |
 
 | `AGENTPOST_REQUIRE_TOKEN` | 仪表盘表现 |
 |-------------------------|------------|
