@@ -334,12 +334,32 @@
       font-family: var(--mono);
     }
     .mailbox-item.has-unread .mailbox-avatar { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
+    .mailbox-avatar-wrap { position: relative; flex-shrink: 0; }
+    .activity-dot {
+      position: absolute; right: -2px; bottom: -2px;
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 2px solid var(--bg-elevated); box-sizing: border-box;
+    }
+    .activity-dot.online { background: var(--ok); box-shadow: 0 0 0 1px var(--ok-soft); }
+    .activity-dot.recent { background: #ff9f0a; }
+    .activity-dot.idle { background: var(--text-3); }
+    .activity-dot.offline { background: var(--bg); border-color: var(--text-3); opacity: 0.65; }
     .mailbox-meta { flex: 1; min-width: 0; }
     .mailbox-name {
       font-size: 0.86rem; font-weight: 600; font-family: var(--mono);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .mailbox-sub { font-size: 0.72rem; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mailbox-activity {
+      font-size: 0.68rem; color: var(--text-3); margin-top: 0.1rem;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    .mailbox-activity.online { color: var(--ok); }
+    .mailbox-activity.recent { color: #ff9f0a; }
+    .mini-chip.activity-online { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, var(--hairline)); }
+    .mini-chip.activity-recent { color: #ff9f0a; border-color: color-mix(in srgb, #ff9f0a 35%, var(--hairline)); }
+    .mini-chip.activity-idle { color: var(--text-2); }
+    .mini-chip.activity-offline { color: var(--text-3); }
     .unread-badge {
       flex-shrink: 0; min-width: 1.35rem; height: 1.35rem; border-radius: 100px;
       background: var(--ok); color: #fff; font-size: 0.68rem; font-weight: 700;
@@ -820,6 +840,8 @@
         statDomains: "网域",
         statUnread: "待收信件",
         statPairs: "允许投递",
+        statPollingOnline: "轮询在线",
+        statPollingRecent: "近期轮询",
         statUpdated: "更新",
         defaultDomain: "默认域",
         tokenRequired: "需 Token",
@@ -835,6 +857,12 @@
         tabProfile: "资料",
         registered: "注册时间",
         expires: "剩余 TTL",
+        lastPolled: "上次轮询",
+        activityOnline: "在线",
+        activityRecent: "近期活跃",
+        activityIdle: "空闲",
+        activityOffline: "未轮询",
+        activityNever: "尚未轮询",
         queuedMail: "待收",
         outboundPeers: "可发出",
         inboundPeers: "可接收",
@@ -900,6 +928,8 @@
         statDomains: "網域",
         statUnread: "待收信件",
         statPairs: "允許投遞",
+        statPollingOnline: "輪詢在線",
+        statPollingRecent: "近期輪詢",
         statUpdated: "更新",
         defaultDomain: "預設域",
         tokenRequired: "需 Token",
@@ -915,6 +945,12 @@
         tabProfile: "資料",
         registered: "註冊時間",
         expires: "剩餘 TTL",
+        lastPolled: "上次輪詢",
+        activityOnline: "在線",
+        activityRecent: "近期活躍",
+        activityIdle: "空閒",
+        activityOffline: "未輪詢",
+        activityNever: "尚未輪詢",
         queuedMail: "待收",
         outboundPeers: "可發出",
         inboundPeers: "可接收",
@@ -980,6 +1016,8 @@
         statDomains: "Domains",
         statUnread: "Queued mail",
         statPairs: "Allowed routes",
+        statPollingOnline: "Polling online",
+        statPollingRecent: "Recently polled",
         statUpdated: "Updated",
         defaultDomain: "Default",
         tokenRequired: "Token required",
@@ -995,6 +1033,12 @@
         tabProfile: "Profile",
         registered: "Registered",
         expires: "TTL left",
+        lastPolled: "Last poll",
+        activityOnline: "Online",
+        activityRecent: "Recently active",
+        activityIdle: "Idle",
+        activityOffline: "Not polling",
+        activityNever: "Never polled",
         queuedMail: "Queued",
         outboundPeers: "Can send to",
         inboundPeers: "Can receive from",
@@ -1161,6 +1205,46 @@
       const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
       if (h > 0) return `${h}h ${m}m`;
       return `${m}m`;
+    }
+
+    function formatDurationAgo(seconds) {
+      if (seconds == null || seconds < 0) return t("activityNever");
+      if (seconds < 60) {
+        if (lang === "en") return "just now";
+        if (lang === "zh-hant") return "剛剛";
+        return "刚刚";
+      }
+      const m = Math.floor(seconds / 60);
+      if (m < 60) {
+        if (lang === "en") return `${m}m ago`;
+        if (lang === "zh-hant") return `${m} 分鐘前`;
+        return `${m} 分钟前`;
+      }
+      const h = Math.floor(m / 60);
+      if (h < 24) {
+        if (lang === "en") return `${h}h ago`;
+        if (lang === "zh-hant") return `${h} 小時前`;
+        return `${h} 小时前`;
+      }
+      const d = Math.floor(h / 24);
+      if (lang === "en") return `${d}d ago`;
+      if (lang === "zh-hant") return `${d} 天前`;
+      return `${d} 天前`;
+    }
+
+    function activityLabel(level) {
+      switch (level) {
+        case "online": return t("activityOnline");
+        case "recent": return t("activityRecent");
+        case "idle": return t("activityIdle");
+        default: return t("activityOffline");
+      }
+    }
+
+    function formatMailboxActivity(mb) {
+      if (!mb?.last_polled_at) return t("activityNever");
+      const ago = formatDurationAgo(mb.seconds_since_poll);
+      return `${activityLabel(mb.activity_level)} · ${ago}`;
     }
 
     function esc(s) {
@@ -1557,6 +1641,8 @@
         ["mb", t("statMailboxes"), g.active_mailboxes, ""],
         ["dm", t("statDomains"), g.domain_count, ""],
         ["unread", t("statUnread"), g.total_queued_messages ?? 0, "highlight"],
+        ["poll", t("statPollingOnline"), g.polling_online_mailboxes ?? 0, "highlight"],
+        ["pollr", t("statPollingRecent"), g.polling_recent_mailboxes ?? 0, ""],
         ["lk", t("statPairs"), countAllowedEdges(data.links), ""],
       ];
       const statsEl = $("stats");
@@ -1611,11 +1697,17 @@
           const unread = qn > 0 ? " has-unread" : "";
           const display = mb?.profile?.display_name || t("noDisplayName");
           const initials = shortUser(email).slice(0, 2).toUpperCase();
+          const actLevel = mb?.activity_level || "offline";
+          const actText = mb ? formatMailboxActivity(mb) : t("activityNever");
           html += `<div class="mailbox-item${sel}${unread}" data-email="${esc(email)}">
-            <div class="mailbox-avatar">${esc(initials)}</div>
+            <div class="mailbox-avatar-wrap">
+              <div class="mailbox-avatar">${esc(initials)}</div>
+              <span class="activity-dot ${esc(actLevel)}" title="${esc(actText)}"></span>
+            </div>
             <div class="mailbox-meta">
               <div class="mailbox-name">${highlight(shortUser(email), matcher)}</div>
               <div class="mailbox-sub">${esc(display)}</div>
+              <div class="mailbox-activity ${esc(actLevel)}">${esc(actText)}</div>
             </div>
             ${qn > 0 ? `<span class="unread-badge">${qn}</span>` : ""}
           </div>`;
@@ -1762,6 +1854,7 @@
         <div class="detail-chips">
           <span class="mini-chip">${esc(mb.domain)}</span>
           <span class="mini-chip ${mb.queued_messages ? "ok" : ""}">${mb.queued_messages} ${t("queuedMail")}</span>
+          <span class="mini-chip activity-${esc(mb.activity_level || "offline")}">${esc(formatMailboxActivity(mb))}</span>
           <span class="mini-chip">${formatTTL(mb.ttl_remaining_seconds)}</span>
           <span class="mini-chip">${outbound.length} ${t("outCount")}</span>
           <span class="mini-chip">${inbound.length} ${t("inCount")}</span>
@@ -1773,12 +1866,13 @@
       return `
         <div class="stat-grid">
           <div class="stat-cell"><div class="k">${t("queuedMail")}</div><div class="v">${mb.queued_messages}</div></div>
+          <div class="stat-cell"><div class="k">${t("lastPolled")}</div><div class="v">${esc(formatMailboxActivity(mb))}</div></div>
           <div class="stat-cell"><div class="k">${t("expires")}</div><div class="v">${formatTTL(mb.ttl_remaining_seconds)}</div></div>
           <div class="stat-cell"><div class="k">${t("outCount")}</div><div class="v">${outbound.length}</div></div>
           <div class="stat-cell"><div class="k">${t("inCount")}</div><div class="v">${inbound.length}</div></div>
         </div>
         <div class="section-title">${t("registered")}</div>
-        <p class="muted">${fmtTime(mb.registered_at)}</p>`;
+        <p class="muted">${fmtTime(mb.registered_at)}${mb.last_polled_at ? ` · ${t("lastPolled")}: ${fmtTime(mb.last_polled_at)}` : ""}</p>`;
     }
 
     function renderTabConnections(mb) {

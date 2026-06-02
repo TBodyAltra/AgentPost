@@ -99,6 +99,7 @@ type User struct {
 	PublicKey    ed25519.PublicKey
 	ExpiresAt    time.Time
 	RegisteredAt time.Time
+	LastPolledAt time.Time
 	Profile      AgentProfile
 	InboxPolicy  InboxPolicy
 }
@@ -683,6 +684,9 @@ func (a *App) handleMessages(w http.ResponseWriter, r *http.Request) {
 	a.messages[mailbox] = nil
 	if len(messages) > 0 {
 		a.markMessagesReceived(mailbox, messages)
+	}
+	if u := a.users[mailbox]; u != nil {
+		u.LastPolledAt = a.now().UTC()
 	}
 	a.mu.Unlock()
 

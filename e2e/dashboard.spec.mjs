@@ -143,6 +143,16 @@ test.describe("AgentPost dashboard", () => {
     await expect(page.locator("#detail-content")).not.toContainText("Inbox Policy");
   });
 
+  test("mailbox list shows polling activity after agent polls inbox", async ({ page }) => {
+    await page.goto("/dashboard/");
+    await waitForDashboardReady(page, MAILBOX_COUNT);
+    const beta = page.locator('.mailbox-item[data-email="beta@agent.test"]');
+    await expect(beta).toBeVisible();
+    await expect(beta.locator(".activity-dot.online")).toBeVisible();
+    await expect(beta.locator(".mailbox-activity")).toContainText(/在线|在線|Online/i);
+    await expect(page.locator("#stat-poll")).toHaveText("1");
+  });
+
   test("language and refresh controls respond", async ({ page }) => {
     await page.goto("/dashboard/");
     await waitForDashboardReady(page, MAILBOX_COUNT);
